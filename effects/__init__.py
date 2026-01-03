@@ -1,1 +1,0 @@
-# Effects module
