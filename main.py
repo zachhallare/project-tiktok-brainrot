@@ -11,6 +11,7 @@ import pygame
 import os
 import sys
 import time
+import pymunk
 
 # Import our modules
 import config
@@ -249,6 +250,8 @@ def run_simulation(preview_mode=False):
 def main():
     """Main entry point."""
     # Check for preview mode flag
+    print(pymunk.version)
+
     preview_mode = '--preview' in sys.argv or '-p' in sys.argv
     
     if preview_mode:

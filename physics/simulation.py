@@ -33,8 +33,7 @@ class Simulation:
         self.slowmo_timer = 0
         
         # Set up collision handler
-        handler = self.space.add_collision_handler(1, 1)  # Ball vs Ball
-        handler.post_solve = self._handle_collision
+        self.space.on_collision(1, 1, post_solve=self._handle_collision)
         
         # Create walls
         self._create_walls()
