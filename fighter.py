@@ -9,7 +9,7 @@ import random
 from config import (
     SCREEN_WIDTH, SCREEN_HEIGHT, WHITE, GREEN,
     FIGHTER_RADIUS, SWORD_LENGTH, SWORD_WIDTH, BASE_HEALTH,
-    DRAG, MAX_VELOCITY, BOUNCE_ENERGY, ARENA_MARGIN
+    DRAG, MAX_VELOCITY, MIN_VELOCITY, BOUNCE_ENERGY, ARENA_MARGIN
 )
 from skills import SkillType
 
@@ -169,6 +169,17 @@ class Fighter:
         if self.y + self.radius > ay + ah:
             self.y = ay + ah - self.radius
             self.vy = -abs(self.vy) * BOUNCE_ENERGY
+        
+        # Maintain minimum velocity (constant motion like DVD logo)
+        speed = math.hypot(self.vx, self.vy)
+        if speed < MIN_VELOCITY and speed > 0:
+            self.vx = (self.vx / speed) * MIN_VELOCITY
+            self.vy = (self.vy / speed) * MIN_VELOCITY
+        elif speed == 0:
+            # Give random direction if stopped
+            angle = random.uniform(0, 2 * math.pi)
+            self.vx = math.cos(angle) * MIN_VELOCITY
+            self.vy = math.sin(angle) * MIN_VELOCITY
         
         # Sword angle - point toward opponent when close
         dx = opponent.x - self.x

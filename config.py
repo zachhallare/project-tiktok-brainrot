@@ -4,8 +4,8 @@ Simplified for performance - square 1:1 arena.
 """
 
 # Screen dimensions (1:1 square for simplified visuals)
-SCREEN_WIDTH = 800
-SCREEN_HEIGHT = 800
+SCREEN_WIDTH = 600
+SCREEN_HEIGHT = 600
 
 # Arena (square, smaller)
 ARENA_MARGIN = 50
@@ -28,24 +28,29 @@ CYAN = (100, 255, 255)
 ORANGE = (255, 180, 80)
 
 # Physics constants
-DRAG = 0.995  # Very little drag - movement via bouncing
-MAX_VELOCITY = 15
+DRAG = 1.0  # No drag - constant velocity like DVD logo
+MAX_VELOCITY = 16  # Faster gameplay
+MIN_VELOCITY = 6  # Higher minimum speed
 BASE_KNOCKBACK = 10
-BOUNCE_ENERGY = 0.9  # Energy retained on wall bounce
+BOUNCE_ENERGY = 1.0  # Full energy retained on wall bounce
 
 # Game constants
 FPS = 60
 FIGHTER_RADIUS = 25  # Smaller fighters
 SWORD_LENGTH = 50
 SWORD_WIDTH = 4
-BASE_HEALTH = 100
-ARENA_SHRINK_INTERVAL = 8
-ARENA_SHRINK_AMOUNT = 15
-POWERUP_SPAWN_MIN = 2.5
-POWERUP_SPAWN_MAX = 4.5
-MAX_POWERUPS = 2
+BASE_HEALTH = 200  # Increased for ~30 second fights
+DAMAGE_PER_HIT = 8  # Reduced damage for longer fights
+ARENA_SHRINK_INTERVAL = 10
+ARENA_SHRINK_AMOUNT = 12
+POWERUP_SPAWN_MIN = 2.0
+POWERUP_SPAWN_MAX = 4.0
+MAX_POWERUPS = 3
 ROUND_MIN_TIME = 6
-ROUND_MAX_TIME = 15
+ROUND_MAX_TIME = 45  # Longer max time
+
+# Slow motion for death sequence
+SLOW_MOTION_SPEED = 0.25  # 25% of normal speed
 
 # Hit effects
 HIT_STOP_FRAMES = 3

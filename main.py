@@ -13,7 +13,7 @@ from config import (
     ARENA_MARGIN, ARENA_WIDTH, ARENA_HEIGHT,
     ARENA_SHRINK_INTERVAL, ARENA_SHRINK_AMOUNT,
     POWERUP_SPAWN_MIN, POWERUP_SPAWN_MAX, MAX_POWERUPS,
-    ROUND_MAX_TIME, BASE_KNOCKBACK,
+    ROUND_MAX_TIME, BASE_KNOCKBACK, DAMAGE_PER_HIT, SLOW_MOTION_SPEED,
     HIT_STOP_FRAMES, SCREEN_SHAKE_INTENSITY, SCREEN_SHAKE_DECAY
 )
 from effects import ParticleSystem, ShockwaveSystem
@@ -68,6 +68,15 @@ class Game:
         self.winner = None
         self.winner_text = ""
         self.reset_timer = 0
+        
+        # UI controls
+        self.paused = False
+        self.slow_motion = False
+        self.slow_motion_accumulator = 0.0
+        
+        # Countdown before fight
+        self.countdown_timer = 3 * FPS  # 3 seconds
+        self.countdown_active = True
         
         # Sounds
         self._setup_sounds()
@@ -151,7 +160,7 @@ class Game:
             elif self.blue.active_skill == SkillType.OVERDRIVE:
                 knockback *= 1.4
             
-            if self.red.take_damage(12, angle, knockback, self.particles):
+            if self.red.take_damage(DAMAGE_PER_HIT, angle, knockback, self.particles):
                 self._trigger_hit(hit_blue[0], hit_blue[1], self.blue.color)
                 self.blue.attack_cooldown = 18
         
@@ -166,7 +175,7 @@ class Game:
             elif self.red.active_skill == SkillType.OVERDRIVE:
                 knockback *= 1.4
             
-            if self.blue.take_damage(12, angle, knockback, self.particles):
+            if self.blue.take_damage(DAMAGE_PER_HIT, angle, knockback, self.particles):
                 self._trigger_hit(hit_red[0], hit_red[1], self.red.color)
                 self.red.attack_cooldown = 18
         
@@ -178,7 +187,7 @@ class Game:
                 dist = math.hypot(defender.x - attacker.x, defender.y - attacker.y)
                 if dist < 120:
                     angle = math.atan2(defender.y - attacker.y, defender.x - attacker.x)
-                    defender.take_damage(15, angle, 15, self.particles)
+                    defender.take_damage(DAMAGE_PER_HIT * 1.5, angle, 15, self.particles)
                     self._trigger_hit(defender.x, defender.y, attacker.color)
     
     def _trigger_hit(self, x, y, color):
@@ -201,6 +210,10 @@ class Game:
         self.shockwaves.add(loser.x, loser.y, loser.color, 100)
         winner.victory_bounce = 40
         
+        # Enable slow-motion for dramatic effect
+        self.slow_motion = True
+        self.slow_motion_accumulator = 0.0
+        
         if self.sounds_enabled:
             self.explosion_sound.play()
     
@@ -218,9 +231,38 @@ class Game:
         self.round_timer = 0
         self.particles.clear()
         self.shockwaves.clear()
+        
+        # Disable slow-motion
+        self.slow_motion = False
+        self.slow_motion_accumulator = 0.0
+        
+        # Restart countdown
+        self.countdown_timer = 3 * FPS
+        self.countdown_active = True
     
     def update(self):
         """Update game state."""
+        # Check if paused
+        if self.paused:
+            return
+        
+        # Handle countdown before fight
+        if self.countdown_active:
+            self.countdown_timer -= 1
+            if self.countdown_timer <= 0:
+                self.countdown_active = False
+            return
+        
+        # Handle slow-motion during death sequence
+        if self.slow_motion and not self.round_ending:
+            self.slow_motion = False
+        
+        if self.slow_motion:
+            self.slow_motion_accumulator += SLOW_MOTION_SPEED
+            if self.slow_motion_accumulator < 1.0:
+                return
+            self.slow_motion_accumulator -= 1.0
+        
         if self.hit_stop > 0:
             self.hit_stop -= 1
             return
@@ -343,6 +385,19 @@ class Game:
             
             self.screen.blit(text_surface, text_rect)
         
+        # Draw countdown text "Red vs Blue"
+        if self.countdown_active:
+            countdown_text = "Red vs Blue"
+            text_surface = self.font_large.render(countdown_text, True, WHITE)
+            text_rect = text_surface.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2))
+            
+            # Background box
+            bg_rect = text_rect.inflate(40, 20)
+            pygame.draw.rect(self.screen, BLACK, bg_rect)
+            pygame.draw.rect(self.screen, PURPLE, bg_rect, 3)
+            
+            self.screen.blit(text_surface, text_rect)
+        
         pygame.display.flip()
     
     def run(self):
@@ -355,6 +410,10 @@ class Game:
                 elif event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_ESCAPE:
                         running = False
+                    elif event.key == pygame.K_SPACE:
+                        self.paused = not self.paused
+                    elif event.key == pygame.K_r:
+                        self._reset_round()
             
             self.update()
             self.draw()
