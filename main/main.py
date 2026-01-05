@@ -1,8 +1,3 @@
-"""
-Simplified Anime Battle - Red vs Blue
-Square arena, bounce-only movement, minimal visuals, win text.
-"""
-
 import pygame
 import math
 import random

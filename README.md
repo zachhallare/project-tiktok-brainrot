@@ -2,18 +2,15 @@
 
 A simplified physics-based sword battle animation for **TikTok** and **YouTube Shorts**.
 
-![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)
-![Pygame](https://img.shields.io/badge/Pygame-2.5+-green.svg)
-
 ---
 
-## 🎬 Overview
+## Overview
 
 Two fighters bounce around a square arena, swinging swords and collecting power-ups. Simple visuals, satisfying physics, perfect for short-form video loops.
 
 ---
 
-## ✨ Features
+## Features
 
 - **Square 800x800 arena** - clean, minimal design
 - **Bounce-only movement** - fighters ricochet off walls
@@ -25,7 +22,7 @@ Two fighters bounce around a square arena, swinging swords and collecting power-
 
 ---
 
-## 🚀 How to Run
+## How to Run
 
 ```bash
 python main.py
@@ -35,7 +32,7 @@ Press **ESC** to exit.
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 ├── main.py      # Game loop
@@ -49,7 +46,7 @@ Press **ESC** to exit.
 
 ---
 
-## 🎥 Recording
+## Recording
 
 - **Resolution**: 800x800 (1:1 square)
 - **Frame Rate**: 60 FPS
@@ -57,6 +54,6 @@ Press **ESC** to exit.
 
 ---
 
-## 📄 License
+## License
 
 MIT License
