@@ -26,6 +26,8 @@ GREEN = (100, 255, 150)
 PURPLE = (200, 100, 255)
 CYAN = (100, 255, 255)
 ORANGE = (255, 180, 80)
+GOLD = (255, 215, 0)
+PINK = (255, 100, 200)
 
 # Physics constants
 DRAG = 1.0  # No drag - constant velocity like DVD logo

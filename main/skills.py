@@ -1,36 +1,43 @@
 """
-Simplified skill system - solid colored orbs, no animations.
+Skill system with 7 skill-based power-ups.
+Each skill focuses on animation timing, hit-stop, and visual feedback.
 """
 
 import pygame
 import math
 import random
 
-from config import WHITE, CYAN, ORANGE, PURPLE, GREEN
+from config import WHITE, CYAN, ORANGE, PURPLE, GREEN, YELLOW, GOLD, PINK
 
 
 class SkillType:
     """Skill move types."""
-    DASH_SLASH = 0
-    SPIN_CUTTER = 1
-    GROUND_SLAM = 2
-    SHIELD = 3
-    OVERDRIVE = 4
+    DASH_SLASH = 0      # Short high-speed burst with trail
+    SPIN_CUTTER = 1     # 360° spin with pull/knockback
+    GROUND_SLAM = 2     # Jump + plunge with shockwave
+    SHIELD = 3          # Parry stance with barrier
+    PHANTOM_CROSS = 4   # Blink behind + X-slash
+    BLADE_CYCLONE = 5   # Spinning vortex multi-hit
+    FINAL_FLASH_DRAW = 6  # Iaido-style instant slash
     
     NAMES = {
         0: "Dash Slash",
         1: "Spin Cutter",
         2: "Ground Slam",
         3: "Shield",
-        4: "Overdrive"
+        4: "Phantom Cross",
+        5: "Blade Cyclone",
+        6: "Final Flash Draw"
     }
     
     COLORS = {
-        0: CYAN,
-        1: ORANGE,
-        2: PURPLE,
-        3: GREEN,
-        4: (255, 100, 200)  # Pink
+        0: CYAN,        # Dash Slash - cyan
+        1: ORANGE,      # Spin Cutter - orange
+        2: PURPLE,      # Ground Slam - purple
+        3: GREEN,       # Shield - green
+        4: PINK,        # Phantom Cross - pink
+        5: YELLOW,      # Blade Cyclone - yellow
+        6: GOLD         # Final Flash Draw - gold
     }
 
 
