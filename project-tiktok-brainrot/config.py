@@ -31,7 +31,7 @@ PINK = (255, 100, 200)
 
 # Physics constants
 DRAG = 1.0  # No drag - constant velocity like DVD logo
-MAX_VELOCITY = 16  # Faster gameplay
+MAX_VELOCITY = 25  # Faster gameplay
 MIN_VELOCITY = 6  # Higher minimum speed
 BASE_KNOCKBACK = 10
 BOUNCE_ENERGY = 1.0  # Full energy retained on wall bounce
@@ -39,7 +39,7 @@ BOUNCE_ENERGY = 1.0  # Full energy retained on wall bounce
 # Game constants
 FPS = 60
 FIGHTER_RADIUS = 25  # Smaller fighters
-SWORD_LENGTH = 50
+SWORD_LENGTH = 45
 SWORD_WIDTH = 4
 BASE_HEALTH = 200  # Increased for ~30 second fights
 DAMAGE_PER_HIT = 8  # Reduced damage for longer fights
@@ -52,7 +52,7 @@ ROUND_MIN_TIME = 6
 ROUND_MAX_TIME = 45  # Longer max time
 
 # Slow motion for death sequence
-SLOW_MOTION_SPEED = 0.25  # 25% of normal speed
+SLOW_MOTION_SPEED = 0.20  # 25% of normal speed
 
 # Hit effects
 HIT_STOP_FRAMES = 3
