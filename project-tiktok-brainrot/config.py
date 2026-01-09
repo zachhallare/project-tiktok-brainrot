@@ -58,3 +58,27 @@ SLOW_MOTION_SPEED = 0.20  # 25% of normal speed
 HIT_STOP_FRAMES = 3
 SCREEN_SHAKE_INTENSITY = 8
 SCREEN_SHAKE_DECAY = 0.85
+
+# Arena Escalation (Inactivity Handling)
+INACTIVITY_PULSE_TIME = 5  # Seconds before Arena Pulse triggers
+INACTIVITY_SHRINK_TIME = 3  # Additional seconds before shrinking starts
+ARENA_PULSE_VELOCITY_BOOST = 4  # Velocity nudge toward center
+ARENA_PULSE_SHAKE = 6  # Screen shake intensity for pulse
+ESCALATION_SHRINK_SPEED = 0.3  # Pixels per frame during inactivity shrink
+
+# Game Settings (configurable via Tkinter UI)
+GAME_SETTINGS = {
+    'num_rounds': 3,
+    'best_of': 3,
+    'blue_color': BLUE,
+    'blue_bright': BLUE_BRIGHT,
+    'red_color': RED,
+    'red_bright': RED_BRIGHT,
+    'arena_size': 500,  # Base arena dimension
+    'slow_motion_death': True,
+}
+
+def update_settings(new_settings):
+    """Update game settings from Tkinter UI."""
+    global GAME_SETTINGS
+    GAME_SETTINGS.update(new_settings)

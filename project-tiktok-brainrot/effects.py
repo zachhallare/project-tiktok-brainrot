@@ -7,7 +7,7 @@ import pygame
 import math
 import random
 
-from config import WHITE, YELLOW
+from config import WHITE, YELLOW, PURPLE, CYAN
 
 
 class Particle:
@@ -206,3 +206,70 @@ class ShockwaveSystem:
     
     def clear(self):
         self.shockwaves.clear()
+
+
+class ArenaPulse:
+    """Visual pulse wave from arena borders toward center."""
+    
+    def __init__(self, arena_bounds, color=PURPLE):
+        self.ax, self.ay, self.aw, self.ah = arena_bounds
+        self.color = color
+        self.progress = 0.0  # 0 = at borders, 1 = at center
+        self.lifetime = 30  # frames
+        self.max_lifetime = 30
+    
+    def update(self):
+        self.lifetime -= 1
+        self.progress = 1 - (self.lifetime / self.max_lifetime)
+        return self.lifetime > 0
+    
+    def draw(self, surface, offset=(0, 0)):
+        if self.lifetime <= 0:
+            return
+        
+        ox, oy = offset
+        alpha = self.lifetime / self.max_lifetime
+        
+        # Calculate shrinking rectangle representing the pulse wave
+        shrink = self.progress * min(self.aw, self.ah) / 2 * 0.8
+        pulse_rect = pygame.Rect(
+            int(self.ax + shrink + ox),
+            int(self.ay + shrink + oy),
+            int(self.aw - shrink * 2),
+            int(self.ah - shrink * 2)
+        )
+        
+        # Draw pulsing ring
+        thickness = max(3, int(8 * alpha))
+        # Blend color with alpha
+        r, g, b = self.color
+        fade_color = (int(r * alpha), int(g * alpha), int(b * alpha))
+        pygame.draw.rect(surface, fade_color, pulse_rect, thickness)
+        
+        # Inner glow line
+        if thickness > 2:
+            inner_rect = pulse_rect.inflate(-4, -4)
+            glow_color = (min(255, int(r * alpha * 1.5)), 
+                         min(255, int(g * alpha * 1.5)), 
+                         min(255, int(b * alpha * 1.5)))
+            pygame.draw.rect(surface, glow_color, inner_rect, 2)
+
+
+class ArenaPulseSystem:
+    """Manages arena pulse visual effects."""
+    
+    def __init__(self):
+        self.pulses = []
+    
+    def add(self, arena_bounds, color=PURPLE):
+        self.pulses.append(ArenaPulse(arena_bounds, color))
+    
+    def update(self):
+        self.pulses = [p for p in self.pulses if p.update()]
+    
+    def draw(self, surface, offset=(0, 0)):
+        for p in self.pulses:
+            p.draw(surface, offset)
+    
+    def clear(self):
+        self.pulses.clear()

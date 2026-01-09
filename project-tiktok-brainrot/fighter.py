@@ -61,6 +61,15 @@ class Fighter:
         
         # Final Flash Draw screen black
         self.trigger_screen_black = False
+        
+        # Locked state (during countdown)
+        self.locked = False
+        
+        # Spin Parry state
+        self.spin_parry_active = False
+        self.spin_parry_timer = 0
+        self.spin_parry_window = 30  # ~0.5 seconds parry window
+        self.spin_parry_recovery = 0  # Vulnerability after failed parry
     
     def activate_skill(self, skill_type, opponent, particles, shockwaves):
         """Activate a skill move."""
@@ -80,11 +89,17 @@ class Fighter:
             # Store initial position for trail
             self.trail_positions = [(self.x, self.y)]
         
-        elif skill_type == SkillType.SPIN_CUTTER:
-            self.skill_data['duration'] = 50
-            self.skill_data['spin_speed'] = 0.7
-            self.skill_data['pull_phase'] = True  # Pull enemies first
-            self.skill_data['ring_timer'] = 0
+        elif skill_type == SkillType.SPIN_PARRY:
+            # High-risk parry skill - enter spinning stance
+            self.spin_parry_active = True
+            self.spin_parry_timer = 0
+            self.skill_data['duration'] = 40  # Total animation time
+            self.skill_data['parry_window'] = 30  # Active parry frames
+            self.skill_data['spin_speed'] = 0.6
+            self.skill_data['parried'] = False
+            # Slow down during parry stance
+            self.vx *= 0.3
+            self.vy *= 0.3
         
         elif skill_type == SkillType.GROUND_SLAM:
             self.skill_data['phase'] = 'rise'
@@ -161,33 +176,29 @@ class Fighter:
                 self.active_skill = None
                 self.trail_positions = []
         
-        elif self.active_skill == SkillType.SPIN_CUTTER:
+        elif self.active_skill == SkillType.SPIN_PARRY:
+            # Spinning parry stance
             if self.skill_timer < self.skill_data['duration']:
                 self.sword_angle += self.skill_data['spin_speed']
+                self.spin_parry_timer += 1
                 
-                # Emit expanding slash rings every 10 frames
-                self.skill_data['ring_timer'] += 1
-                if self.skill_data['ring_timer'] >= 10:
-                    self.skill_data['ring_timer'] = 0
-                    ring_radius = 30 + (self.skill_timer / self.skill_data['duration']) * 50
-                    particles.emit_ring(self.x, self.y, self.color, ring_radius, count=8)
-                
-                # Pull phase (first half) then knockback phase
-                dist_to_opponent = math.hypot(opponent.x - self.x, opponent.y - self.y)
-                if dist_to_opponent < 150:
-                    angle_to_self = math.atan2(self.y - opponent.y, self.x - opponent.x)
-                    if self.skill_timer < self.skill_data['duration'] // 2:
-                        # Pull inward
-                        pull_force = 2
-                        opponent.vx -= math.cos(angle_to_self) * pull_force
-                        opponent.vy -= math.sin(angle_to_self) * pull_force
-                    elif self.skill_timer == self.skill_data['duration'] // 2:
-                        # Launch outward
-                        knockback_force = 15
-                        opponent.vx += math.cos(angle_to_self) * knockback_force
-                        opponent.vy += math.sin(angle_to_self) * knockback_force
+                # Active parry window
+                if self.spin_parry_timer <= self.skill_data['parry_window']:
+                    self.spin_parry_active = True
+                    # Emit subtle parry indicator particles
+                    if self.skill_timer % 6 == 0:
+                        particles.emit_ring(self.x, self.y, YELLOW, 35, count=6)
+                else:
+                    # Parry window expired - entering recovery
+                    self.spin_parry_active = False
+                    if not self.skill_data.get('parried'):
+                        # Failed parry - enter vulnerability
+                        self.spin_parry_recovery = 20  # Recovery frames
             else:
+                # Skill complete
                 self.active_skill = None
+                self.spin_parry_active = False
+                self.spin_parry_timer = 0
         
         elif self.active_skill == SkillType.GROUND_SLAM:
             if self.skill_data['phase'] == 'rise':
@@ -281,6 +292,10 @@ class Fighter:
     
     def update(self, opponent, arena_bounds, particles, shockwaves):
         """Update fighter - bounce-only movement."""
+        # Skip update if locked (during countdown)
+        if self.locked:
+            return
+        
         self.update_skill(opponent, particles, shockwaves)
         self.update_pending_damage(particles)
         
@@ -293,6 +308,8 @@ class Fighter:
             self.invincible -= 1
         if self.shield_parry_window > 0:
             self.shield_parry_window -= 1
+        if self.spin_parry_recovery > 0:
+            self.spin_parry_recovery -= 1
         
         # Apply minimal drag
         self.vx *= DRAG
@@ -343,7 +360,7 @@ class Fighter:
         dy = opponent.y - self.y
         dist = math.hypot(dx, dy)
         
-        if self.active_skill not in [SkillType.SPIN_CUTTER, SkillType.BLADE_CYCLONE, 
+        if self.active_skill not in [SkillType.SPIN_PARRY, SkillType.BLADE_CYCLONE, 
                                       SkillType.FINAL_FLASH_DRAW]:
             if dist < 200:
                 # Point at opponent
@@ -416,6 +433,15 @@ class Fighter:
             pygame.draw.circle(surface, YELLOW,
                               (int(self.x + ox), int(self.y + oy)),
                               int(vortex_radius), 2)
+        
+        # Spin Parry indicator
+        if self.spin_parry_active:
+            parry_radius = 45 + math.sin(self.skill_timer * 0.4) * 5
+            # Orange spinning ring
+            from config import ORANGE
+            pygame.draw.circle(surface, ORANGE,
+                              (int(self.x + ox), int(self.y + oy)),
+                              int(parry_radius), 3)
     
     def _draw_sword(self, surface, offset):
         """Draw simple line sword."""
@@ -491,8 +517,8 @@ class Fighter:
         """Reset fighter state."""
         self.x = self.start_x
         self.y = self.start_y
-        self.vx = random.uniform(-6, 6)
-        self.vy = random.uniform(-6, 6)
+        self.vx = 0  # Will be set by main.py after countdown
+        self.vy = 0
         self.radius = FIGHTER_RADIUS
         self.health = BASE_HEALTH
         self.sword_length = self.base_sword_length
@@ -508,3 +534,42 @@ class Fighter:
         self.attack_cooldown = 0
         self.pending_damage = []
         self.trigger_screen_black = False
+        self.locked = False
+        self.spin_parry_active = False
+        self.spin_parry_timer = 0
+        self.spin_parry_recovery = 0
+    
+    def check_spin_parry(self, attacker, particles):
+        """Check if this fighter's Spin Parry successfully blocks an attack.
+        Returns True if parry succeeded."""
+        if not self.spin_parry_active:
+            return False
+        
+        # Check if attacker's sword is within parry radius
+        (_, _), (tip_x, tip_y) = attacker.get_sword_hitbox()
+        dist = math.hypot(tip_x - self.x, tip_y - self.y)
+        parry_radius = 55  # Slightly larger than visual indicator
+        
+        if dist < parry_radius:
+            # Parry successful!
+            self.skill_data['parried'] = True
+            self.spin_parry_active = False
+            
+            # Visual effects
+            particles.emit_sparks(self.x, self.y)
+            particles.emit_ring(self.x, self.y, YELLOW, 40, count=12)
+            self.flash_timer = 8
+            
+            # Pull attacker inward briefly, then launch
+            angle_to_attacker = math.atan2(attacker.y - self.y, attacker.x - self.x)
+            # Slight pull
+            attacker.vx = -math.cos(angle_to_attacker) * 3
+            attacker.vy = -math.sin(angle_to_attacker) * 3
+            # Then knockback (will be applied next frame)
+            attacker.vx += math.cos(angle_to_attacker) * 18
+            attacker.vy += math.sin(angle_to_attacker) * 18
+            
+            return True
+        
+        return False
+

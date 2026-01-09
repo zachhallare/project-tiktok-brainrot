@@ -1,6 +1,7 @@
 """
 Skill system with 7 skill-based power-ups.
 Each skill focuses on animation timing, hit-stop, and visual feedback.
+Spin Parry is a high-risk, high-reward reactive parry skill.
 """
 
 import pygame
@@ -13,7 +14,7 @@ from config import WHITE, CYAN, ORANGE, PURPLE, GREEN, YELLOW, GOLD, PINK
 class SkillType:
     """Skill move types."""
     DASH_SLASH = 0      # Short high-speed burst with trail
-    SPIN_CUTTER = 1     # 360° spin with pull/knockback
+    SPIN_PARRY = 1      # Reactive parry with spin stance
     GROUND_SLAM = 2     # Jump + plunge with shockwave
     SHIELD = 3          # Parry stance with barrier
     PHANTOM_CROSS = 4   # Blink behind + X-slash
@@ -22,7 +23,7 @@ class SkillType:
     
     NAMES = {
         0: "Dash Slash",
-        1: "Spin Cutter",
+        1: "Spin Parry",
         2: "Ground Slam",
         3: "Shield",
         4: "Phantom Cross",
@@ -32,7 +33,7 @@ class SkillType:
     
     COLORS = {
         0: CYAN,        # Dash Slash - cyan
-        1: ORANGE,      # Spin Cutter - orange
+        1: ORANGE,      # Spin Parry - orange
         2: PURPLE,      # Ground Slam - purple
         3: GREEN,       # Shield - green
         4: PINK,        # Phantom Cross - pink

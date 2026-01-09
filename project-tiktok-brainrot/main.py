@@ -6,14 +6,16 @@ import random
 from config import (
     SCREEN_WIDTH, SCREEN_HEIGHT, FPS,
     BLUE, BLUE_BRIGHT, RED, RED_BRIGHT, WHITE, PURPLE, BLACK, DARK_GRAY, GRAY,
-    YELLOW, GOLD,
+    YELLOW, GOLD, ORANGE,
     ARENA_MARGIN, ARENA_WIDTH, ARENA_HEIGHT,
     ARENA_SHRINK_INTERVAL, ARENA_SHRINK_AMOUNT,
     POWERUP_SPAWN_MIN, POWERUP_SPAWN_MAX, MAX_POWERUPS,
     ROUND_MAX_TIME, BASE_KNOCKBACK, DAMAGE_PER_HIT, SLOW_MOTION_SPEED,
-    HIT_STOP_FRAMES, SCREEN_SHAKE_INTENSITY, SCREEN_SHAKE_DECAY
+    HIT_STOP_FRAMES, SCREEN_SHAKE_INTENSITY, SCREEN_SHAKE_DECAY,
+    INACTIVITY_PULSE_TIME, INACTIVITY_SHRINK_TIME, ARENA_PULSE_VELOCITY_BOOST,
+    ARENA_PULSE_SHAKE, ESCALATION_SHRINK_SPEED, GAME_SETTINGS
 )
-from effects import ParticleSystem, ShockwaveSystem
+from effects import ParticleSystem, ShockwaveSystem, ArenaPulseSystem
 from skills import SkillType, SkillOrb
 from fighter import Fighter
 
@@ -49,9 +51,13 @@ class Game:
         self.red = Fighter(SCREEN_WIDTH - ARENA_MARGIN - spawn_margin, center_y, 
                             RED, RED_BRIGHT, is_blue=False)
         
+        # Lock fighters for countdown (facing each other)
+        self._lock_fighters_for_countdown()
+        
         # Visual effect systems.
         self.particles = ParticleSystem()
         self.shockwaves = ShockwaveSystem()
+        self.arena_pulses = ArenaPulseSystem()
         
         # Fighter power-up (skill orb) management.
         self.skill_orbs = []
@@ -82,8 +88,66 @@ class Game:
         self.countdown_duration = 45  # Frames per number (~0.75 seconds)
         self.fight_duration = 30  # FIGHT shows a bit shorter
         
+        # Arena Escalation System (Inactivity Handling)
+        self.inactivity_timer = 0  # Frames since last interaction
+        self.escalation_state = 'normal'  # 'normal', 'pulse_triggered', 'shrinking'
+        self.escalation_shrink_paused = False  # Paused when interaction occurs
+        
         # Load/generated sounds.
         self._setup_sounds()
+    
+    def _lock_fighters_for_countdown(self):
+        """Lock fighters in place and face each other for countdown."""
+        self.blue.locked = True
+        self.red.locked = True
+        self.blue.vx = 0
+        self.blue.vy = 0
+        self.red.vx = 0
+        self.red.vy = 0
+        # Point swords at each other
+        self.blue.sword_angle = 0  # Points right (toward red)
+        self.red.sword_angle = math.pi  # Points left (toward blue)
+    
+    def _unlock_fighters(self):
+        """Unlock fighters and give them initial velocity after countdown."""
+        self.blue.locked = False
+        self.red.locked = False
+        # Give random starting velocities
+        self.blue.vx = random.uniform(-6, 6)
+        self.blue.vy = random.uniform(-6, 6)
+        self.red.vx = random.uniform(-6, 6)
+        self.red.vy = random.uniform(-6, 6)
+    
+    def _reset_inactivity(self):
+        """Reset inactivity timer (called on combat interactions)."""
+        self.inactivity_timer = 0
+        if self.escalation_state == 'shrinking':
+            self.escalation_shrink_paused = True
+            # Don't reset state - just pause shrinking
+    
+    def _trigger_arena_pulse(self):
+        """Trigger Tier 1 Arena Pulse - visual wave and fighter nudge."""
+        # Visual effect
+        self.arena_pulses.add(tuple(self.arena_bounds), PURPLE)
+        self.screen_shake = ARENA_PULSE_SHAKE
+        
+        # Nudge both fighters toward center
+        center_x = SCREEN_WIDTH // 2
+        center_y = SCREEN_HEIGHT // 2
+        
+        for fighter in [self.blue, self.red]:
+            dx = center_x - fighter.x
+            dy = center_y - fighter.y
+            dist = max(1, math.hypot(dx, dy))
+            # Normalize and apply velocity boost toward center
+            fighter.vx += (dx / dist) * ARENA_PULSE_VELOCITY_BOOST
+            fighter.vy += (dy / dist) * ARENA_PULSE_VELOCITY_BOOST
+            # Also increase overall speed slightly
+            speed = math.hypot(fighter.vx, fighter.vy)
+            if speed > 0:
+                boost = 1.2
+                fighter.vx *= boost
+                fighter.vy *= boost
     
 
     # Generate simple procedural hit and explosion sounds.
@@ -163,12 +227,24 @@ class Game:
 
     # Detect and resolve sword attacks and skill-specific damage.
     def _handle_combat(self):
+        # Check for Spin Parry first for both fighters
+        for defender, attacker in [(self.blue, self.red), (self.red, self.blue)]:
+            if defender.check_spin_parry(attacker, self.particles):
+                # Parry successful - trigger effects and reset inactivity
+                self._trigger_hit(defender.x, defender.y, ORANGE, 6)  # Strong hit-stop
+                self._reset_inactivity()
+                attacker.attack_cooldown = 30  # Punish attacker
+                return  # Skip other combat this frame after parry
+        
         # Blue attacking Red.
         hit_blue = self._check_sword_hit(self.blue, self.red)
         if hit_blue and self.blue.attack_cooldown <= 0:
+            # Check if Red's Spin Parry is in recovery (extra vulnerable)
+            extra_damage = 1.3 if self.red.spin_parry_recovery > 0 else 1.0
+            
             angle = math.atan2(self.red.y - self.blue.y, self.red.x - self.blue.x)
             knockback = BASE_KNOCKBACK
-            damage = DAMAGE_PER_HIT
+            damage = DAMAGE_PER_HIT * extra_damage
             hit_stop_frames = HIT_STOP_FRAMES
             
             # Skill-specific effects
@@ -177,7 +253,7 @@ class Game:
                 hit_stop_frames = 4  # Extra hit-stop
                 # Flash both fighters
                 self.blue.flash_timer = 4
-            elif self.blue.active_skill == SkillType.SPIN_CUTTER:
+            elif self.blue.active_skill == SkillType.SPIN_PARRY:
                 knockback *= 1.3
             elif self.blue.active_skill == SkillType.BLADE_CYCLONE:
                 knockback *= 0.5  # Less knockback, more hits
@@ -191,20 +267,24 @@ class Game:
             if self.red.take_damage(damage, angle, knockback, self.particles):
                 self._trigger_hit(hit_blue[0], hit_blue[1], self.blue.color, hit_stop_frames)
                 self.blue.attack_cooldown = 18      # Prevent spam.
+                self._reset_inactivity()  # Reset inactivity on hit
         
         # Red attacking Blue.
         hit_red = self._check_sword_hit(self.red, self.blue)
         if hit_red and self.red.attack_cooldown <= 0:
+            # Check if Blue's Spin Parry is in recovery (extra vulnerable)
+            extra_damage = 1.3 if self.blue.spin_parry_recovery > 0 else 1.0
+            
             angle = math.atan2(self.blue.y - self.red.y, self.blue.x - self.red.x)
             knockback = BASE_KNOCKBACK
-            damage = DAMAGE_PER_HIT
+            damage = DAMAGE_PER_HIT * extra_damage
             hit_stop_frames = HIT_STOP_FRAMES
             
             if self.red.active_skill == SkillType.DASH_SLASH:
                 knockback *= 1.8
                 hit_stop_frames = 4
                 self.red.flash_timer = 4
-            elif self.red.active_skill == SkillType.SPIN_CUTTER:
+            elif self.red.active_skill == SkillType.SPIN_PARRY:
                 knockback *= 1.3
             elif self.red.active_skill == SkillType.BLADE_CYCLONE:
                 knockback *= 0.5
@@ -218,6 +298,7 @@ class Game:
             if self.blue.take_damage(damage, angle, knockback, self.particles):
                 self._trigger_hit(hit_red[0], hit_red[1], self.red.color, hit_stop_frames)
                 self.red.attack_cooldown = 18
+                self._reset_inactivity()  # Reset inactivity on hit
         
         # Ground slam area damage when skill impacts.
         for attacker, defender in [(self.blue, self.red), (self.red, self.blue)]:
@@ -227,8 +308,9 @@ class Game:
                 dist = math.hypot(defender.x - attacker.x, defender.y - attacker.y)
                 if dist < 130:      # Slam radius.
                     angle = math.atan2(defender.y - attacker.y, defender.x - attacker.x)
-                    defender.take_damage(DAMAGE_PER_HIT * 1.5, angle, 18, self.particles)
-                    self._trigger_hit(defender.x, defender.y, attacker.color, 5)
+                    if defender.take_damage(DAMAGE_PER_HIT * 1.5, angle, 18, self.particles):
+                        self._trigger_hit(defender.x, defender.y, attacker.color, 5)
+                        self._reset_inactivity()
             
             # Phantom Cross delayed damage
             if (attacker.active_skill == SkillType.PHANTOM_CROSS and
@@ -237,8 +319,9 @@ class Game:
                                  defender.y - attacker.skill_data.get('target_pos', (0, 0))[1])
                 if dist < 80:
                     angle = math.atan2(defender.y - attacker.y, defender.x - attacker.x)
-                    defender.take_damage(DAMAGE_PER_HIT * 1.8, angle, 15, self.particles)
-                    self._trigger_hit(defender.x, defender.y, attacker.color, 5)
+                    if defender.take_damage(DAMAGE_PER_HIT * 1.8, angle, 15, self.particles):
+                        self._trigger_hit(defender.x, defender.y, attacker.color, 5)
+                        self._reset_inactivity()
         
         # Check for Final Flash Draw screen black trigger
         for fighter in [self.blue, self.red]:
@@ -291,13 +374,20 @@ class Game:
         self.round_timer = 0
         self.particles.clear()
         self.shockwaves.clear()
+        self.arena_pulses.clear()
         self.screen_black_frames = 0
         
         # End slow-motion.
         self.slow_motion = False
         self.slow_motion_accumulator = 0.0
         
-        # Restart countdown.
+        # Reset arena escalation.
+        self.inactivity_timer = 0
+        self.escalation_state = 'normal'
+        self.escalation_shrink_paused = False
+        
+        # Lock fighters and restart countdown.
+        self._lock_fighters_for_countdown()
         self.countdown_stage = 0
         self.countdown_timer = 0
         self.countdown_active = True
@@ -320,6 +410,7 @@ class Game:
                 self.countdown_stage += 1
                 if self.countdown_stage > 3:
                     self.countdown_active = False
+                    self._unlock_fighters()  # Unlock fighters after "FIGHT"
             return
         
         # Slow-motion handling (only during death sequence).
@@ -354,10 +445,43 @@ class Game:
                 self._reset_round()
             self.particles.update()
             self.shockwaves.update()
+            self.arena_pulses.update()
             return
         
         # Normal round progression.
         self.round_timer += 1
+        
+        # ===== Arena Escalation System =====
+        self.inactivity_timer += 1
+        
+        # Tier 1: Arena Pulse (after 5 seconds of inactivity)
+        if self.escalation_state == 'normal':
+            if self.inactivity_timer >= INACTIVITY_PULSE_TIME * FPS:
+                self._trigger_arena_pulse()
+                self.escalation_state = 'pulse_triggered'
+                self.inactivity_timer = 0
+        
+        # Tier 2: Shrinking Walls (continued inactivity after pulse)
+        elif self.escalation_state == 'pulse_triggered':
+            if self.inactivity_timer >= INACTIVITY_SHRINK_TIME * FPS:
+                self.escalation_state = 'shrinking'
+                self.escalation_shrink_paused = False
+        
+        # Active shrinking (paused on interaction)
+        elif self.escalation_state == 'shrinking':
+            if not self.escalation_shrink_paused:
+                ax, ay, aw, ah = self.arena_bounds
+                if aw > 250 and ah > 250:  # Don't shrink too small
+                    self.arena_bounds = [
+                        ax + ESCALATION_SHRINK_SPEED,
+                        ay + ESCALATION_SHRINK_SPEED,
+                        aw - ESCALATION_SHRINK_SPEED * 2,
+                        ah - ESCALATION_SHRINK_SPEED * 2
+                    ]
+            else:
+                # Resume shrinking after interaction pause
+                if self.inactivity_timer >= FPS * 2:  # 2 second grace period
+                    self.escalation_shrink_paused = False
         
         # Shrink arena periodically.
         self.arena_shrink_timer -= 1
@@ -400,6 +524,7 @@ class Game:
         # Update visual effects.
         self.particles.update()
         self.shockwaves.update()
+        self.arena_pulses.update()
         
         # Check win by KO.
         if self.blue.health <= 0:
@@ -437,11 +562,25 @@ class Game:
         # Dark background.
         self.screen.fill(DARK_GRAY)
         
-        # Draw shrinking arena border.
+        # Draw shrinking arena border with escalation indicator.
         ax, ay, aw, ah = self.arena_bounds
         arena_rect = pygame.Rect(int(ax + offset[0]), int(ay + offset[1]), int(aw), int(ah))
         pygame.draw.rect(self.screen, BLACK, arena_rect)
-        pygame.draw.rect(self.screen, GRAY, arena_rect, 4)
+        
+        # Border color changes based on escalation state
+        if self.escalation_state == 'shrinking':
+            border_color = ORANGE  # Warning: arena is shrinking!
+            border_width = 6
+        elif self.escalation_state == 'pulse_triggered':
+            border_color = YELLOW  # Caution: shrinking soon
+            border_width = 5
+        else:
+            border_color = GRAY
+            border_width = 4
+        pygame.draw.rect(self.screen, border_color, arena_rect, border_width)
+        
+        # Draw arena pulse effects.
+        self.arena_pulses.draw(self.screen, offset)
         
         # Draw effects in correct order.
         self.shockwaves.draw(self.screen, offset)
