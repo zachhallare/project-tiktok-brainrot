@@ -12,6 +12,7 @@ from config import (
     POWERUP_SPAWN_MIN, POWERUP_SPAWN_MAX, MAX_POWERUPS,
     ROUND_MAX_TIME, BASE_KNOCKBACK, DAMAGE_PER_HIT, SLOW_MOTION_SPEED,
     HIT_STOP_FRAMES, SCREEN_SHAKE_INTENSITY, SCREEN_SHAKE_DECAY,
+    PARRY_SLOWMO_FRAMES, PARRY_SLOWMO_TIMESCALE, PARRY_HITSTOP_FRAMES,
     INACTIVITY_PULSE_TIME, INACTIVITY_SHRINK_TIME, ARENA_PULSE_VELOCITY_BOOST,
     ARENA_PULSE_SHAKE, ESCALATION_SHRINK_SPEED, GAME_SETTINGS
 )
@@ -67,6 +68,8 @@ class Game:
         self.screen_shake = 0
         self.hit_stop = 0
         self.screen_black_frames = 0  # For Final Flash Draw
+        self.parry_slowmo_frames = 0  # Parry slow-motion effect
+        self.parry_slowmo_accumulator = 0.0
         
         # Round state tracking.
         self.round_timer = 0
@@ -92,6 +95,9 @@ class Game:
         self.inactivity_timer = 0  # Frames since last interaction
         self.escalation_state = 'normal'  # 'normal', 'pulse_triggered', 'shrinking'
         self.escalation_shrink_paused = False  # Paused when interaction occurs
+        
+        # Game State (TITLE, PLAYING, ROUND_END)
+        self.game_state = 'TITLE'  # Start at title screen
         
         # Load/generated sounds.
         self._setup_sounds()
@@ -188,6 +194,27 @@ class Game:
             self.explosion_sound = pygame.mixer.Sound(buffer=exp_arr)
             self.explosion_sound.set_volume(0.5)
             
+            # Generate metallic clang sound for parries (higher frequency, sharper decay)
+            clang_dur = 0.08
+            t_clang = [i / sample_rate for i in range(int(sample_rate * clang_dur))]
+            clang_samples = []
+            for i in t_clang:
+                # Multiple frequencies for metallic ring
+                freq1 = 800
+                freq2 = 1200
+                amp = 18000 * math.exp(-i * 40) * (
+                    math.sin(2 * math.pi * freq1 * i) +
+                    0.5 * math.sin(2 * math.pi * freq2 * i)
+                )
+                clang_samples.append(int(max(-32768, min(32767, amp))))
+            
+            clang_arr = bytes()
+            for s in clang_samples:
+                clang_arr += s.to_bytes(2, 'little', signed=True)
+            
+            self.clang_sound = pygame.mixer.Sound(buffer=clang_arr)
+            self.clang_sound.set_volume(0.5)
+            
             self.sounds_enabled = True
         except Exception:
             self.sounds_enabled = False
@@ -227,13 +254,35 @@ class Game:
 
     # Detect and resolve sword attacks and skill-specific damage.
     def _handle_combat(self):
-        # Check for Spin Parry first for both fighters
+        # ===== Check for Sword-on-Sword Parry (new universal rule) =====
+        if self.blue.check_sword_on_sword_parry(self.red):
+            # Both swords collided during attacks!
+            # No damage - both combos reset
+            self._handle_sword_parry(self.blue, self.red)
+            return  # Skip other combat this frame
+        
+        # ===== Check for Sword Clash (basic attack vs skill) =====
+        for defender, attacker in [(self.blue, self.red), (self.red, self.blue)]:
+            clashed_skill = defender.check_sword_clash(attacker, self.particles)
+            if clashed_skill is not None:
+                # Clash occurred! Apply skill-specific outcome
+                self._handle_clash_outcome(defender, attacker, clashed_skill)
+                self._reset_inactivity()
+                self.hit_stop = 3  # Brief hit-stop for clash
+                return  # Skip other combat this frame
+        
+        # ===== Check for Spin Parry (only when active) =====
         for defender, attacker in [(self.blue, self.red), (self.red, self.blue)]:
             if defender.check_spin_parry(attacker, self.particles):
-                # Parry successful - trigger effects and reset inactivity
-                self._trigger_hit(defender.x, defender.y, ORANGE, 6)  # Strong hit-stop
+                # Parry successful - trigger samurai slow-mo and effects
+                self.hit_stop = PARRY_HITSTOP_FRAMES
+                self.parry_slowmo_frames = PARRY_SLOWMO_FRAMES
+                self.screen_shake = 5
                 self._reset_inactivity()
                 attacker.attack_cooldown = 30  # Punish attacker
+                # Metallic clang
+                if self.sounds_enabled and hasattr(self, 'clang_sound'):
+                    self.clang_sound.play()
                 return  # Skip other combat this frame after parry
         
         # Blue attacking Red.
@@ -339,12 +388,83 @@ class Game:
         if self.sounds_enabled:
             self.hit_sound.play()
     
+    def _handle_sword_parry(self, fighter1, fighter2):
+        """Handle sword-on-sword parry - both fighters reset combo, no damage."""
+        # Reset both combos
+        fighter1.combo_step = 0
+        fighter1.combo_timer = 0
+        fighter1.combo_recovery = 8  # Brief stagger
+        
+        fighter2.combo_step = 0
+        fighter2.combo_timer = 0
+        fighter2.combo_recovery = 8
+        
+        # Visual feedback - white flash at midpoint between fighters (sword contact)
+        mid_x = (fighter1.x + fighter2.x) / 2
+        mid_y = (fighter1.y + fighter2.y) / 2
+        self.particles.emit(mid_x, mid_y, WHITE, count=8, size=5, lifetime=10)
+        
+        # Both fighters flash
+        fighter1.flash_timer = 4
+        fighter2.flash_timer = 4
+        
+        # Parry slow-motion effect (samurai-style)
+        self.hit_stop = PARRY_HITSTOP_FRAMES  # Small hit-stop stacked on slow-mo
+        self.parry_slowmo_frames = PARRY_SLOWMO_FRAMES  # Then slow-mo
+        self.screen_shake = 4
+        
+        # Audio feedback - metallic clang
+        if self.sounds_enabled and hasattr(self, 'clang_sound'):
+            self.clang_sound.play()
+        elif self.sounds_enabled:
+            self.hit_sound.play()  # Fallback
+        
+        self._reset_inactivity()
+    
+    def _handle_clash_outcome(self, defender, attacker, clashed_skill):
+        """Handle skill-specific outcomes when basic attack clashes with skill."""
+        # White flash for clash
+        defender.flash_timer = 3
+        self.screen_shake = 4
+        
+        if clashed_skill == SkillType.DASH_SLASH:
+            # Deflected off-angle - change attacker's velocity direction
+            angle = math.atan2(attacker.vy, attacker.vx)
+            deflect_angle = angle + random.uniform(-0.8, 0.8)  # Random deflection
+            speed = math.hypot(attacker.vx, attacker.vy)
+            attacker.vx = math.cos(deflect_angle) * speed
+            attacker.vy = math.sin(deflect_angle) * speed
+            attacker.active_skill = None  # Cancel skill
+        
+        elif clashed_skill == SkillType.SPIN_PARRY:
+            # Spin Parry dissipates when active (clash only works on active)
+            if attacker.spin_parry_active:
+                attacker.active_skill = None
+                attacker.spin_parry_active = False
+                attacker.spin_parry_recovery = 15  # Brief vulnerability
+        
+        elif clashed_skill == SkillType.GROUND_SLAM:
+            # Shockwave reduced - reduce future impact damage
+            attacker.skill_data['shockwave_reduced'] = True
+        
+        elif clashed_skill == SkillType.PHANTOM_CROSS:
+            # Delayed damage canceled
+            attacker.pending_damage = []
+            attacker.active_skill = None
+        
+        elif clashed_skill == SkillType.BLADE_CYCLONE:
+            # Pushback only - push defender away
+            angle = math.atan2(defender.y - attacker.y, defender.x - attacker.x)
+            defender.vx += math.cos(angle) * 8
+            defender.vy += math.sin(angle) * 8
+        
+        # Final Flash Draw cannot be clashed (handled in check_sword_clash)
 
-    # Handle round end: declare winner, play effects, start slow-motion.
+    # Handle round end: play effects, start slow-motion.
     def _end_round(self, winner, loser):
         self.round_ending = True
         self.winner = winner
-        self.winner_text = "Blue Wins!" if winner.is_blue else "Red Wins!"
+        # No victory text - slow-motion death is the sole indicator
         self.reset_timer = 120  # 2 seconds
         
         # Dramatic death effects on loser.
@@ -432,6 +552,15 @@ class Game:
             self.hit_stop -= 1
             return
         
+        # Parry slow-motion effect (samurai-style)
+        # Physics continues at reduced timescale, not paused
+        if self.parry_slowmo_frames > 0:
+            self.parry_slowmo_accumulator += PARRY_SLOWMO_TIMESCALE
+            self.parry_slowmo_frames -= 1
+            if self.parry_slowmo_accumulator < 1.0:
+                return  # Skip this frame
+            self.parry_slowmo_accumulator -= 1.0
+        
         # Decay screen shake.
         if self.screen_shake > 0:
             self.screen_shake *= SCREEN_SHAKE_DECAY
@@ -507,16 +636,28 @@ class Game:
             orb.update()
             if orb.check_collision(self.blue):
                 self.blue.activate_skill(orb.skill_type, self.red, self.particles, self.shockwaves)
+                # FFD: Stun opponent on activation
+                if orb.skill_type == SkillType.FINAL_FLASH_DRAW:
+                    self.red.ffd_stunned = True
                 self.skill_orbs.remove(orb)
                 self.particles.emit(orb.x, orb.y, orb.color, count=12, size=4)
             elif orb.check_collision(self.red):
                 self.red.activate_skill(orb.skill_type, self.blue, self.particles, self.shockwaves)
+                # FFD: Stun opponent on activation
+                if orb.skill_type == SkillType.FINAL_FLASH_DRAW:
+                    self.blue.ffd_stunned = True
                 self.skill_orbs.remove(orb)
                 self.particles.emit(orb.x, orb.y, orb.color, count=12, size=4)
         
         # Update both fighters (movement, skills, etc.)
         self.blue.update(self.red, tuple(self.arena_bounds), self.particles, self.shockwaves)
         self.red.update(self.blue, tuple(self.arena_bounds), self.particles, self.shockwaves)
+        
+        # FFD stun release: when user's lock-in ends, release opponent's stun
+        if not self.blue.ffd_locked_in and self.red.ffd_stunned:
+            self.red.ffd_stunned = False
+        if not self.red.ffd_locked_in and self.blue.ffd_stunned:
+            self.blue.ffd_stunned = False
         
         # Handle attacks and damage.
         self._handle_combat()
@@ -544,6 +685,48 @@ class Game:
                 self._end_round(winner=self.red, loser=self.blue)
     
 
+
+    def _draw_title_screen(self):
+        """Draw Pygame-only title screen."""
+        self.screen.fill(DARK_GRAY)
+        
+        # Draw arena preview
+        ax, ay, aw, ah = self.base_arena
+        arena_rect = pygame.Rect(int(ax), int(ay), int(aw), int(ah))
+        pygame.draw.rect(self.screen, BLACK, arena_rect)
+        pygame.draw.rect(self.screen, GRAY, arena_rect, 4)
+        
+        # Title
+        title_text = "RED vs BLUE"
+        title_surface = self.font_large.render(title_text, True, WHITE)
+        title_rect = title_surface.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 80))
+        
+        # Title shadow
+        shadow_surface = self.font_large.render(title_text, True, (50, 50, 50))
+        shadow_rect = shadow_surface.get_rect(center=(SCREEN_WIDTH // 2 + 3, SCREEN_HEIGHT // 2 - 77))
+        self.screen.blit(shadow_surface, shadow_rect)
+        self.screen.blit(title_surface, title_rect)
+        
+        # Subtitle
+        subtitle = "BATTLE"
+        subtitle_surface = self.font_medium.render(subtitle, True, YELLOW)
+        subtitle_rect = subtitle_surface.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 10))
+        self.screen.blit(subtitle_surface, subtitle_rect)
+        
+        # Start prompt (blinking effect)
+        if (pygame.time.get_ticks() // 500) % 2 == 0:
+            prompt = "Press SPACE or CLICK to Start"
+            prompt_surface = self.font_small.render(prompt, True, WHITE)
+            prompt_rect = prompt_surface.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 80))
+            self.screen.blit(prompt_surface, prompt_rect)
+        
+        # Controls hint
+        controls = "SPACE: Pause  |  R: Reset  |  ESC: Exit"
+        controls_surface = self.font_small.render(controls, True, GRAY)
+        controls_rect = controls_surface.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT - 40))
+        self.screen.blit(controls_surface, controls_rect)
+        
+        pygame.display.flip()
 
     # Render everything to the screen.
     def draw(self):
@@ -598,18 +781,8 @@ class Game:
         # Particles on top.
         self.particles.draw(self.screen, offset)
         
-        # Victory text overlay.
-        if self.round_ending and self.winner_text:
-            text_color = BLUE if self.winner.is_blue else RED
-            text_surface = self.font_medium.render(self.winner_text, True, text_color)
-            text_rect = text_surface.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2))
-            
-            # Background box
-            bg_rect = text_rect.inflate(40, 20)
-            pygame.draw.rect(self.screen, BLACK, bg_rect)
-            pygame.draw.rect(self.screen, text_color, bg_rect, 3)
-            
-            self.screen.blit(text_surface, text_rect)
+        # Victory is now indicated solely by slow-motion death sequence
+        # No text overlay
         
         # Draw countdown "3" -> "2" -> "1" -> "FIGHT"
         if self.countdown_active:
@@ -647,12 +820,23 @@ class Game:
                     if event.key == pygame.K_ESCAPE:
                         running = False
                     elif event.key == pygame.K_SPACE:
-                        self.paused = not self.paused
+                        if self.game_state == 'TITLE':
+                            # Start game from title screen
+                            self.game_state = 'PLAYING'
+                        else:
+                            self.paused = not self.paused
                     elif event.key == pygame.K_r:
                         self._reset_round()
+                elif event.type == pygame.MOUSEBUTTONDOWN:
+                    # Also allow mouse click to start from title
+                    if self.game_state == 'TITLE':
+                        self.game_state = 'PLAYING'
             
-            self.update()
-            self.draw()
+            if self.game_state == 'TITLE':
+                self._draw_title_screen()
+            else:
+                self.update()
+                self.draw()
             self.clock.tick(FPS)
         
         pygame.quit()
