@@ -1,5 +1,7 @@
 """
-Simplified fighter with bounce-only movement and 7 skill-based power-ups.
+Simplified fighter with bounce-only movement and 5 skill-based power-ups.
+Constant weapon rotation with ninja wall boost physics.
+DVD logo style - fighters bounce around arena with spinning swords.
 """
 
 import pygame
@@ -7,15 +9,17 @@ import math
 import random
 
 from config import (
-    SCREEN_WIDTH, SCREEN_HEIGHT, WHITE, GREEN, YELLOW, PINK, GOLD, BLACK,
+    SCREEN_WIDTH, SCREEN_HEIGHT, WHITE, GREEN, YELLOW, BLACK,
     FIGHTER_RADIUS, SWORD_LENGTH, SWORD_WIDTH, BASE_HEALTH,
-    DRAG, MAX_VELOCITY, MIN_VELOCITY, BOUNCE_ENERGY, ARENA_MARGIN
+    DRAG, MAX_VELOCITY, MIN_VELOCITY, BOUNCE_ENERGY, ARENA_MARGIN,
+    WEAPON_ROTATION_SPEED, ROTATION_PARRY_DISTANCE, ROTATION_BODY_HIT_BONUS,
+    WALL_BOOST_STRENGTH
 )
 from skills import SkillType
 
 
 class Fighter:
-    """Simplified fighter with wall-bounce movement."""
+    """Simplified fighter with wall-bounce movement and constant rotation."""
     
     def __init__(self, x, y, color, color_bright, is_blue=True):
         self.x = x
@@ -56,19 +60,8 @@ class Fighter:
         self.attack_cooldown = 0
         self.invincible = 0
         
-        # Phantom Cross delayed damage
-        self.pending_damage = []  # [(target, damage, angle, knockback, delay_frames), ...]
-        
-        # Final Flash Draw screen black
-        self.trigger_screen_black = False
-        
         # Locked state (during countdown)
         self.locked = False
-        
-        # Final Flash Draw fairness lock-in
-        self.ffd_locked_in = False       # User is locked during charge
-        self.ffd_lock_position = None    # Stored position during lock
-        self.ffd_stunned = False         # Opponent is stunned during FFD
         
         # Spin Parry state
         self.spin_parry_active = False
@@ -79,50 +72,12 @@ class Fighter:
         # Skill targeting - stores opponent position at skill activation
         self.skill_target_pos = None
         
-        # 3-Hit Combo System
-        # Combo: Left Slash -> Right Slash -> Pierce -> reset
-        self.combo_step = 0       # 0=none, 1=left slash, 2=right slash, 3=pierce
-        self.combo_timer = 0      # Active frames for current attack
-        self.combo_recovery = 0   # Recovery frames after attack
-        self.combo_timeout = 0    # Frames since last hit (reset combo if too long)
-        
-        # Combo constants (tunable for feel)
-        self.COMBO_ACTIVE_FRAMES = 12    # How long attack hitbox is active
-        self.COMBO_RECOVERY_FRAMES = 8   # Recovery after each attack
-        self.COMBO_TIMEOUT_FRAMES = 25   # Reset combo if no hit within this time
-        self.COMBO_PIERCE_RECOVERY = 18  # Pierce has longer recovery (risk/reward)
-        
-        # Combo damage multipliers
-        self.COMBO_DAMAGE = {
-            1: 1.0,  # Left Slash - base damage
-            2: 1.2,  # Right Slash - slightly more
-            3: 1.5,  # Pierce - high damage finisher
-        }
-        
-        # Exact swing angles (in radians) - angles are relative to facing direction
-        # Hit 1: Left -> Right Slash: 180° -> 45° (wide arc, 135° sweep)
-        # Hit 2: Right -> Left Slash: 0° -> 135° (medium arc, 135° sweep)
-        # Hit 3: Pierce: Straight 90° (narrow thrust)
-        self.COMBO_SWING = {
-            1: {
-                'start': math.radians(180),  # Start from left/behind
-                'end': math.radians(45),     # End at upper-right
-                'arc': math.radians(135),    # Total sweep
-            },
-            2: {
-                'start': math.radians(0),    # Start from front/right
-                'end': math.radians(135),    # End at upper-left
-                'arc': math.radians(135),    # Total sweep
-            },
-            3: {
-                'start': math.radians(90),   # Straight thrust (down if facing right)
-                'end': math.radians(90),     # No sweep for thrust
-                'arc': math.radians(30),     # Narrow hitbox
-            },
-        }
-        
-        # Store current swing progress
-        self.combo_swing_angle = 0  # Current sword angle during swing
+        # Rotational Weapon System - CONSTANT rotation (DVD logo style)
+        # Sword always rotates, only paused during skills
+        self.rotation_clockwise = True      # Direction of rotation
+        self.last_hit_frame = -100          # Frame of last hit
+        self.rotation_paused = False        # Paused during skills
+        self.attack_recovery = 0            # Brief recovery after shield block
     
     def activate_skill(self, skill_type, opponent, particles, shockwaves):
         """Activate a skill move. Skills always face and launch toward opponent."""
@@ -130,11 +85,9 @@ class Fighter:
         self.skill_timer = 0
         self.trail_positions = []
         
-        # Reset combo when activating any skill
-        self.combo_step = 0
-        self.combo_timer = 0
-        self.combo_recovery = 0
-        self.combo_timeout = 0
+        # Pause rotation when activating any skill
+        self.is_attacking = False
+        self.rotation_paused = True
         
         # Store opponent position for autotargeting (skills launch toward this)
         self.skill_target_pos = (opponent.x, opponent.y)
@@ -179,26 +132,6 @@ class Fighter:
             self.shield_parry_window = 20  # Active parry for ~0.33 seconds
             self.active_skill = None
         
-        elif skill_type == SkillType.PHANTOM_CROSS:
-            # Calculate position behind opponent
-            dx = opponent.x - self.x
-            dy = opponent.y - self.y
-            dist = max(1, math.hypot(dx, dy))
-            # Teleport behind
-            behind_dist = 50
-            self.skill_data['original_pos'] = (self.x, self.y)
-            self.x = opponent.x + (dx / dist) * behind_dist
-            self.y = opponent.y + (dy / dist) * behind_dist
-            self.skill_data['target_pos'] = (opponent.x, opponent.y)
-            self.skill_data['duration'] = 25
-            self.skill_data['slash_frame'] = 8
-            self.skill_data['damage_frame'] = 12  # Delayed damage
-            self.vx = 0
-            self.vy = 0
-            # Emit teleport particles at original position
-            ox, oy = self.skill_data['original_pos']
-            particles.emit(ox, oy, PINK, count=15, size=5)
-        
         elif skill_type == SkillType.BLADE_CYCLONE:
             self.skill_data['duration'] = 60
             self.skill_data['spin_speed'] = 0.8
@@ -207,21 +140,6 @@ class Fighter:
             # Slow down during cyclone
             self.vx *= 0.3
             self.vy *= 0.3
-        
-        elif skill_type == SkillType.FINAL_FLASH_DRAW:
-            self.skill_data['phase'] = 'sheath'  # sheath -> pause -> slash
-            self.skill_data['duration'] = 45
-            self.skill_data['sheath_frames'] = 20
-            self.skill_data['pause_frames'] = 8
-            self.skill_data['slash_frame'] = 30
-            # User lock-in: freeze position during charge
-            self.ffd_locked_in = True
-            self.ffd_lock_position = (self.x, self.y)
-            self.vx = 0
-            self.vy = 0
-            self.skill_data['target_angle'] = math.atan2(
-                opponent.y - self.y, opponent.x - self.x
-            )
     
     def update_skill(self, opponent, particles, shockwaves):
         """Update active skill."""
@@ -245,6 +163,7 @@ class Fighter:
             if self.skill_timer >= self.skill_data['duration']:
                 self.active_skill = None
                 self.trail_positions = []
+                self.rotation_paused = False
         
         elif self.active_skill == SkillType.SPIN_PARRY:
             # Spinning parry stance
@@ -269,6 +188,7 @@ class Fighter:
                 self.active_skill = None
                 self.spin_parry_active = False
                 self.spin_parry_timer = 0
+                self.rotation_paused = False
         
         elif self.active_skill == SkillType.GROUND_SLAM:
             if self.skill_data['phase'] == 'rise':
@@ -288,15 +208,7 @@ class Fighter:
             elif self.skill_data['phase'] == 'impact':
                 if self.skill_timer > self.skill_data['duration']:
                     self.active_skill = None
-        
-        elif self.active_skill == SkillType.PHANTOM_CROSS:
-            # Draw X-slash at target on slash frame
-            if self.skill_timer == self.skill_data['slash_frame']:
-                tx, ty = self.skill_data['target_pos']
-                particles.emit_cross_slash(tx, ty, PINK)
-            
-            if self.skill_timer >= self.skill_data['duration']:
-                self.active_skill = None
+                    self.rotation_paused = False
         
         elif self.active_skill == SkillType.BLADE_CYCLONE:
             if self.skill_timer < self.skill_data['duration']:
@@ -330,62 +242,56 @@ class Fighter:
                     opponent.vx += math.cos(angle_away) * 12
                     opponent.vy += math.sin(angle_away) * 12
                 self.active_skill = None
-        
-        elif self.active_skill == SkillType.FINAL_FLASH_DRAW:
-            # Enforce user lock-in position throughout charge
-            if self.ffd_locked_in and self.ffd_lock_position:
-                self.x, self.y = self.ffd_lock_position
-                self.vx = 0
-                self.vy = 0
-            
-            if self.skill_data['phase'] == 'sheath':
-                # Point sword backward (sheathing)
-                self.sword_angle = self.skill_data['target_angle'] + math.pi
-                if self.skill_timer >= self.skill_data['sheath_frames']:
-                    self.skill_data['phase'] = 'pause'
-            
-            elif self.skill_data['phase'] == 'pause':
-                if self.skill_timer >= self.skill_data['sheath_frames'] + self.skill_data['pause_frames']:
-                    self.skill_data['phase'] = 'slash'
-                    self.trigger_screen_black = True  # Signal to main.py
-            
-            elif self.skill_data['phase'] == 'slash':
-                # Instant slash toward opponent
-                self.sword_angle = self.skill_data['target_angle']
-                # Emit dramatic slash particles
-                if self.skill_timer == self.skill_data['slash_frame']:
-                    particles.emit(self.x, self.y, GOLD, count=20, size=5, lifetime=30)
-                    shockwaves.add(self.x, self.y, GOLD, 100)
-                
-                if self.skill_timer >= self.skill_data['duration']:
-                    # Release user lock-in
-                    self.ffd_locked_in = False
-                    self.ffd_lock_position = None
-                    self.active_skill = None
+                self.rotation_paused = False
     
-    def update_pending_damage(self, particles):
-        """Process delayed damage effects."""
-        new_pending = []
-        for target, damage, angle, knockback, delay in self.pending_damage:
-            if delay <= 0:
-                target.take_damage(damage, angle, knockback, particles)
-            else:
-                new_pending.append((target, damage, angle, knockback, delay - 1))
-        self.pending_damage = new_pending
+    def update_rotation(self, opponent=None):
+        """Update sword angle - points toward opponent like a duel."""
+        # Skills override sword direction
+        if self.rotation_paused:
+            return
+        
+        # Sword points toward opponent (like a real fight)
+        if opponent:
+            target_angle = math.atan2(opponent.y - self.y, opponent.x - self.x)
+            
+            # Smooth rotation toward opponent
+            angle_diff = ((target_angle - self.sword_angle + math.pi) % (2 * math.pi)) - math.pi
+            self.sword_angle += angle_diff * 0.25  # Smooth tracking
+        
+        # Keep angle in [-π, π]
+        if self.sword_angle > math.pi:
+            self.sword_angle -= 2 * math.pi
+        elif self.sword_angle < -math.pi:
+            self.sword_angle += 2 * math.pi
+    
+    def on_rotation_hit(self, hit_sword=False, frame_count=0):
+        """Called when rotation attack hits something.
+        Flips rotation direction for natural combat feel.
+        """
+        # Prevent multi-hits in same rotation
+        if frame_count - self.last_hit_frame < 10:
+            return False
+        
+        self.last_hit_frame = frame_count
+        
+        # Flip direction on hit (makes combat look responsive)
+        self.rotation_clockwise = not self.rotation_clockwise
+        
+        return True
+    
+    def on_attack_blocked(self):
+        """Called when attack is blocked by shield."""
+        self.attack_recovery = 15  # Brief stagger
+        self.rotation_clockwise = not self.rotation_clockwise
     
     def update(self, opponent, arena_bounds, particles, shockwaves):
-        """Update fighter - bounce-only movement."""
+        """Update fighter - bounce-only movement with ninja wall boosts."""
         # Skip update if locked (during countdown)
         if self.locked:
             return
         
-        # Skip update if stunned by Final Flash Draw
-        if self.ffd_stunned:
-            return
-        
         self.update_skill(opponent, particles, shockwaves)
-        self.update_pending_damage(particles)
-        self.update_combo()  # Update combo timers and state
+        self.update_rotation(opponent)  # Sword faces opponent
         
         # Decrease timers
         if self.flash_timer > 0:
@@ -398,8 +304,10 @@ class Fighter:
             self.shield_parry_window -= 1
         if self.spin_parry_recovery > 0:
             self.spin_parry_recovery -= 1
+        if self.attack_recovery > 0:
+            self.attack_recovery -= 1
         
-        # Apply minimal drag
+        # Apply minimal drag (DVD logo - constant velocity)
         self.vx *= DRAG
         self.vy *= DRAG
         
@@ -410,59 +318,55 @@ class Fighter:
             self.vx = (self.vx / speed) * max_vel
             self.vy = (self.vy / speed) * max_vel
         
+        # Ensure minimum velocity (DVD logo always moving)
+        if speed < MIN_VELOCITY and speed > 0:
+            self.vx = (self.vx / speed) * MIN_VELOCITY
+            self.vy = (self.vy / speed) * MIN_VELOCITY
+        elif speed == 0:
+            # Give random velocity if stopped
+            angle = random.uniform(0, 2 * math.pi)
+            self.vx = math.cos(angle) * MIN_VELOCITY
+            self.vy = math.sin(angle) * MIN_VELOCITY
+        
         # Update position
         self.x += self.vx
         self.y += self.vy
         
-        # Wall bouncing (square arena)
+        # Wall collision with perfect bounce (DVD logo style)
         ax, ay, aw, ah = arena_bounds
         
+        # Left wall
         if self.x - self.radius < ax:
             self.x = ax + self.radius
             self.vx = abs(self.vx) * BOUNCE_ENERGY
+            # Ninja wall boost toward center
+            center_x = ax + aw / 2
+            if self.x < center_x:
+                self.vx += WALL_BOOST_STRENGTH
+        
+        # Right wall
         if self.x + self.radius > ax + aw:
             self.x = ax + aw - self.radius
             self.vx = -abs(self.vx) * BOUNCE_ENERGY
+            center_x = ax + aw / 2
+            if self.x > center_x:
+                self.vx -= WALL_BOOST_STRENGTH
+        
+        # Top wall
         if self.y - self.radius < ay:
             self.y = ay + self.radius
             self.vy = abs(self.vy) * BOUNCE_ENERGY
+            center_y = ay + ah / 2
+            if self.y < center_y:
+                self.vy += WALL_BOOST_STRENGTH
+        
+        # Bottom wall
         if self.y + self.radius > ay + ah:
             self.y = ay + ah - self.radius
             self.vy = -abs(self.vy) * BOUNCE_ENERGY
-        
-        # Maintain minimum velocity (constant motion like DVD logo)
-        speed = math.hypot(self.vx, self.vy)
-        # Don't force movement during certain skills
-        if self.active_skill not in [SkillType.PHANTOM_CROSS, SkillType.FINAL_FLASH_DRAW]:
-            if speed < MIN_VELOCITY and speed > 0:
-                self.vx = (self.vx / speed) * MIN_VELOCITY
-                self.vy = (self.vy / speed) * MIN_VELOCITY
-            elif speed == 0:
-                # Give random direction if stopped
-                angle = random.uniform(0, 2 * math.pi)
-                self.vx = math.cos(angle) * MIN_VELOCITY
-                self.vy = math.sin(angle) * MIN_VELOCITY
-        
-        # Sword angle - point toward opponent when close
-        dx = opponent.x - self.x
-        dy = opponent.y - self.y
-        dist = math.hypot(dx, dy)
-        
-        if self.active_skill not in [SkillType.SPIN_PARRY, SkillType.BLADE_CYCLONE, 
-                                      SkillType.FINAL_FLASH_DRAW]:
-            if dist < 200:
-                # Point at opponent
-                target_angle = math.atan2(dy, dx)
-            else:
-                # Point in movement direction
-                if speed > 1:
-                    target_angle = math.atan2(self.vy, self.vx)
-                else:
-                    target_angle = self.sword_angle
-            
-            # Smooth rotation
-            diff = ((target_angle - self.sword_angle + math.pi) % (2 * math.pi)) - math.pi
-            self.sword_angle += diff * 0.15
+            center_y = ay + ah / 2
+            if self.y > center_y:
+                self.vy -= WALL_BOOST_STRENGTH
         
         # Victory bounce
         if self.victory_bounce > 0:
@@ -470,15 +374,78 @@ class Fighter:
             self.y += math.sin(self.victory_bounce * 0.4) * 5
     
     def get_sword_hitbox(self):
-        """Get sword collision points."""
+        """Get sword collision points for rotation attacks."""
         base_x = self.x + math.cos(self.sword_angle) * (self.radius + 3)
         base_y = self.y + math.sin(self.sword_angle) * (self.radius + 3)
         tip_x = base_x + math.cos(self.sword_angle) * self.sword_length
         tip_y = base_y + math.sin(self.sword_angle) * self.sword_length
         return (base_x, base_y), (tip_x, tip_y)
     
+    def check_sword_on_sword_parry(self, other):
+        """Check if two rotating swords collide (parry)."""
+        if self.rotation_paused or other.rotation_paused:
+            return False
+        if self.attack_cooldown > 0 or other.attack_cooldown > 0:
+            return False
+        
+        (_, _), (my_tip_x, my_tip_y) = self.get_sword_hitbox()
+        (_, _), (other_tip_x, other_tip_y) = other.get_sword_hitbox()
+        
+        # Check tip-to-tip distance
+        dist = math.hypot(my_tip_x - other_tip_x, my_tip_y - other_tip_y)
+        return dist < ROTATION_PARRY_DISTANCE
+    
+    def check_sword_clash(self, other, particles):
+        """Check if rotating sword clashes with opponent's skill."""
+        if self.rotation_paused:
+            return None
+        if other.active_skill is None:
+            return None
+        
+        (_, _), (tip_x, tip_y) = self.get_sword_hitbox()
+        
+        if other.active_skill == SkillType.BLADE_CYCLONE:
+            dist = math.hypot(tip_x - other.x, tip_y - other.y)
+            if dist < 60:
+                return SkillType.BLADE_CYCLONE
+        
+        elif other.active_skill == SkillType.SPIN_PARRY:
+            if other.spin_parry_active:
+                dist = math.hypot(tip_x - other.x, tip_y - other.y)
+                if dist < 50:
+                    return SkillType.SPIN_PARRY
+        
+        return None
+    
+    def check_spin_parry(self, attacker, particles):
+        """Check if Spin Parry skill successfully parries an attack."""
+        if not self.spin_parry_active:
+            return False
+        
+        (_, _), (tip_x, tip_y) = attacker.get_sword_hitbox()
+        dist = math.hypot(tip_x - self.x, tip_y - self.y)
+        parry_radius = 55
+        
+        if dist < parry_radius:
+            self.skill_data['parried'] = True
+            self.spin_parry_active = False
+            
+            base_knockback = 15
+            particles.emit_sparks(self.x, self.y)
+            particles.emit_ring(self.x, self.y, YELLOW, 40, count=12)
+            self.flash_timer = 8
+            
+            angle_to_attacker = math.atan2(attacker.y - self.y, attacker.x - self.x)
+            attacker.vx = math.cos(angle_to_attacker) * base_knockback
+            attacker.vy = math.sin(angle_to_attacker) * base_knockback
+            attacker.attack_cooldown = 30
+            
+            return True
+        
+        return False
+    
     def draw(self, surface, offset=(0, 0)):
-        """Draw simplified fighter."""
+        """Draw fighter."""
         ox, oy = offset
         
         # Draw dash trail
@@ -496,26 +463,26 @@ class Fighter:
         pygame.draw.circle(surface, body_color, 
                           (int(self.x + ox), int(self.y + oy)), self.radius)
         
-        # Small inner highlight (optional)
+        # Inner highlight
         pygame.draw.circle(surface, self.color_bright,
                           (int(self.x - self.radius * 0.2 + ox), 
                            int(self.y - self.radius * 0.2 + oy)), 
                           int(self.radius * 0.3))
         
-        # Simple sword (just a line)
+        # Sword
         self._draw_sword(surface, offset)
         
-        # Health bar above fighter
+        # Health bar
         self._draw_health_bar(surface, offset)
         
-        # Shield indicator (with parry glow)
+        # Shield indicator
         if self.has_shield:
             shield_color = WHITE if self.shield_parry_window > 0 else GREEN
             pygame.draw.circle(surface, shield_color, 
                               (int(self.x + ox), int(self.y + oy)), 
                               self.radius + 8, 3)
         
-        # Blade Cyclone vortex indicator
+        # Blade Cyclone vortex
         if self.active_skill == SkillType.BLADE_CYCLONE:
             vortex_radius = 80 + math.sin(self.skill_timer * 0.3) * 10
             pygame.draw.circle(surface, YELLOW,
@@ -525,14 +492,13 @@ class Fighter:
         # Spin Parry indicator
         if self.spin_parry_active:
             parry_radius = 45 + math.sin(self.skill_timer * 0.4) * 5
-            # Orange spinning ring
             from config import ORANGE
             pygame.draw.circle(surface, ORANGE,
                               (int(self.x + ox), int(self.y + oy)),
                               int(parry_radius), 3)
     
     def _draw_sword(self, surface, offset):
-        """Draw simple line sword."""
+        """Draw sword."""
         ox, oy = offset
         
         base_x = self.x + math.cos(self.sword_angle) * (self.radius + 3)
@@ -540,8 +506,8 @@ class Fighter:
         tip_x = base_x + math.cos(self.sword_angle) * self.sword_length
         tip_y = base_y + math.sin(self.sword_angle) * self.sword_length
         
-        # Simple line
         sword_color = WHITE if self.flash_timer > 0 else self.color_bright
+        
         pygame.draw.line(surface, sword_color,
                         (int(base_x + ox), int(base_y + oy)),
                         (int(tip_x + ox), int(tip_y + oy)), SWORD_WIDTH)
@@ -570,7 +536,7 @@ class Fighter:
                         (int(bar_x + ox), int(bar_y + oy), bar_width, bar_height), 1)
     
     def is_outside_arena(self, arena_bounds):
-        """Check if outside arena (for ring-out)."""
+        """Check if outside arena (ring-out)."""
         ax, ay, aw, ah = arena_bounds
         margin = self.radius * 3
         return (self.x < ax - margin or self.x > ax + aw + margin or
@@ -583,18 +549,16 @@ class Fighter:
         
         if self.has_shield:
             self.has_shield = False
-            # Spark/counter-flash effect on parry
             if self.shield_parry_window > 0:
-                # Perfect parry - emit sparks
                 particles.emit_sparks(self.x, self.y)
-                self.flash_timer = 8  # Bright counter-flash
+                self.flash_timer = 8
             else:
                 particles.emit(self.x, self.y, GREEN, count=10, size=4)
             return False
         
         self.health -= amount
         self.flash_timer = 6
-        self.invincible = 8
+        self.invincible = 10
         
         self.vx += math.cos(knockback_angle) * knockback_force
         self.vy += math.sin(knockback_angle) * knockback_force
@@ -605,271 +569,32 @@ class Fighter:
         """Reset fighter state."""
         self.x = self.start_x
         self.y = self.start_y
-        self.vx = 0  # Will be set by main.py after countdown
-        self.vy = 0
+        self.vx = random.uniform(-8, 8)
+        self.vy = random.uniform(-8, 8)
         self.radius = FIGHTER_RADIUS
         self.health = BASE_HEALTH
+        self.sword_angle = 0
         self.sword_length = self.base_sword_length
+        
         self.active_skill = None
         self.skill_timer = 0
         self.skill_data = {}
         self.skill_target_pos = None
         self.trail_positions = []
+        
         self.flash_timer = 0
         self.victory_bounce = 0
         self.has_shield = False
         self.shield_parry_window = 0
-        self.invincible = 0
         self.attack_cooldown = 0
-        self.pending_damage = []
-        self.trigger_screen_black = False
+        self.invincible = 0
         self.locked = False
-        self.ffd_locked_in = False
-        self.ffd_lock_position = None
-        self.ffd_stunned = False
+        
         self.spin_parry_active = False
         self.spin_parry_timer = 0
         self.spin_parry_recovery = 0
-        # Reset combo state
-        self.combo_step = 0
-        self.combo_timer = 0
-        self.combo_recovery = 0
-        self.combo_timeout = 0
-    
-    def check_spin_parry(self, attacker, particles):
-        """Check if this fighter's Spin Parry successfully blocks an attack.
-        Returns True if parry succeeded."""
-        if not self.spin_parry_active:
-            return False
         
-        # Check if attacker's sword is within parry radius
-        (_, _), (tip_x, tip_y) = attacker.get_sword_hitbox()
-        dist = math.hypot(tip_x - self.x, tip_y - self.y)
-        parry_radius = 55  # Slightly larger than visual indicator
-        
-        if dist < parry_radius:
-            # Parry successful! Scale knockback based on attacker's combo step
-            self.skill_data['parried'] = True
-            self.spin_parry_active = False
-            
-            # Knockback scales with combo step (Pierce = massive punish)
-            base_knockback = 15
-            if attacker.combo_step == 3:  # Pierce
-                knockback_mult = 2.0  # Massive punish
-            elif attacker.combo_step == 2:  # Right slash
-                knockback_mult = 1.3
-            else:
-                knockback_mult = 1.0
-            
-            # Visual effects
-            particles.emit_sparks(self.x, self.y)
-            particles.emit_ring(self.x, self.y, YELLOW, 40, count=12)
-            self.flash_timer = 8
-            
-            # Knockback attacker
-            angle_to_attacker = math.atan2(attacker.y - self.y, attacker.x - self.x)
-            attacker.vx = math.cos(angle_to_attacker) * base_knockback * knockback_mult
-            attacker.vy = math.sin(angle_to_attacker) * base_knockback * knockback_mult
-            
-            # Reset attacker's combo
-            attacker.combo_step = 0
-            attacker.combo_timer = 0
-            attacker.combo_recovery = 15  # Brief stun
-            
-            return True
-        
-        return False
-    
-    # ===== 3-Hit Combo System =====
-    
-    def start_combo_attack(self, opponent):
-        """Initiate or continue the combo chain. Returns True if attack started."""
-        # Can't attack during skill, recovery, or cooldown
-        if self.active_skill is not None:
-            return False
-        if self.combo_recovery > 0:
-            return False
-        if self.attack_cooldown > 0:
-            return False
-        if self.locked:
-            return False
-        
-        # Advance combo step (1 -> 2 -> 3 -> 1)
-        if self.combo_step == 0 or self.combo_timeout > self.COMBO_TIMEOUT_FRAMES:
-            self.combo_step = 1  # Start fresh
-        else:
-            self.combo_step = (self.combo_step % 3) + 1
-        
-        self.combo_timer = self.COMBO_ACTIVE_FRAMES
-        self.combo_timeout = 0
-        
-        # Get base facing direction toward opponent
-        dx = opponent.x - self.x
-        dy = opponent.y - self.y
-        base_angle = math.atan2(dy, dx)
-        
-        # Apply starting angle from COMBO_SWING (relative to facing)
-        swing_data = self.COMBO_SWING[self.combo_step]
-        self.combo_swing_angle = base_angle + swing_data['start']
-        self.sword_angle = self.combo_swing_angle
-        
-        return True
-    
-    def update_combo(self):
-        """Update combo timers and state. Called each frame."""
-        if self.combo_timer > 0:
-            self.combo_timer -= 1
-            
-            swing_data = self.COMBO_SWING.get(self.combo_step, {})
-            
-            if self.combo_step in [1, 2]:
-                # Animate sword swing from start to end angle
-                total_sweep = swing_data.get('arc', math.radians(90))
-                swing_per_frame = total_sweep / self.COMBO_ACTIVE_FRAMES
-                
-                if self.combo_step == 1:
-                    # Hit 1: Left to right (decreasing angle: 180° -> 45°)
-                    self.sword_angle -= swing_per_frame
-                else:
-                    # Hit 2: Right to left (increasing angle: 0° -> 135°)
-                    self.sword_angle += swing_per_frame
-            # Pierce (step 3) doesn't swing - stays fixed
-            
-            if self.combo_timer == 0:
-                # Attack ended - enter recovery
-                if self.combo_step == 3:
-                    self.combo_recovery = self.COMBO_PIERCE_RECOVERY
-                else:
-                    self.combo_recovery = self.COMBO_RECOVERY_FRAMES
-        
-        if self.combo_recovery > 0:
-            self.combo_recovery -= 1
-        
-        # Count frames since last hit for timeout
-        if self.combo_step > 0 and self.combo_timer == 0 and self.combo_recovery == 0:
-            self.combo_timeout += 1
-            if self.combo_timeout > self.COMBO_TIMEOUT_FRAMES:
-                self.combo_step = 0  # Reset combo
-    
-    def is_combo_active(self):
-        """Check if currently in an active combo attack frame."""
-        return self.combo_timer > 0
-    
-    def get_combo_damage_mult(self):
-        """Get damage multiplier for current combo step."""
-        return self.COMBO_DAMAGE.get(self.combo_step, 1.0)
-    
-    def get_combo_arc(self):
-        """Get arc width for current combo step hitbox."""
-        swing_data = self.COMBO_SWING.get(self.combo_step, {})
-        return swing_data.get('arc', math.radians(60))
-    
-    def on_combo_hit(self):
-        """Called when combo attack successfully hits. Resets timeout."""
-        self.combo_timeout = 0
-    
-    def on_combo_blocked(self):
-        """Called when combo is blocked by shield. Resets combo."""
-        self.combo_step = 0
-        self.combo_timer = 0
-        self.combo_recovery = 12  # Brief stagger
-    
-    def on_take_damage_combo_reset(self):
-        """Called when taking damage. Resets combo."""
-        self.combo_step = 0
-        self.combo_timer = 0
-        self.combo_recovery = 0
-        self.combo_timeout = 0
-    
-    def check_sword_clash(self, opponent, particles):
-        """Check if this fighter's basic attack clashes with opponent's skill.
-        Returns skill type if clash occurred, None otherwise.
-        Only triggers when THIS fighter is mid-combo attack."""
-        if not self.is_combo_active():
-            return None
-        
-        # Only check when opponent has an active skill (not Final Flash Draw)
-        if opponent.active_skill is None:
-            return None
-        if opponent.active_skill == SkillType.FINAL_FLASH_DRAW:
-            return None  # Cannot be clashed
-        
-        # Check if sword arc intersects skill hitbox
-        # Use sword tip position
-        (_, _), (tip_x, tip_y) = self.get_sword_hitbox()
-        
-        # Calculate distance to opponent (skill center)
-        dist = math.hypot(tip_x - opponent.x, tip_y - opponent.y)
-        clash_radius = 60  # Tunable
-        
-        if dist < clash_radius:
-            # CLASH! Return the skill type for specific handling
-            clashed_skill = opponent.active_skill
-            
-            # Visual feedback
-            clash_x = (tip_x + opponent.x) / 2
-            clash_y = (tip_y + opponent.y) / 2
-            particles.emit(clash_x, clash_y, WHITE, count=8, size=4, lifetime=8)
-            
-            return clashed_skill
-        
-        return None
-    
-    def check_sword_on_sword_parry(self, opponent):
-        """Check if this fighter's sword collides with opponent's sword.
-        Returns True if both swords intersect during active combo attacks.
-        This triggers a mutual parry - no damage, combo reset for both."""
-        # Both fighters must be mid-combo attack
-        if not self.is_combo_active():
-            return False
-        if not opponent.is_combo_active():
-            return False
-        
-        # Get both sword hitboxes
-        (my_base_x, my_base_y), (my_tip_x, my_tip_y) = self.get_sword_hitbox()
-        (opp_base_x, opp_base_y), (opp_tip_x, opp_tip_y) = opponent.get_sword_hitbox()
-        
-        # Line segment intersection check
-        # Simplified: check if sword tips are close to each other's sword lines
-        
-        # Check if my tip is close to opponent's sword line
-        my_tip_to_opp_line = self._point_to_line_distance(
-            my_tip_x, my_tip_y,
-            opp_base_x, opp_base_y, opp_tip_x, opp_tip_y
-        )
-        
-        # Check if opponent's tip is close to my sword line
-        opp_tip_to_my_line = self._point_to_line_distance(
-            opp_tip_x, opp_tip_y,
-            my_base_x, my_base_y, my_tip_x, my_tip_y
-        )
-        
-        # Parry threshold
-        parry_distance = 15  # Tunable
-        
-        if my_tip_to_opp_line < parry_distance or opp_tip_to_my_line < parry_distance:
-            return True
-        
-        return False
-    
-    def _point_to_line_distance(self, px, py, x1, y1, x2, y2):
-        """Calculate distance from point (px, py) to line segment (x1,y1)-(x2,y2)."""
-        # Line segment vector
-        dx = x2 - x1
-        dy = y2 - y1
-        
-        # Handle zero-length line
-        length_sq = dx * dx + dy * dy
-        if length_sq < 0.001:
-            return math.hypot(px - x1, py - y1)
-        
-        # Project point onto line, clamped to segment
-        t = max(0, min(1, ((px - x1) * dx + (py - y1) * dy) / length_sq))
-        
-        # Closest point on segment
-        closest_x = x1 + t * dx
-        closest_y = y1 + t * dy
-        
-        return math.hypot(px - closest_x, py - closest_y)
-
-
+        self.rotation_clockwise = True
+        self.last_hit_frame = -100
+        self.rotation_paused = False
+        self.attack_recovery = 0

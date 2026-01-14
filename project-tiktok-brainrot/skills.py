@@ -1,5 +1,5 @@
 """
-Skill system with 7 skill-based power-ups.
+Skill system with 5 skill-based power-ups.
 Each skill focuses on animation timing, hit-stop, and visual feedback.
 Spin Parry is a high-risk, high-reward reactive parry skill.
 """
@@ -8,7 +8,7 @@ import pygame
 import math
 import random
 
-from config import WHITE, CYAN, ORANGE, PURPLE, GREEN, YELLOW, GOLD, PINK
+from config import WHITE, CYAN, ORANGE, PURPLE, GREEN, YELLOW
 
 
 class SkillType:
@@ -17,18 +17,14 @@ class SkillType:
     SPIN_PARRY = 1      # Reactive parry with spin stance
     GROUND_SLAM = 2     # Jump + plunge with shockwave
     SHIELD = 3          # Parry stance with barrier
-    PHANTOM_CROSS = 4   # Blink behind + X-slash
-    BLADE_CYCLONE = 5   # Spinning vortex multi-hit
-    FINAL_FLASH_DRAW = 6  # Iaido-style instant slash
+    BLADE_CYCLONE = 4   # Spinning vortex multi-hit (was 5, now 4)
     
     NAMES = {
         0: "Dash Slash",
         1: "Spin Parry",
         2: "Ground Slam",
         3: "Shield",
-        4: "Phantom Cross",
-        5: "Blade Cyclone",
-        6: "Final Flash Draw"
+        4: "Blade Cyclone"
     }
     
     COLORS = {
@@ -36,9 +32,7 @@ class SkillType:
         1: ORANGE,      # Spin Parry - orange
         2: PURPLE,      # Ground Slam - purple
         3: GREEN,       # Shield - green
-        4: PINK,        # Phantom Cross - pink
-        5: YELLOW,      # Blade Cyclone - yellow
-        6: GOLD         # Final Flash Draw - gold
+        4: YELLOW       # Blade Cyclone - yellow
     }
 
 
