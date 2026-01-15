@@ -1,203 +1,180 @@
-# ⚔️ Red vs Blue Battle
+# 🔴 Red vs Blue Battle 🔵
 
-![Python](https://img.shields.io/badge/Python-3.8+-blue?style=flat-square&logo=python&logoColor=white)
-![Pygame](https://img.shields.io/badge/Pygame-2.0+-green?style=flat-square&logo=python&logoColor=white)
-![License](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)
-
-**A physics-based sword battle animation optimized for TikTok and YouTube Shorts.**
-
-Red vs Blue Battle is a DVD-style bouncing combat game featuring rotating swords, skill-based power-ups, and stunning visual effects. Two AI-controlled fighters bounce around a square arena, continuously spinning their swords while collecting power-ups to unleash devastating skill moves. Perfect for creating engaging short-form video content.
+> A fast-paced, minimalist 2D sword fighting simulation inspired by DVD screensaver physics. Watch as two AI-controlled fighters bounce around an arena, trading blows with swinging swords in epic, bite-sized battles perfect for social media content.
 
 ---
 
-## ✨ Key Features
+## 📖 Project Overview
 
-- **DVD Logo Physics** — Fighters bounce around the arena at constant velocity with satisfying wall bounces
-- **Continuous Sword Rotation** — Swords always spin, creating dynamic sword-on-sword parries and body hits
-- **5 Unique Skills** — Collectible power-ups grant special abilities (Dash Slash, Spin Parry, Ground Slam, Shield, Blade Cyclone)
-- **Juicy Combat Feel** — Hit-stop, slow-motion effects, screen shake, and particle explosions
-- **Arena Escalation** — Prevents stalemates with arena pulses and shrinking boundaries
-- **Optimized for Short-Form** — Rounds designed for 30-second TikTok-friendly loops
-- **Modular Skill System** — Easy to add new skills via the registry pattern
+**Red vs Blue Battle** is an automated AI-vs-AI combat simulation built for endless, satisfying content loops. The game features two circular fighters—one Red, one Blue—bouncing around a shrinking arena like a DVD screensaver while wielding swords that swing in fluid combo attacks.
 
----
+### Core Loop
+1. **Countdown** → "3-2-1-FIGHT" initiates each round
+2. **Battle Phase** → Fighters autonomously bounce, collide, and attack
+3. **Escalation** → The arena shrinks over time, forcing combat
+4. **Resolution** → Slow-motion death sequence with particle explosion
+5. **Repeat** → Auto-reset for the next round
 
-## 🎮 Combat Philosophy
-
-| Principle | Description |
-|-----------|-------------|
-| **Skill Autotargeting** | Skills always face and launch toward opponent (but can still miss) |
-| **No Auto-hit** | Skills can be blocked, parried, or clashed |
-| **Interaction Over Randomness** | Every action creates meaningful combat engagement |
-| **DVD Movement** | Constant-speed wall-bouncing is never modified by attacks |
+The aesthetic is intentionally minimalist—solid-colored circles with inner highlights, simple line swords, and health bars—but the combat *feels* punchy thanks to hit-stop, screen shake, and slow-motion effects.
 
 ---
 
-## 🛠️ Tech Stack
+## 🏆 Objective & Win/Lose Conditions
 
-| Technology | Purpose |
-|------------|---------|
-| **Python 3.8+** | Core programming language |
-| **Pygame 2.0+** | Game engine, rendering, and audio |
+### Victory Condition
+A fighter wins when their opponent's **health drops to zero**. When this happens:
+- Slow-motion kicks in at 20% speed
+- The loser explodes in a burst of colored particles
+- The winner performs a celebratory bounce animation
+- The round resets after a brief delay
 
----
+### Timeout Condition
+If neither fighter is eliminated within **45 seconds** (`ROUND_MAX_TIME`), the fighter **closest to the arena center** wins the round. This prevents stalemates and rewards aggressive, center-controlling play.
 
-## 📋 Prerequisites
-
-- Python 3.8 or higher
-- pip (Python package manager)
-
----
-
-## 🚀 Installation
-
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/zachhallare/project-tiktok-brainrot.git
-   cd project-tiktok-brainrot
-   ```
-
-2. **Install dependencies**
-   ```bash
-   pip install pygame
-   ```
-
-3. **(Optional) Add sound files**
-   
-   Replace `.txt` placeholder files in `project-tiktok-brainrot/sounds/` with actual `.wav` or `.ogg` audio files:
-   - `dash_slash.wav`
-   - `spin_parry.wav`
-   - `ground_slam.wav`
-   - `shield.wav`
-   - `blade_cyclone.wav`
-   - `hit_impact.wav`
-   - `explosion.wav`
-   - `arena_pulse.wav`
-   - `arena_shrink.wav`
+### Failure State
+There is no player failure state—this is an automated simulation. Both fighters are AI-controlled, so rounds always resolve naturally.
 
 ---
 
-## ▶️ Usage
+## ⚔️ Combat Mechanics
 
-**Run the game:**
-```bash
-cd project-tiktok-brainrot
-python main.py
-```
+### Attack Triggering
+Attacks are triggered **automatically** when fighters are within **120 pixels** of each other (`attack_trigger_range`). There are no player inputs—the AI decides when to swing based on proximity.
 
-**Controls:**
-| Key | Action |
-|-----|--------|
-| `SPACE` / `CLICK` | Start game from title screen |
-| `SPACE` | Pause / Resume |
-| `R` | Reset round |
-| `ESC` | Exit game |
+### Weapon System: Combo Sword Attacks
+The combat uses a **3-hit combo system** with escalating damage:
 
----
+| Combo Stage | Attack Type | Arc Width | Damage Multiplier |
+|-------------|-------------|-----------|-------------------|
+| **1st Hit** | Left Slash  | ~120°     | 1.0x (10 damage)  |
+| **2nd Hit** | Right Slash | ~90°      | 1.2x (12 damage)  |
+| **3rd Hit** | Pierce      | ~30°      | 1.5x (15 damage)  |
 
-## ⚔️ Combat System
+#### Attack Mechanics
+- **Attack Duration:** 12 frames per swing
+- **Attack Cooldown:** 8 frames between attacks
+- **Combo Timeout:** 45 frames to land the next hit or the combo resets
+- **Pierce Extended Reach:** The 3rd hit extends sword length by 30%
 
-### Continuous Rotation Combat
+### Damage & Collision
+- **Hitbox:** Sword collision is checked at 50%, 75%, and 100% of sword length
+- **Hit Detection:** If any hitbox point is within the defender's body radius + 8 pixels, damage is dealt
+- **Invincibility Frames:** 10 frames of immunity after taking damage
+- **Knockback:** Varies slightly based on combo stage (1.0x to 1.25x)
 
-Swords constantly rotate around each fighter. When the sword tip connects with an opponent's body, it deals damage. Two rotating swords meeting causes a **parry** — a satisfying clash with slow-motion and knockback.
-
-### Defensive Triangle
-
-| Defense | Risk | Effect |
-|---------|------|--------|
-| **Shield** | Safe | Blocks one hit, resets attacker momentum |
-| **Spin Parry** | High | Cancels attacks, massive knockback on success |
-| **Sword Clash** | Medium | Basic rotation deflects/weakens incoming skills |
-
-### Sword Clash Outcomes
-
-| Skill | Clash Result |
-|-------|--------------|
-| Dash Slash | Deflected off-angle |
-| Spin Parry | Dissipates (when active) |
-| Ground Slam | Shockwave reduced |
-| Blade Cyclone | Pushback only |
+### Hit Feedback
+Each successful hit triggers:
+- **Hit-Stop:** 3 frames (5 frames for pierce attacks)
+- **Hit Slow-Mo:** 5 frames at 60% speed
+- **Screen Shake:** Intensity 8, decaying at 85% per frame
+- **Particle Burst:** 10 white particles
+- **Sound Effect:** Procedurally generated hit sound
 
 ---
 
-## 🌟 Skills (5 Total)
+## 🎮 Movement & Physics
 
-| Skill | Color | Description |
-|-------|-------|-------------|
-| **Dash Slash** | Cyan | High-speed burst toward opponent with trailing particles |
-| **Spin Parry** | Orange | Reactive parry stance with knockback on successful counter |
-| **Ground Slam** | Purple | Jump into the air and plunge with a shockwave impact |
-| **Shield** | Green | Instant one-hit block barrier |
-| **Blade Cyclone** | Yellow | Spinning vortex multi-hit attack |
+### DVD Screensaver Physics
+Fighters use a unique **constant-velocity bounce** system inspired by DVD screensaver logos:
+
+- **Drag:** `1.0` (no drag—velocity is maintained)
+- **Bounce Energy:** `1.0` (perfect elastic bounces)
+- **Minimum Velocity:** 10 pixels/frame
+- **Maximum Velocity:** 20 pixels/frame
+- **Initial Velocity:** Random between -8 and +8 on both axes
+
+If a fighter ever stops moving (velocity = 0), they're given a random directional nudge to keep the action flowing.
+
+### Ninja Wall Boosts
+When bouncing off walls, fighters receive a **4 pixel/frame velocity boost toward the arena center**. This prevents corner camping and naturally guides fighters back into combat.
+
+### Sword Orientation
+The sword **always points toward the opponent**, with an angular offset based on the current combo stage:
+- **Left Slash Ready:** Sword angled 0.6 radians to the left
+- **Right Slash Ready:** Sword angled 0.6 radians to the right  
+- **Pierce Ready:** Sword straight ahead
 
 ---
 
-## ⏱️ Arena Escalation
+## 🎯 Arena Escalation System
 
-Prevents stalemates without random punishment:
+To prevent stalemates and keep battles short, the arena features multiple escalation mechanics:
 
-| Timer | Event | Effect |
-|-------|-------|--------|
-| 5s inactivity | **Arena Pulse** | Visual wave, fighters nudged to center |
-| 8s+ inactivity | **Shrinking Walls** | Arena slowly shrinks (pauses on hit) |
+### Time-Based Shrinking
+- Every **10 seconds**, the arena shrinks by 12 pixels per side
+- Minimum arena size: 300x300 pixels
+
+### Inactivity Pressure
+If no combat occurs for **5 seconds**:
+1. **Arena Pulse** — Purple shockwave pushes fighters toward center (4 velocity boost)
+2. **Warning Phase** — Arena border turns yellow (3 additional seconds)
+3. **Rapid Shrink** — Arena border turns orange and shrinks at 0.3 px/frame continuously
+
+Any successful hit pauses the shrink for 2 seconds, rewarding aggression.
 
 ---
 
-## 📁 Project Structure
+## 🕹️ Controls
 
+| Key          | Action                           |
+|--------------|----------------------------------|
+| **SPACE**    | Start game / Pause               |
+| **R**        | Reset current round              |
+| **ESC**      | Exit game                        |
+| **Mouse Click** | Start game (title screen only) |
+
+---
+
+## 🛠️ Technical Stack
+
+| Component    | Technology                        |
+|--------------|-----------------------------------|
+| **Language** | Python 3.x                        |
+| **Framework**| Pygame (game loop, rendering, audio) |
+| **Audio**    | Procedurally generated at runtime |
+| **Physics**  | Custom bounce-based movement      |
+
+### Project Structure
 ```
 project-tiktok-brainrot/
-├── project-tiktok-brainrot/
-│   ├── main.py            # Game loop, combat logic, title screen
-│   ├── fighter.py         # Fighter class, movement, skills, drawing
-│   ├── effects.py         # Particles, shockwaves, slash effects
-│   ├── config.py          # Game constants and settings
-│   ├── skills.py          # Skill types and SkillOrb (legacy)
-│   ├── sound_manager.py   # Audio system with fallback support
-│   ├── utils.py           # Utility functions (lerp, clamp, etc.)
-│   ├── skills/            # Modular skill system
-│   │   ├── __init__.py    # Skill exports and SkillType enum
-│   │   ├── base.py        # BaseSkill abstract class
-│   │   ├── registry.py    # Skill registration system
-│   │   └── orb.py         # SkillOrb power-up collectible
-│   └── sounds/            # Audio placeholders (.txt → replace with .wav/.ogg)
-├── LICENSE                # MIT License
-└── README.md              # Documentation
+├── main.py           # Game loop, combat handling, rendering
+├── fighter.py        # Fighter class with movement and attacks
+├── config.py         # All tuning constants and physics values
+├── effects.py        # Particle, shockwave, and slash effects
+├── sound_manager.py  # Sound generation utilities
+├── utils.py          # Helper functions
+└── sounds/           # Audio assets directory
 ```
 
 ---
 
-## ⚙️ Configuration
+## 🚀 Quick Start
 
-Key settings in `config.py`:
+```bash
+# Install dependencies
+pip install pygame
 
-| Constant | Default | Description |
-|----------|---------|-------------|
-| `SCREEN_WIDTH` | 600 | Window width (1:1 aspect ratio) |
-| `SCREEN_HEIGHT` | 600 | Window height |
-| `FPS` | 60 | Target frame rate |
-| `BASE_HEALTH` | 240 | Fighter health points |
-| `MAX_VELOCITY` | 20 | Maximum movement speed |
-| `WEAPON_ROTATION_SPEED` | 0.18 | Radians per frame (~10.3°/frame) |
-| `SLOW_MOTION_SPEED` | 0.20 | Death sequence slow-mo (20% speed) |
-| `PARRY_SLOWMO_TIMESCALE` | 0.30 | Parry slow-mo (30% speed) |
+# Run the game
+python project-tiktok-brainrot/main.py
+```
 
 ---
 
-## 🏆 Victory
+## 📊 Key Constants Reference
 
-Victory is indicated by a slow-motion death sequence. The winning fighter continues bouncing as the loser fades out. No text overlay — pure visual storytelling.
+| Constant              | Value | Description                          |
+|-----------------------|-------|--------------------------------------|
+| `SCREEN_WIDTH`        | 600   | Window width in pixels               |
+| `SCREEN_HEIGHT`       | 600   | Window height in pixels              |
+| `FPS`                 | 60    | Target frames per second             |
+| `BASE_HEALTH`         | 240   | Hit points per fighter               |
+| `DAMAGE_PER_HIT`      | 10    | Base damage (before multipliers)     |
+| `FIGHTER_RADIUS`      | 30    | Fighter body size                    |
+| `SWORD_LENGTH`        | 55    | Sword reach in pixels                |
+| `ROUND_MAX_TIME`      | 45    | Force resolution after 45 seconds    |
 
 ---
 
 ## 📜 License
 
-This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
-
----
-
-## 🙏 Acknowledgments
-
-- Inspired by classic DVD screensaver physics
-- Built with [Pygame](https://www.pygame.org/)
-- Designed for TikTok content creation
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
