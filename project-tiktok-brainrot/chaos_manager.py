@@ -9,7 +9,7 @@ import pygame
 
 from config import (
     FPS, CHAOS_MIN_INTERVAL, CHAOS_MAX_INTERVAL, CHAOS_DURATION,
-    NEON_RED, NEON_BLUE, NEON_BG, WHITE, BLACK
+    NEON_RED, NEON_BLUE, NEON_BG, WHITE, BLACK, ORANGE
 )
 
 
@@ -18,13 +18,13 @@ class ChaosManager:
     
     # All available chaos events
     EVENTS = [
-        "HYPER SPEED",   # 2.0x physics speed
-        "GIANT MODE",    # 2.0x fighter size
-        "TINY TERROR",   # 0.5x size, 1.5x speed & damage
-        "DISCO FEVER",   # Rainbow colors, constant particles
-        "TUMBLE DRYER",  # Rotational clockwise gravity
+        "HYPER SPEED",   # 3.0x physics speed (incredibly fast)
+        "SPIKE WALLS",   # Walls deal damage + 3x knockback
+        "TINY TERROR",   # 0.5x body size, normal sword, slower attacks, 1.5x damage
+        "DISCO FEVER",   # Rainbow colors, particles, 100% life steal
+        "TUMBLE DRYER",  # VERY strong rotational gravity
         "THE CRUSHER",   # Arena shrinks to 50%
-        "BLACKOUT"       # White BG, black fighters, no UI
+        "BLACKOUT"       # White BG, black fighters + health bars
     ]
     
     def __init__(self):
@@ -43,6 +43,10 @@ class ChaosManager:
         # Crusher state
         self.crusher_arena_mult = 1.0
         self.crusher_shrinking = True
+        self.crusher_fighters_pushed = False  # Safety teleport flag
+        
+        # Spike walls state
+        self.spike_wall_flash_timer = 0
         
         # Stored original arena for Crusher
         self.original_arena = None
@@ -68,11 +72,14 @@ class ChaosManager:
                         particles.emit(fighter.x, fighter.y, color, count=2, size=3, lifetime=15)
             
             elif self.active_event == "TUMBLE DRYER":
-                self.tumble_angle += 0.05  # Rotate clockwise
+                self.tumble_angle += 0.15  # Much faster rotation
+            
+            elif self.active_event == "SPIKE WALLS":
+                self.spike_wall_flash_timer += 1
             
             elif self.active_event == "THE CRUSHER":
                 if self.crusher_shrinking:
-                    self.crusher_arena_mult = max(0.5, self.crusher_arena_mult - dt * 0.2)
+                    self.crusher_arena_mult = max(0.5, self.crusher_arena_mult - dt * 0.3)
                     if self.crusher_arena_mult <= 0.5:
                         self.crusher_shrinking = False
             
@@ -103,6 +110,10 @@ class ChaosManager:
         elif self.active_event == "THE CRUSHER":
             self.crusher_arena_mult = 1.0
             self.crusher_shrinking = True
+            self.crusher_fighters_pushed = False  # Reset safety flag
+        
+        elif self.active_event == "SPIKE WALLS":
+            self.spike_wall_flash_timer = 0
         
         return self.active_event
     
@@ -115,21 +126,29 @@ class ChaosManager:
         # Reset Crusher
         self.crusher_arena_mult = 1.0
         self.crusher_shrinking = True
+        self.crusher_fighters_pushed = False
     
     def get_speed_mult(self):
         """Get current physics/movement speed multiplier."""
         if self.active_event == "HYPER SPEED":
-            return 2.0
-        elif self.active_event == "TINY TERROR":
-            return 1.5
+            return 3.0  # Incredibly fast/uncontrollable
         return 1.0
     
-    def get_size_mult(self):
-        """Get current fighter size multiplier."""
-        if self.active_event == "GIANT MODE":
-            return 2.0
-        elif self.active_event == "TINY TERROR":
-            return 0.5
+    def get_body_size_mult(self):
+        """Get current fighter BODY size multiplier (separate from sword)."""
+        if self.active_event == "TINY TERROR":
+            return 0.5  # Body shrinks
+        return 1.0
+    
+    def get_sword_size_mult(self):
+        """Get current SWORD size multiplier (stays normal for Tiny Terror)."""
+        # Sword always stays normal size
+        return 1.0
+    
+    def get_attack_speed_mult(self):
+        """Get attack speed multiplier (lower = slower attacks)."""
+        if self.active_event == "TINY TERROR":
+            return 0.5  # Slower attacks
         return 1.0
     
     def get_damage_mult(self):
@@ -137,6 +156,12 @@ class ChaosManager:
         if self.active_event == "TINY TERROR":
             return 1.5
         return 1.0
+    
+    def get_life_steal(self):
+        """Get life steal percentage (0.0 to 1.0)."""
+        if self.active_event == "DISCO FEVER":
+            return 1.0  # 100% life steal (vampirism)
+        return 0.0
     
     def get_fighter_color(self, original_color, is_blue=True):
         """Get fighter color (modified for Disco/Blackout)."""
@@ -146,6 +171,12 @@ class ChaosManager:
             # Offset hue for blue vs red
             offset = 0 if is_blue else 180
             return self._hue_to_rgb((self.disco_hue + offset) % 360)
+        return original_color
+    
+    def get_health_bar_color(self, original_color):
+        """Get health bar color (black during Blackout, otherwise normal)."""
+        if self.active_event == "BLACKOUT":
+            return BLACK
         return original_color
     
     def get_bg_color(self):
@@ -161,7 +192,7 @@ class ChaosManager:
         return NEON_BG
     
     def get_gravity_force(self, fighter_x, fighter_y, center_x, center_y):
-        """Get Tumble Dryer rotational gravity force."""
+        """Get Tumble Dryer rotational gravity force - VERY STRONG."""
         if self.active_event != "TUMBLE DRYER":
             return (0, 0)
         
@@ -170,12 +201,13 @@ class ChaosManager:
         dy = fighter_y - center_y
         dist = max(1, math.hypot(dx, dy))
         
-        # Push perpendicular (clockwise) with force proportional to distance
-        # Clockwise = rotate angle by -90 degrees
+        # Push perpendicular (clockwise) with VERY STRONG force
+        # Force proportional to distance from center
         angle = math.atan2(dy, dx)
         push_angle = angle - math.pi / 2  # Perpendicular clockwise
         
-        force_strength = 0.8  # Constant force
+        # MUCH stronger force - overrides normal bouncing
+        force_strength = 3.5 + (dist / 100)  # Stronger further from center
         fx = math.cos(push_angle) * force_strength
         fy = math.sin(push_angle) * force_strength
         
@@ -187,6 +219,33 @@ class ChaosManager:
             return self.crusher_arena_mult
         return 1.0
     
+    def is_spike_walls(self):
+        """Check if Spike Walls event is active."""
+        return self.active_event == "SPIKE WALLS"
+    
+    def get_spike_wall_damage(self):
+        """Get damage dealt by spike walls on contact."""
+        if self.active_event == "SPIKE WALLS":
+            return 15
+        return 0
+    
+    def get_spike_wall_knockback_mult(self):
+        """Get knockback multiplier for spike walls (pinball effect)."""
+        if self.active_event == "SPIKE WALLS":
+            return 3.0
+        return 1.0
+    
+    def get_wall_glow_color(self):
+        """Get wall glow color for Spike Walls."""
+        if self.active_event == "SPIKE WALLS":
+            # Pulsing between red and orange
+            pulse = (math.sin(self.spike_wall_flash_timer * 0.15) + 1) / 2
+            r = int(255 * pulse + 200 * (1 - pulse))
+            g = int(100 * pulse + 50 * (1 - pulse))
+            b = int(0)
+            return (r, g, b)
+        return None
+    
     def is_blackout(self):
         """Check if Blackout event is active."""
         return self.active_event == "BLACKOUT"
@@ -194,6 +253,17 @@ class ChaosManager:
     def is_disco(self):
         """Check if Disco Fever is active."""
         return self.active_event == "DISCO FEVER"
+    
+    def is_crusher(self):
+        """Check if The Crusher event is active."""
+        return self.active_event == "THE CRUSHER"
+    
+    def needs_crusher_safety_push(self):
+        """Check if fighters need to be pushed inside Crusher arena."""
+        if self.active_event == "THE CRUSHER" and not self.crusher_fighters_pushed:
+            self.crusher_fighters_pushed = True
+            return True
+        return False
     
     def get_event_progress(self):
         """Get progress through current event (0.0 to 1.0)."""

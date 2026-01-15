@@ -269,6 +269,14 @@ class Game:
                     self.hit_slowmo_frames = HIT_SLOWMO_FRAMES
                     attacker.on_attack_hit(self.round_timer)
                     self._reset_inactivity()
+                    
+                    # DISCO FEVER: 100% Life Steal (vampirism)
+                    life_steal = self.chaos.get_life_steal()
+                    if life_steal > 0:
+                        heal_amount = damage * life_steal
+                        attacker.health = min(attacker.max_health, attacker.health + heal_amount)
+                        # Visual feedback for healing
+                        self.particles.emit(attacker.x, attacker.y, (100, 255, 100), count=6, size=3)
 
     def _trigger_hit(self, x, y, color, hit_stop_frames=None, damage=0):
         """Apply hit effects including damage numbers."""
@@ -426,48 +434,76 @@ class Game:
         dt = 1.0 / FPS
         self.chaos.update(dt, self.particles, [self.blue, self.red])
         
-        # Apply chaos modifiers to fighters
+        # Get chaos modifiers
         speed_mult = self.chaos.get_speed_mult()
-        size_mult = self.chaos.get_size_mult()
+        body_size_mult = self.chaos.get_body_size_mult()
+        sword_size_mult = self.chaos.get_sword_size_mult()
+        attack_speed_mult = self.chaos.get_attack_speed_mult()
         center_x = SCREEN_WIDTH // 2
         center_y = SCREEN_HEIGHT // 2
         
+        # Apply chaos modifiers to fighters
         for fighter in [self.blue, self.red]:
-            # Apply size multiplier
-            fighter.size_multiplier = size_mult
+            # Apply separate body and sword size multipliers
+            fighter.body_size_multiplier = body_size_mult
+            fighter.sword_size_multiplier = sword_size_mult
+            
+            # Apply attack speed multiplier
+            fighter.attack_speed_multiplier = attack_speed_mult
             
             # Apply chaos color overrides
             fighter.render_color = self.chaos.get_fighter_color(fighter.color, fighter.is_blue)
             fighter.render_color_bright = self.chaos.get_fighter_color(fighter.color_bright, fighter.is_blue)
             
-            # Apply Tumble Dryer rotational gravity
+            # Apply health bar color (BLACK during Blackout)
+            fighter.health_bar_color = self.chaos.get_health_bar_color(fighter.color)
+            
+            # Apply Tumble Dryer rotational gravity (VERY STRONG)
             fx, fy = self.chaos.get_gravity_force(fighter.x, fighter.y, center_x, center_y)
             fighter.vx += fx
             fighter.vy += fy
             
-            # Apply speed multiplier to velocity
+            # Apply speed multiplier to velocity (HYPER SPEED = 3.0x)
             if speed_mult != 1.0:
-                fighter.vx *= (1.0 + (speed_mult - 1.0) * 0.1)  # Gradual speed change
-                fighter.vy *= (1.0 + (speed_mult - 1.0) * 0.1)
+                fighter.vx *= (1.0 + (speed_mult - 1.0) * 0.15)  # More aggressive speed scaling
+                fighter.vy *= (1.0 + (speed_mult - 1.0) * 0.15)
         
         # Calculate arena bounds with Crusher modifier
         arena_mult = self.chaos.get_arena_mult()
         if arena_mult < 1.0:
             # Apply Crusher shrinking
-            base_ax, base_ay, base_aw, base_ah = self.base_arena
-            shrink = (1.0 - arena_mult) * min(base_aw, base_ah) / 2
+            shrink = (1.0 - arena_mult) * min(self.arena_bounds[2], self.arena_bounds[3]) / 2
             effective_arena = (
                 self.arena_bounds[0] + shrink,
                 self.arena_bounds[1] + shrink,
                 max(200, self.arena_bounds[2] - shrink * 2),
                 max(200, self.arena_bounds[3] - shrink * 2)
             )
+            
+            # Crusher safety push - push fighters inside if they're outside new bounds
+            if self.chaos.needs_crusher_safety_push():
+                for fighter in [self.blue, self.red]:
+                    ax, ay, aw, ah = effective_arena
+                    # Clamp fighter position inside arena with margin
+                    margin = fighter.current_radius + 5
+                    if fighter.x < ax + margin:
+                        fighter.x = ax + margin
+                    elif fighter.x > ax + aw - margin:
+                        fighter.x = ax + aw - margin
+                    if fighter.y < ay + margin:
+                        fighter.y = ay + margin
+                    elif fighter.y > ay + ah - margin:
+                        fighter.y = ay + ah - margin
         else:
             effective_arena = tuple(self.arena_bounds)
         
         # Update fighters with effective arena
         self.blue.update(self.red, effective_arena, self.particles, self.shockwaves)
         self.red.update(self.blue, effective_arena, self.particles, self.shockwaves)
+        
+        # Handle Spike Walls damage/knockback
+        if self.chaos.is_spike_walls():
+            self._handle_spike_walls(effective_arena)
         
         self._handle_combat()
         
@@ -490,6 +526,53 @@ class Game:
                 self._end_round(winner=self.blue, loser=self.red)
             else:
                 self._end_round(winner=self.red, loser=self.blue)
+    
+    def _handle_spike_walls(self, arena_bounds):
+        """Handle Spike Walls damage and knockback when fighters touch walls."""
+        ax, ay, aw, ah = arena_bounds
+        damage = self.chaos.get_spike_wall_damage()
+        knockback_mult = self.chaos.get_spike_wall_knockback_mult()
+        
+        for fighter in [self.blue, self.red]:
+            if fighter.wall_damage_cooldown > 0:
+                continue
+            
+            r = fighter.current_radius
+            wall_hit = False
+            knockback_angle = 0
+            
+            # Check wall collisions
+            if fighter.x - r <= ax:  # Left wall
+                wall_hit = True
+                knockback_angle = 0  # Push right
+            elif fighter.x + r >= ax + aw:  # Right wall
+                wall_hit = True
+                knockback_angle = math.pi  # Push left
+            elif fighter.y - r <= ay:  # Top wall
+                wall_hit = True
+                knockback_angle = math.pi / 2  # Push down
+            elif fighter.y + r >= ay + ah:  # Bottom wall
+                wall_hit = True
+                knockback_angle = -math.pi / 2  # Push up
+            
+            if wall_hit:
+                # Apply spike damage
+                fighter.health -= damage
+                fighter.flash_timer = 8
+                fighter.wall_damage_cooldown = 30  # Cooldown before next wall damage
+                
+                # Apply 3x knockback (pinball bumper effect)
+                knockback_force = BASE_KNOCKBACK * knockback_mult
+                fighter.vx += math.cos(knockback_angle) * knockback_force
+                fighter.vy += math.sin(knockback_angle) * knockback_force
+                
+                # Visual and audio feedback
+                self.particles.emit(fighter.x, fighter.y, NEON_RED, count=12, size=5)
+                self.screen_shake = max(self.screen_shake, SCREEN_SHAKE_INTENSITY * 1.5)
+                self.damage_numbers.spawn(fighter.x, fighter.y - 20, damage, NEON_RED)
+                
+                if self.sounds_enabled:
+                    self.hit_sound.play()
 
     def _draw_title_screen(self):
         """Draw title screen."""
@@ -563,7 +646,11 @@ class Game:
         pygame.draw.rect(self.screen, arena_fill, arena_rect)
         
         # Arena border
-        if self.escalation_state == 'shrinking' or self.chaos.active_event == "THE CRUSHER":
+        if self.chaos.is_spike_walls():
+            # SPIKE WALLS: Glowing red/orange pulsing border
+            border_color = self.chaos.get_wall_glow_color()
+            border_width = 8  # Thicker glowing border
+        elif self.escalation_state == 'shrinking' or self.chaos.active_event == "THE CRUSHER":
             border_color = NEON_RED if not self.chaos.is_blackout() else BLACK
             border_width = 6
         elif self.escalation_state == 'pulse_triggered':
@@ -586,8 +673,8 @@ class Game:
         self.particles.draw(self.screen, offset)
         self.damage_numbers.draw(self.screen, offset)
         
-        # Draw chaos event banner (unless Blackout which hides UI)
-        if self.chaos.active_event and not self.chaos.is_blackout():
+        # Draw chaos event banner (always visible, black text during Blackout)
+        if self.chaos.active_event:
             self._draw_chaos_banner()
         
         # Countdown overlay
@@ -634,8 +721,11 @@ class Game:
         
         event_text = self.chaos.active_event
         
+        # Text color (BLACK during Blackout for contrast on white BG)
+        text_color = BLACK if self.chaos.is_blackout() else WHITE
+        
         # Render text
-        text_surface = self.font_chaos.render(event_text, True, WHITE)
+        text_surface = self.font_chaos.render(event_text, True, text_color)
         
         # Scale for pulse effect
         if pulse != 1.0:

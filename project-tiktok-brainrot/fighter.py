@@ -59,7 +59,7 @@ class Fighter:
         self.last_hit_frame = -100     # Frame of last successful hit
         self.combo_reset_timer = 0     # Timer to reset combo on miss/timeout
         
-        # Attack timing constants
+        # Attack timing constants (base values - modified by chaos)
         self.ATTACK_DURATION = 12      # Frames per swing
         self.ATTACK_COOLDOWN = 8       # Frames between attacks
         self.COMBO_TIMEOUT = 45        # Frames before combo resets
@@ -68,12 +68,23 @@ class Fighter:
         self.trail = []
         
         # Dynamic sizing (modified by chaos events)
-        self.size_multiplier = 1.0
-        self.current_radius = self.radius  # Actual collision radius
+        # Separate body and sword size for Tiny Terror
+        self.body_size_multiplier = 1.0   # Body/collision size
+        self.sword_size_multiplier = 1.0  # Sword length/reach
+        self.current_radius = self.radius  # Actual collision radius (body only)
+        
+        # Attack speed multiplier (lower = slower attacks)
+        self.attack_speed_multiplier = 1.0
+        
+        # Wall damage cooldown (for Spike Walls)
+        self.wall_damage_cooldown = 0
         
         # Render color (can be overridden by chaos events)
         self.render_color = color
         self.render_color_bright = color_bright
+        
+        # Health bar render color (for Blackout)
+        self.health_bar_color = color
     
 
     
@@ -200,8 +211,8 @@ class Fighter:
         if self.locked:
             return
         
-        # Update current radius based on size multiplier
-        self.current_radius = self.radius * self.size_multiplier
+        # Update current radius based on BODY size multiplier (not sword)
+        self.current_radius = self.radius * self.body_size_multiplier
         
         # Update trail (store previous positions for motion trail effect)
         self.trail.insert(0, (self.x, self.y))
@@ -214,9 +225,12 @@ class Fighter:
         if self.flash_timer > 0:
             self.flash_timer -= 1
         if self.attack_cooldown > 0:
-            self.attack_cooldown -= 1
+            # Apply attack speed multiplier (slower attacks = slower cooldown decay)
+            self.attack_cooldown -= self.attack_speed_multiplier
         if self.invincible > 0:
             self.invincible -= 1
+        if self.wall_damage_cooldown > 0:
+            self.wall_damage_cooldown -= 1
 
         
         # Apply minimal drag (DVD logo - constant velocity)
@@ -289,10 +303,10 @@ class Fighter:
     
     def get_sword_hitbox(self):
         """Get sword collision points for rotation attacks."""
-        # Use current_radius for proper sizing with chaos events
+        # Use current_radius (body) for sword base position
         r = self.current_radius
-        # Scale sword length with size multiplier
-        scaled_sword_length = self.sword_length * self.size_multiplier
+        # Scale sword length with SWORD size multiplier (separate from body)
+        scaled_sword_length = self.sword_length * self.sword_size_multiplier
         
         base_x = self.x + math.cos(self.sword_angle) * (r + 3)
         base_y = self.y + math.sin(self.sword_angle) * (r + 3)
@@ -394,7 +408,8 @@ class Fighter:
         """Draw sword with proper sizing."""
         ox, oy = offset
         r = self.current_radius
-        scaled_sword_length = self.sword_length * self.size_multiplier
+        # Use SWORD size multiplier (stays normal during Tiny Terror)
+        scaled_sword_length = self.sword_length * self.sword_size_multiplier
         
         base_x = self.x + math.cos(self.sword_angle) * (r + 3)
         base_y = self.y + math.sin(self.sword_angle) * (r + 3)
@@ -403,8 +418,8 @@ class Fighter:
         
         sword_color = WHITE if self.flash_timer > 0 else self.render_color_bright
         
-        # Scale sword width with size
-        sword_w = max(2, int(SWORD_WIDTH * self.size_multiplier))
+        # Sword width stays normal (doesn't scale with body size)
+        sword_w = max(2, int(SWORD_WIDTH * self.sword_size_multiplier))
         
         pygame.draw.line(surface, sword_color,
                         (int(base_x + ox), int(base_y + oy)),
@@ -416,21 +431,22 @@ class Fighter:
         bar_width = 40
         bar_height = 6
         bar_x = self.x - bar_width // 2
-        bar_y = self.y - self.radius - 15
+        bar_y = self.y - self.current_radius - 15  # Use current_radius for proper positioning
         
         # Background
         pygame.draw.rect(surface, (50, 50, 50),
                         (int(bar_x + ox), int(bar_y + oy), bar_width, bar_height))
         
-        # Health fill
+        # Health fill - use health_bar_color (BLACK during Blackout, otherwise normal)
         health_pct = max(0, self.health / self.max_health)
         fill_width = int(bar_width * health_pct)
         if fill_width > 0:
-            pygame.draw.rect(surface, self.color,
+            pygame.draw.rect(surface, self.health_bar_color,
                             (int(bar_x + ox), int(bar_y + oy), fill_width, bar_height))
         
-        # Border
-        pygame.draw.rect(surface, WHITE,
+        # Border - also use health bar color for consistency during Blackout
+        border_color = self.health_bar_color if self.health_bar_color == BLACK else WHITE
+        pygame.draw.rect(surface, border_color,
                         (int(bar_x + ox), int(bar_y + oy), bar_width, bar_height), 1)
     
     def is_outside_arena(self, arena_bounds):
@@ -479,7 +495,11 @@ class Fighter:
         
         # Reset chaos event properties
         self.trail.clear()
-        self.size_multiplier = 1.0
+        self.body_size_multiplier = 1.0
+        self.sword_size_multiplier = 1.0
+        self.attack_speed_multiplier = 1.0
         self.current_radius = self.radius
         self.render_color = self.color
         self.render_color_bright = self.color_bright
+        self.health_bar_color = self.color
+        self.wall_damage_cooldown = 0
