@@ -11,7 +11,8 @@ from config import (
     SCREEN_WIDTH, SCREEN_HEIGHT, WHITE, GREEN, YELLOW, BLACK,
     FIGHTER_RADIUS, SWORD_LENGTH, SWORD_WIDTH, BASE_HEALTH,
     DRAG, MAX_VELOCITY, MIN_VELOCITY, BOUNCE_ENERGY, ARENA_MARGIN,
-    WALL_BOOST_STRENGTH
+    WALL_BOOST_STRENGTH, TRAIL_LENGTH, TRAIL_FADE_RATE,
+    GLOW_ALPHA, GLOW_RADIUS_MULT, NEON_RED, NEON_BLUE
 )
 
 
@@ -62,6 +63,17 @@ class Fighter:
         self.ATTACK_DURATION = 12      # Frames per swing
         self.ATTACK_COOLDOWN = 8       # Frames between attacks
         self.COMBO_TIMEOUT = 45        # Frames before combo resets
+        
+        # Motion trail (list of previous positions)
+        self.trail = []
+        
+        # Dynamic sizing (modified by chaos events)
+        self.size_multiplier = 1.0
+        self.current_radius = self.radius  # Actual collision radius
+        
+        # Render color (can be overridden by chaos events)
+        self.render_color = color
+        self.render_color_bright = color_bright
     
 
     
@@ -188,6 +200,14 @@ class Fighter:
         if self.locked:
             return
         
+        # Update current radius based on size multiplier
+        self.current_radius = self.radius * self.size_multiplier
+        
+        # Update trail (store previous positions for motion trail effect)
+        self.trail.insert(0, (self.x, self.y))
+        if len(self.trail) > TRAIL_LENGTH:
+            self.trail.pop()
+        
         self.update_rotation(opponent, 0)  # Sword faces opponent with combo offset
         
         # Decrease timers
@@ -225,11 +245,13 @@ class Fighter:
         self.y += self.vy
         
         # Wall collision with perfect bounce (DVD logo style)
+        # Use current_radius for proper collision with size changes
         ax, ay, aw, ah = arena_bounds
+        r = self.current_radius
         
         # Left wall
-        if self.x - self.radius < ax:
-            self.x = ax + self.radius
+        if self.x - r < ax:
+            self.x = ax + r
             self.vx = abs(self.vx) * BOUNCE_ENERGY
             # Ninja wall boost toward center
             center_x = ax + aw / 2
@@ -237,24 +259,24 @@ class Fighter:
                 self.vx += WALL_BOOST_STRENGTH
         
         # Right wall
-        if self.x + self.radius > ax + aw:
-            self.x = ax + aw - self.radius
+        if self.x + r > ax + aw:
+            self.x = ax + aw - r
             self.vx = -abs(self.vx) * BOUNCE_ENERGY
             center_x = ax + aw / 2
             if self.x > center_x:
                 self.vx -= WALL_BOOST_STRENGTH
         
         # Top wall
-        if self.y - self.radius < ay:
-            self.y = ay + self.radius
+        if self.y - r < ay:
+            self.y = ay + r
             self.vy = abs(self.vy) * BOUNCE_ENERGY
             center_y = ay + ah / 2
             if self.y < center_y:
                 self.vy += WALL_BOOST_STRENGTH
         
         # Bottom wall
-        if self.y + self.radius > ay + ah:
-            self.y = ay + ah - self.radius
+        if self.y + r > ay + ah:
+            self.y = ay + ah - r
             self.vy = -abs(self.vy) * BOUNCE_ENERGY
             center_y = ay + ah / 2
             if self.y > center_y:
@@ -267,10 +289,15 @@ class Fighter:
     
     def get_sword_hitbox(self):
         """Get sword collision points for rotation attacks."""
-        base_x = self.x + math.cos(self.sword_angle) * (self.radius + 3)
-        base_y = self.y + math.sin(self.sword_angle) * (self.radius + 3)
-        tip_x = base_x + math.cos(self.sword_angle) * self.sword_length
-        tip_y = base_y + math.sin(self.sword_angle) * self.sword_length
+        # Use current_radius for proper sizing with chaos events
+        r = self.current_radius
+        # Scale sword length with size multiplier
+        scaled_sword_length = self.sword_length * self.size_multiplier
+        
+        base_x = self.x + math.cos(self.sword_angle) * (r + 3)
+        base_y = self.y + math.sin(self.sword_angle) * (r + 3)
+        tip_x = base_x + math.cos(self.sword_angle) * scaled_sword_length
+        tip_y = base_y + math.sin(self.sword_angle) * scaled_sword_length
         return (base_x, base_y), (tip_x, tip_y)
     
     def get_attack_damage_multiplier(self):
@@ -285,40 +312,103 @@ class Fighter:
 
     
     def draw(self, surface, offset=(0, 0)):
-        """Draw fighter."""
+        """Draw fighter with glow, trail, and neon effects."""
         ox, oy = offset
+        r = self.current_radius
         
-        # Main body circle
-        body_color = WHITE if self.flash_timer > 0 else self.color
+        # Draw motion trail first (behind fighter)
+        self._draw_trail(surface, offset)
+        
+        # Draw glow effect (bloom simulation)
+        self._draw_glow(surface, offset)
+        
+        # Main body circle - use render_color for chaos events
+        body_color = WHITE if self.flash_timer > 0 else self.render_color
         pygame.draw.circle(surface, body_color, 
-                          (int(self.x + ox), int(self.y + oy)), self.radius)
+                          (int(self.x + ox), int(self.y + oy)), int(r))
         
         # Inner highlight
-        pygame.draw.circle(surface, self.color_bright,
-                          (int(self.x - self.radius * 0.2 + ox), 
-                           int(self.y - self.radius * 0.2 + oy)), 
-                          int(self.radius * 0.3))
+        pygame.draw.circle(surface, self.render_color_bright,
+                          (int(self.x - r * 0.2 + ox), 
+                           int(self.y - r * 0.2 + oy)), 
+                          int(r * 0.3))
         
         # Sword
         self._draw_sword(surface, offset)
         
-        # Health bar
+        # Health bar (can be hidden during blackout via main.py)
         self._draw_health_bar(surface, offset)
     
-    def _draw_sword(self, surface, offset):
-        """Draw sword."""
+    def _draw_glow(self, surface, offset):
+        """Draw a glow/bloom effect behind the fighter."""
+        ox, oy = offset
+        glow_radius = int(self.current_radius * GLOW_RADIUS_MULT)
+        
+        # Create a surface for the glow with alpha
+        glow_size = glow_radius * 2 + 4
+        glow_surf = pygame.Surface((glow_size, glow_size), pygame.SRCALPHA)
+        
+        # Draw gradient circles for bloom effect
+        for i in range(3):
+            r = glow_radius - i * 4
+            if r > 0:
+                alpha = GLOW_ALPHA - i * 15
+                color = (*self.render_color[:3], max(0, alpha))
+                pygame.draw.circle(glow_surf, color, (glow_size // 2, glow_size // 2), r)
+        
+        # Blit the glow
+        glow_x = int(self.x + ox) - glow_size // 2
+        glow_y = int(self.y + oy) - glow_size // 2
+        surface.blit(glow_surf, (glow_x, glow_y))
+    
+    def _draw_trail(self, surface, offset):
+        """Draw motion trail as fading circles."""
+        if len(self.trail) < 2:
+            return
+        
         ox, oy = offset
         
-        base_x = self.x + math.cos(self.sword_angle) * (self.radius + 3)
-        base_y = self.y + math.sin(self.sword_angle) * (self.radius + 3)
-        tip_x = base_x + math.cos(self.sword_angle) * self.sword_length
-        tip_y = base_y + math.sin(self.sword_angle) * self.sword_length
+        for i, (tx, ty) in enumerate(self.trail):
+            # Calculate fade based on position in trail
+            fade = 1.0 - (i / len(self.trail))
+            fade *= TRAIL_FADE_RATE
+            
+            if fade <= 0:
+                continue
+            
+            # Trail circle gets smaller further back
+            trail_r = int(self.current_radius * fade * 0.7)
+            if trail_r < 2:
+                continue
+            
+            # Create faded color
+            alpha = int(100 * fade)
+            trail_color = (*self.render_color[:3], alpha)
+            
+            # Draw on a temp surface for alpha
+            trail_surf = pygame.Surface((trail_r * 2, trail_r * 2), pygame.SRCALPHA)
+            pygame.draw.circle(trail_surf, trail_color, (trail_r, trail_r), trail_r)
+            surface.blit(trail_surf, (int(tx + ox) - trail_r, int(ty + oy) - trail_r))
+    
+    def _draw_sword(self, surface, offset):
+        """Draw sword with proper sizing."""
+        ox, oy = offset
+        r = self.current_radius
+        scaled_sword_length = self.sword_length * self.size_multiplier
         
-        sword_color = WHITE if self.flash_timer > 0 else self.color_bright
+        base_x = self.x + math.cos(self.sword_angle) * (r + 3)
+        base_y = self.y + math.sin(self.sword_angle) * (r + 3)
+        tip_x = base_x + math.cos(self.sword_angle) * scaled_sword_length
+        tip_y = base_y + math.sin(self.sword_angle) * scaled_sword_length
+        
+        sword_color = WHITE if self.flash_timer > 0 else self.render_color_bright
+        
+        # Scale sword width with size
+        sword_w = max(2, int(SWORD_WIDTH * self.size_multiplier))
         
         pygame.draw.line(surface, sword_color,
                         (int(base_x + ox), int(base_y + oy)),
-                        (int(tip_x + ox), int(tip_y + oy)), SWORD_WIDTH)
+                        (int(tip_x + ox), int(tip_y + oy)), sword_w)
     
     def _draw_health_bar(self, surface, offset):
         """Draw health bar above fighter."""
@@ -386,3 +476,10 @@ class Fighter:
         self.attack_timer = 0
         self.combo_reset_timer = 0
         self.last_hit_frame = -100
+        
+        # Reset chaos event properties
+        self.trail.clear()
+        self.size_multiplier = 1.0
+        self.current_radius = self.radius
+        self.render_color = self.color
+        self.render_color_bright = self.color_bright

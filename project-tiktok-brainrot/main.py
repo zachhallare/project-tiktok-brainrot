@@ -14,10 +14,12 @@ from config import (
     HIT_SLOWMO_FRAMES, HIT_SLOWMO_TIMESCALE,
     INACTIVITY_PULSE_TIME, INACTIVITY_SHRINK_TIME, ARENA_PULSE_VELOCITY_BOOST,
     ARENA_PULSE_SHAKE, ESCALATION_SHRINK_SPEED, GAME_SETTINGS,
-    FIGHTER_RADIUS
+    FIGHTER_RADIUS,
+    NEON_RED, NEON_BLUE, NEON_BG, NEON_GRID
 )
-from effects import ParticleSystem, ShockwaveSystem, ArenaPulseSystem
+from effects import ParticleSystem, ShockwaveSystem, ArenaPulseSystem, DamageNumberSystem
 from fighter import Fighter
+from chaos_manager import ChaosManager
 
 
 # Main game class - DVD logo style combat with rotating swords.
@@ -30,7 +32,7 @@ class Game:
         
         # Create the game window.
         self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-        pygame.display.set_caption("Red vs Blue Battle")
+        pygame.display.set_caption("Red vs Blue Battle - TikTok Brainrot Edition")
         self.clock = pygame.time.Clock()
         
         # Fonts for UI text
@@ -38,18 +40,24 @@ class Game:
         self.font_medium = pygame.font.Font(None, 72)
         self.font_small = pygame.font.Font(None, 36)
         
+        # Bold/Impact font for chaos banner
+        try:
+            self.font_chaos = pygame.font.SysFont("Impact", 48, bold=True)
+        except:
+            self.font_chaos = pygame.font.Font(None, 56)
+        
         # Define the base arena square.
         self.base_arena = (ARENA_MARGIN, ARENA_MARGIN, ARENA_WIDTH, ARENA_HEIGHT)
         self.arena_bounds = list(self.base_arena)
         self.arena_shrink_timer = ARENA_SHRINK_INTERVAL * FPS
         
-        # Spawn fighters on opposite sides of the arena
+        # Use neon colors for fighters
         spawn_margin = 100
         center_y = SCREEN_HEIGHT // 2
         self.blue = Fighter(ARENA_MARGIN + spawn_margin, center_y, 
-                            BLUE, BLUE_BRIGHT, is_blue=True)
+                            NEON_BLUE, (100, 255, 255), is_blue=True)
         self.red = Fighter(SCREEN_WIDTH - ARENA_MARGIN - spawn_margin, center_y, 
-                            RED, RED_BRIGHT, is_blue=False)
+                            NEON_RED, (255, 100, 120), is_blue=False)
         
         # Lock fighters for countdown
         self._lock_fighters_for_countdown()
@@ -58,7 +66,10 @@ class Game:
         self.particles = ParticleSystem()
         self.shockwaves = ShockwaveSystem()
         self.arena_pulses = ArenaPulseSystem()
+        self.damage_numbers = DamageNumberSystem()
         
+        # Chaos Manager for TikTok Brainrot events
+        self.chaos = ChaosManager()
         
         # Screen effects.
         self.screen_shake = 0
@@ -220,7 +231,8 @@ class Game:
             check_x = base_x + (tip_x - base_x) * t
             check_y = base_y + (tip_y - base_y) * t
             dist = math.hypot(check_x - defender.x, check_y - defender.y)
-            if dist < defender.radius + 8:
+            # Use current_radius for proper chaos event sizing
+            if dist < defender.current_radius + 8:
                 return (check_x, check_y)
         return None
 
@@ -240,26 +252,33 @@ class Game:
             hit_pos = self._check_sword_hit(attacker, defender)
             if hit_pos:
                 
-                # Apply combo damage multiplier
+                # Apply combo damage multiplier + chaos damage multiplier
                 damage_mult = attacker.get_attack_damage_multiplier()
+                chaos_damage_mult = self.chaos.get_damage_mult()
+                total_damage_mult = damage_mult * chaos_damage_mult
+                
                 angle = math.atan2(defender.y - attacker.y, defender.x - attacker.x)
-                knockback = BASE_KNOCKBACK * (1.0 + (damage_mult - 1.0) * 0.5)  # Slight knockback scaling
-                damage = DAMAGE_PER_HIT * damage_mult
+                knockback = BASE_KNOCKBACK * (1.0 + (total_damage_mult - 1.0) * 0.5)
+                damage = DAMAGE_PER_HIT * total_damage_mult
                 
                 # Pierce (combo stage 2) has more hit-stop
                 hit_stop_frames = HIT_STOP_FRAMES + (2 if attacker.combo_stage == 2 else 0)
                 
                 if defender.take_damage(damage, angle, knockback, self.particles):
-                    self._trigger_hit(hit_pos[0], hit_pos[1], attacker.color, hit_stop_frames)
+                    self._trigger_hit(hit_pos[0], hit_pos[1], attacker.render_color, hit_stop_frames, damage)
                     self.hit_slowmo_frames = HIT_SLOWMO_FRAMES
                     attacker.on_attack_hit(self.round_timer)
                     self._reset_inactivity()
 
-    def _trigger_hit(self, x, y, color, hit_stop_frames=None):
-        """Apply hit effects."""
+    def _trigger_hit(self, x, y, color, hit_stop_frames=None, damage=0):
+        """Apply hit effects including damage numbers."""
         self.particles.emit(x, y, WHITE, count=10, size=4)
         self.hit_stop = hit_stop_frames if hit_stop_frames else HIT_STOP_FRAMES
         self.screen_shake = SCREEN_SHAKE_INTENSITY
+        
+        # Spawn floating damage number
+        if damage > 0:
+            self.damage_numbers.spawn(x, y - 20, damage, color)
         
         if self.sounds_enabled:
             self.hit_sound.play()
@@ -293,6 +312,10 @@ class Game:
         self.particles.clear()
         self.shockwaves.clear()
         self.arena_pulses.clear()
+        self.damage_numbers.clear()
+        
+        # Reset chaos system
+        self.chaos.reset_chaos()
         
         self.hit_slowmo_frames = 0
         self.hit_slowmo_accumulator = 0.0
@@ -399,16 +422,59 @@ class Game:
                     ah - ARENA_SHRINK_AMOUNT * 2
                 ]
         
-        # Skills disabled - orb spawning and collection removed
+        # ===== CHAOS SYSTEM UPDATE =====
+        dt = 1.0 / FPS
+        self.chaos.update(dt, self.particles, [self.blue, self.red])
         
-        self.blue.update(self.red, tuple(self.arena_bounds), self.particles, self.shockwaves)
-        self.red.update(self.blue, tuple(self.arena_bounds), self.particles, self.shockwaves)
+        # Apply chaos modifiers to fighters
+        speed_mult = self.chaos.get_speed_mult()
+        size_mult = self.chaos.get_size_mult()
+        center_x = SCREEN_WIDTH // 2
+        center_y = SCREEN_HEIGHT // 2
+        
+        for fighter in [self.blue, self.red]:
+            # Apply size multiplier
+            fighter.size_multiplier = size_mult
+            
+            # Apply chaos color overrides
+            fighter.render_color = self.chaos.get_fighter_color(fighter.color, fighter.is_blue)
+            fighter.render_color_bright = self.chaos.get_fighter_color(fighter.color_bright, fighter.is_blue)
+            
+            # Apply Tumble Dryer rotational gravity
+            fx, fy = self.chaos.get_gravity_force(fighter.x, fighter.y, center_x, center_y)
+            fighter.vx += fx
+            fighter.vy += fy
+            
+            # Apply speed multiplier to velocity
+            if speed_mult != 1.0:
+                fighter.vx *= (1.0 + (speed_mult - 1.0) * 0.1)  # Gradual speed change
+                fighter.vy *= (1.0 + (speed_mult - 1.0) * 0.1)
+        
+        # Calculate arena bounds with Crusher modifier
+        arena_mult = self.chaos.get_arena_mult()
+        if arena_mult < 1.0:
+            # Apply Crusher shrinking
+            base_ax, base_ay, base_aw, base_ah = self.base_arena
+            shrink = (1.0 - arena_mult) * min(base_aw, base_ah) / 2
+            effective_arena = (
+                self.arena_bounds[0] + shrink,
+                self.arena_bounds[1] + shrink,
+                max(200, self.arena_bounds[2] - shrink * 2),
+                max(200, self.arena_bounds[3] - shrink * 2)
+            )
+        else:
+            effective_arena = tuple(self.arena_bounds)
+        
+        # Update fighters with effective arena
+        self.blue.update(self.red, effective_arena, self.particles, self.shockwaves)
+        self.red.update(self.blue, effective_arena, self.particles, self.shockwaves)
         
         self._handle_combat()
         
         self.particles.update()
         self.shockwaves.update()
         self.arena_pulses.update()
+        self.damage_numbers.update()
         
         if self.blue.health <= 0:
             self._end_round(winner=self.red, loser=self.blue)
@@ -462,60 +528,156 @@ class Game:
         pygame.display.flip()
 
     def draw(self):
-        """Draw game."""
+        """Draw game with neon visuals and chaos effects."""
         offset = (0, 0)
         if self.screen_shake > 0:
             offset = (random.uniform(-self.screen_shake, self.screen_shake),
                      random.uniform(-self.screen_shake, self.screen_shake))
         
-        self.screen.fill(DARK_GRAY)
+        # Use chaos background color (NEON_BG normally, WHITE for Blackout)
+        bg_color = self.chaos.get_bg_color()
+        self.screen.fill(bg_color)
         
-        ax, ay, aw, ah = self.arena_bounds
+        # Draw grid (unless Blackout)
+        if not self.chaos.is_blackout():
+            self._draw_grid(offset)
+        
+        # Calculate effective arena for Crusher
+        arena_mult = self.chaos.get_arena_mult()
+        if arena_mult < 1.0:
+            shrink = (1.0 - arena_mult) * min(self.arena_bounds[2], self.arena_bounds[3]) / 2
+            draw_arena = (
+                self.arena_bounds[0] + shrink,
+                self.arena_bounds[1] + shrink,
+                max(200, self.arena_bounds[2] - shrink * 2),
+                max(200, self.arena_bounds[3] - shrink * 2)
+            )
+        else:
+            draw_arena = self.arena_bounds
+        
+        ax, ay, aw, ah = draw_arena
         arena_rect = pygame.Rect(int(ax + offset[0]), int(ay + offset[1]), int(aw), int(ah))
-        pygame.draw.rect(self.screen, BLACK, arena_rect)
         
-        if self.escalation_state == 'shrinking':
-            border_color = ORANGE
+        # Arena fill color (dark or Blackout inverted)
+        arena_fill = WHITE if self.chaos.is_blackout() else BLACK
+        pygame.draw.rect(self.screen, arena_fill, arena_rect)
+        
+        # Arena border
+        if self.escalation_state == 'shrinking' or self.chaos.active_event == "THE CRUSHER":
+            border_color = NEON_RED if not self.chaos.is_blackout() else BLACK
             border_width = 6
         elif self.escalation_state == 'pulse_triggered':
             border_color = YELLOW
             border_width = 5
         else:
-            border_color = GRAY
+            border_color = NEON_BLUE if not self.chaos.is_blackout() else GRAY
             border_width = 4
         pygame.draw.rect(self.screen, border_color, arena_rect, border_width)
         
         self.arena_pulses.draw(self.screen, offset)
         self.shockwaves.draw(self.screen, offset)
         
-        # Skills disabled - orb drawing removed
-        
+        # Draw fighters
         if not self.round_ending or self.winner == self.blue:
             self.blue.draw(self.screen, offset)
         if not self.round_ending or self.winner == self.red:
             self.red.draw(self.screen, offset)
         
         self.particles.draw(self.screen, offset)
+        self.damage_numbers.draw(self.screen, offset)
         
+        # Draw chaos event banner (unless Blackout which hides UI)
+        if self.chaos.active_event and not self.chaos.is_blackout():
+            self._draw_chaos_banner()
+        
+        # Countdown overlay
         if self.countdown_active:
             countdown_text = self.countdown_texts[self.countdown_stage]
             
             if countdown_text == "FIGHT":
                 text_surface = self.font_medium.render(countdown_text, True, WHITE)
-                border_color = YELLOW
+                border_color = NEON_BLUE
             else:
                 text_surface = self.font_large.render(countdown_text, True, WHITE)
-                border_color = PURPLE
+                border_color = NEON_RED
             
             text_rect = text_surface.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2))
             
             bg_rect = text_rect.inflate(50, 30)
-            pygame.draw.rect(self.screen, BLACK, bg_rect)
+            pygame.draw.rect(self.screen, NEON_BG, bg_rect)
             pygame.draw.rect(self.screen, border_color, bg_rect, 4)
             
             self.screen.blit(text_surface, text_rect)
         
         pygame.display.flip()
+    
+    def _draw_grid(self, offset):
+        """Draw faint grid for cyberpunk aesthetic."""
+        ox, oy = offset
+        grid_spacing = 40
+        
+        for x in range(0, SCREEN_WIDTH + grid_spacing, grid_spacing):
+            pygame.draw.line(self.screen, NEON_GRID, 
+                           (int(x + ox), 0), (int(x + ox), SCREEN_HEIGHT), 1)
+        
+        for y in range(0, SCREEN_HEIGHT + grid_spacing, grid_spacing):
+            pygame.draw.line(self.screen, NEON_GRID,
+                           (0, int(y + oy)), (SCREEN_WIDTH, int(y + oy)), 1)
+    
+    def _draw_chaos_banner(self):
+        """Draw pulsing chaos event banner."""
+        if not self.chaos.active_event:
+            return
+        
+        # Pulsing animation
+        pulse = 1.0 + 0.15 * math.sin(pygame.time.get_ticks() * 0.008)
+        
+        event_text = self.chaos.active_event
+        
+        # Render text
+        text_surface = self.font_chaos.render(event_text, True, WHITE)
+        
+        # Scale for pulse effect
+        if pulse != 1.0:
+            new_w = int(text_surface.get_width() * pulse)
+            new_h = int(text_surface.get_height() * pulse)
+            if new_w > 0 and new_h > 0:
+                text_surface = pygame.transform.scale(text_surface, (new_w, new_h))
+        
+        # Position at top of screen
+        text_rect = text_surface.get_rect(center=(SCREEN_WIDTH // 2, 60))
+        
+        # Draw shadow
+        shadow_surface = self.font_chaos.render(event_text, True, (30, 30, 30))
+        if pulse != 1.0:
+            new_w = int(shadow_surface.get_width() * pulse)
+            new_h = int(shadow_surface.get_height() * pulse)
+            if new_w > 0 and new_h > 0:
+                shadow_surface = pygame.transform.scale(shadow_surface, (new_w, new_h))
+        shadow_rect = shadow_surface.get_rect(center=(SCREEN_WIDTH // 2 + 2, 62))
+        
+        # Background bar
+        bar_rect = pygame.Rect(0, 30, SCREEN_WIDTH, 60)
+        bar_surface = pygame.Surface((bar_rect.width, bar_rect.height), pygame.SRCALPHA)
+        pygame.draw.rect(bar_surface, (0, 0, 0, 180), bar_surface.get_rect())
+        self.screen.blit(bar_surface, bar_rect)
+        
+        # Draw text
+        self.screen.blit(shadow_surface, shadow_rect)
+        self.screen.blit(text_surface, text_rect)
+        
+        # Progress bar for event duration
+        progress = self.chaos.get_event_progress()
+        bar_width = int(SCREEN_WIDTH * 0.6)
+        bar_x = (SCREEN_WIDTH - bar_width) // 2
+        bar_y = 85
+        
+        # Background bar
+        pygame.draw.rect(self.screen, (50, 50, 50), (bar_x, bar_y, bar_width, 6))
+        # Progress fill
+        fill_width = int(bar_width * (1.0 - progress))
+        if fill_width > 0:
+            pygame.draw.rect(self.screen, NEON_BLUE, (bar_x, bar_y, fill_width, 6))
 
     def run(self):
         """Main loop."""

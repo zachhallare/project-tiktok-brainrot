@@ -29,6 +29,29 @@ ORANGE = (255, 180, 80)
 GOLD = (255, 215, 0)
 PINK = (255, 100, 200)
 
+# Cyberpunk/Neon Color Palette (TikTok Brainrot Style)
+NEON_RED = (255, 0, 60)
+NEON_BLUE = (0, 240, 255)
+NEON_BG = (20, 20, 25)
+NEON_GRID = (35, 35, 45)
+
+# Glow/Bloom settings
+GLOW_ALPHA = 50
+GLOW_RADIUS_MULT = 1.8
+
+# Chaos System Constants
+CHAOS_MIN_INTERVAL = 5.0  # seconds before event triggers
+CHAOS_MAX_INTERVAL = 8.0  # seconds max wait
+CHAOS_DURATION = 5.0      # seconds each event lasts
+
+# Motion Trail Settings
+TRAIL_LENGTH = 8          # Number of trail positions to store
+TRAIL_FADE_RATE = 0.7     # Alpha decay per trail step
+
+# Floating Damage Numbers
+DAMAGE_NUMBER_LIFETIME = 45  # frames
+DAMAGE_NUMBER_SPEED = 2      # float up speed
+
 # Physics constants - DVD logo style (constant velocity, no drag)
 DRAG = 1.0  # No drag - constant velocity like DVD logo
 MAX_VELOCITY = 20  # Faster gameplay

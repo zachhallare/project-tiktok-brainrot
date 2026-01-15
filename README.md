@@ -19,7 +19,7 @@ The aesthetic is intentionally minimalist—solid-colored circles with inner hig
 
 ---
 
-## 🏆 Objective & Win/Lose Conditions
+## Objective & Win/Lose Conditions
 
 ### Victory Condition
 A fighter wins when their opponent's **health drops to zero**. When this happens:
@@ -36,7 +36,7 @@ There is no player failure state—this is an automated simulation. Both fighter
 
 ---
 
-## ⚔️ Combat Mechanics
+## Combat Mechanics
 
 ### Attack Triggering
 Attacks are triggered **automatically** when fighters are within **120 pixels** of each other (`attack_trigger_range`). There are no player inputs—the AI decides when to swing based on proximity.
@@ -72,7 +72,7 @@ Each successful hit triggers:
 
 ---
 
-## 🎮 Movement & Physics
+## Movement & Physics
 
 ### DVD Screensaver Physics
 Fighters use a unique **constant-velocity bounce** system inspired by DVD screensaver logos:
@@ -96,7 +96,7 @@ The sword **always points toward the opponent**, with an angular offset based on
 
 ---
 
-## 🎯 Arena Escalation System
+## Arena Escalation System
 
 To prevent stalemates and keep battles short, the arena features multiple escalation mechanics:
 
@@ -114,7 +114,7 @@ Any successful hit pauses the shrink for 2 seconds, rewarding aggression.
 
 ---
 
-## 🕹️ Controls
+## Controls
 
 | Key          | Action                           |
 |--------------|----------------------------------|
@@ -125,7 +125,7 @@ Any successful hit pauses the shrink for 2 seconds, rewarding aggression.
 
 ---
 
-## 🛠️ Technical Stack
+## Technical Stack
 
 | Component    | Technology                        |
 |--------------|-----------------------------------|
@@ -148,7 +148,7 @@ project-tiktok-brainrot/
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ```bash
 # Install dependencies
@@ -160,7 +160,7 @@ python project-tiktok-brainrot/main.py
 
 ---
 
-## 📊 Key Constants Reference
+## Key Constants Reference
 
 | Constant              | Value | Description                          |
 |-----------------------|-------|--------------------------------------|
@@ -175,6 +175,6 @@ python project-tiktok-brainrot/main.py
 
 ---
 
-## 📜 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

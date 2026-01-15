@@ -1,13 +1,13 @@
 """
 Simplified particle and visual effects for performance.
-Enhanced with skill-specific effects.
+Enhanced with skill-specific effects and damage numbers.
 """
 
 import pygame
 import math
 import random
 
-from config import WHITE, YELLOW, PURPLE, CYAN
+from config import WHITE, YELLOW, PURPLE, CYAN, DAMAGE_NUMBER_LIFETIME, DAMAGE_NUMBER_SPEED
 
 
 class Particle:
@@ -273,3 +273,93 @@ class ArenaPulseSystem:
     
     def clear(self):
         self.pulses.clear()
+
+
+class DamageNumber:
+    """Floating damage number that rises and fades."""
+    
+    def __init__(self, x, y, damage, color):
+        self.x = x
+        self.y = y
+        self.damage = int(damage)
+        self.color = color
+        self.lifetime = DAMAGE_NUMBER_LIFETIME
+        self.max_lifetime = DAMAGE_NUMBER_LIFETIME
+        self.scale = 1.0
+        self.vy = -DAMAGE_NUMBER_SPEED
+    
+    def update(self):
+        self.y += self.vy
+        self.vy *= 0.95  # Slow down over time
+        self.lifetime -= 1
+        
+        # Scale up then down
+        progress = 1 - (self.lifetime / self.max_lifetime)
+        if progress < 0.2:
+            self.scale = 1.0 + progress * 2  # Scale up to 1.4
+        else:
+            self.scale = 1.4 - (progress - 0.2) * 0.5  # Scale back down
+        
+        return self.lifetime > 0
+    
+    def draw(self, surface, offset, font):
+        if self.lifetime <= 0:
+            return
+        
+        ox, oy = offset
+        alpha = min(255, int(255 * (self.lifetime / self.max_lifetime) * 1.5))
+        
+        # Render damage text
+        text = str(self.damage)
+        
+        # Create text surface
+        text_surface = font.render(text, True, self.color)
+        
+        # Scale the text
+        if self.scale != 1.0:
+            new_width = int(text_surface.get_width() * self.scale)
+            new_height = int(text_surface.get_height() * self.scale)
+            if new_width > 0 and new_height > 0:
+                text_surface = pygame.transform.scale(text_surface, (new_width, new_height))
+        
+        # Apply alpha by blitting to a transparent surface
+        text_surface.set_alpha(alpha)
+        
+        # Center the text at position
+        text_rect = text_surface.get_rect(center=(int(self.x + ox), int(self.y + oy)))
+        surface.blit(text_surface, text_rect)
+
+
+class DamageNumberSystem:
+    """Manages floating damage numbers."""
+    
+    def __init__(self):
+        self.numbers = []
+        self.font = None
+    
+    def init_font(self):
+        """Initialize font for damage numbers."""
+        if self.font is None:
+            try:
+                # Try to use a bold/impact font
+                self.font = pygame.font.SysFont("Impact", 28, bold=True)
+            except:
+                self.font = pygame.font.Font(None, 32)
+    
+    def spawn(self, x, y, damage, color):
+        """Spawn a new damage number."""
+        # Add random offset to prevent stacking
+        x += random.uniform(-10, 10)
+        y += random.uniform(-5, 5)
+        self.numbers.append(DamageNumber(x, y, damage, color))
+    
+    def update(self):
+        self.numbers = [n for n in self.numbers if n.update()]
+    
+    def draw(self, surface, offset=(0, 0)):
+        self.init_font()
+        for n in self.numbers:
+            n.draw(surface, offset, self.font)
+    
+    def clear(self):
+        self.numbers.clear()
