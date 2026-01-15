@@ -114,6 +114,27 @@ Any successful hit pauses the shrink for 2 seconds, rewarding aggression.
 
 ---
 
+## 🎲 Chaos Event System
+
+Every **5-8 seconds**, a random chaos event triggers that dramatically alters gameplay for **4 seconds**. This keeps fights unpredictable and creates TikTok-worthy moments.
+
+| Event | Effect |
+|-------|--------|
+| **HYPER SPEED** | 3.0x physics speed—fighters zoom uncontrollably |
+| **SPIKE WALLS** | Walls deal 15 damage + 3x knockback (pinball bumpers) |
+| **TINY TERROR** | 0.5x body size, normal-length sword, slower attacks, 1.5x damage |
+| **DISCO FEVER** | Rainbow colors, particles, 100% life steal (vampirism) |
+| **TUMBLE DRYER** | Extreme rotational gravity spins fighters clockwise |
+| **THE CRUSHER** | Arena shrinks to 50%, fighters pushed inside |
+| **BLACKOUT** | White background, black fighters + UI |
+
+### Visual Indicators
+- **Banner:** Event name pulses at top of screen
+- **Progress Bar:** Shows remaining event duration
+- **Arena Border:** Changes color during Crusher/Spike Walls
+
+---
+
 ## Controls
 
 | Key          | Action                           |
@@ -141,6 +162,7 @@ project-tiktok-brainrot/
 ├── fighter.py        # Fighter class with movement and attacks
 ├── config.py         # All tuning constants and physics values
 ├── effects.py        # Particle, shockwave, and slash effects
+├── chaos_manager.py  # Chaos event system (7 random events)
 ├── sound_manager.py  # Sound generation utilities
 ├── utils.py          # Helper functions
 └── sounds/           # Audio assets directory
