@@ -9,17 +9,14 @@ from config import (
     YELLOW, ORANGE,
     ARENA_MARGIN, ARENA_WIDTH, ARENA_HEIGHT,
     ARENA_SHRINK_INTERVAL, ARENA_SHRINK_AMOUNT,
-    POWERUP_SPAWN_MIN, POWERUP_SPAWN_MAX, MAX_POWERUPS,
     ROUND_MAX_TIME, BASE_KNOCKBACK, DAMAGE_PER_HIT, SLOW_MOTION_SPEED,
     HIT_STOP_FRAMES, SCREEN_SHAKE_INTENSITY, SCREEN_SHAKE_DECAY,
-    PARRY_SLOWMO_FRAMES, PARRY_SLOWMO_TIMESCALE, PARRY_HITSTOP_FRAMES,
     HIT_SLOWMO_FRAMES, HIT_SLOWMO_TIMESCALE,
     INACTIVITY_PULSE_TIME, INACTIVITY_SHRINK_TIME, ARENA_PULSE_VELOCITY_BOOST,
     ARENA_PULSE_SHAKE, ESCALATION_SHRINK_SPEED, GAME_SETTINGS,
-    ROTATION_BODY_HIT_BONUS
+    FIGHTER_RADIUS
 )
 from effects import ParticleSystem, ShockwaveSystem, ArenaPulseSystem
-from skills import SkillType, SkillOrb
 from fighter import Fighter
 
 
@@ -62,17 +59,15 @@ class Game:
         self.shockwaves = ShockwaveSystem()
         self.arena_pulses = ArenaPulseSystem()
         
-        # Fighter power-up (skill orb) management.
-        self.skill_orbs = []
-        self.powerup_timer = random.uniform(POWERUP_SPAWN_MIN, POWERUP_SPAWN_MAX) * FPS
         
         # Screen effects.
         self.screen_shake = 0
         self.hit_stop = 0
-        self.parry_slowmo_frames = 0
-        self.parry_slowmo_accumulator = 0.0
         self.hit_slowmo_frames = 0
         self.hit_slowmo_accumulator = 0.0
+        
+        # Attack range for triggering combos
+        self.attack_trigger_range = 120  # Distance to trigger attack
         
         # Round state tracking.
         self.round_timer = 0
@@ -211,120 +206,54 @@ class Game:
         except Exception:
             self.sounds_enabled = False
 
-    def _spawn_skill_orb(self):
-        """Spawn a random skill orb."""
-        if len(self.skill_orbs) >= MAX_POWERUPS:
-            return
-        
-        ax, ay, aw, ah = self.arena_bounds
-        margin = 60
-        x = random.randint(int(ax + margin), int(ax + aw - margin))
-        y = random.randint(int(ay + margin), int(ay + ah - margin))
-        
-        # Only 5 skills
-        SELECTED_SKILLS = [0, 1, 2, 3, 4]
-        skill_type = random.choice(SELECTED_SKILLS)
-        self.skill_orbs.append(SkillOrb(x, y, skill_type))
+    # Skills disabled - _spawn_skill_orb removed
 
     def _check_sword_hit(self, attacker, defender):
-        """Check if sword tip hits defender body."""
+        """Check if sword tip hits defender body during attack."""
+        if not attacker.is_attacking:
+            return None
+        
         (base_x, base_y), (tip_x, tip_y) = attacker.get_sword_hitbox()
         
-        for t in [0.4, 0.7, 1.0]:
+        # Check multiple points along sword
+        for t in [0.5, 0.75, 1.0]:
             check_x = base_x + (tip_x - base_x) * t
             check_y = base_y + (tip_y - base_y) * t
             dist = math.hypot(check_x - defender.x, check_y - defender.y)
-            if dist < defender.radius + ROTATION_BODY_HIT_BONUS:
+            if dist < defender.radius + 8:
                 return (check_x, check_y)
         return None
 
     def _handle_combat(self):
         """Detect and resolve combat interactions."""
         
-        # Check for Sword-on-Sword Parry (both rotating)
-        if self.blue.check_sword_on_sword_parry(self.red):
-            self._handle_sword_parry(self.blue, self.red)
-            return
-        
-        # Check for Sword Clash (rotation vs skill)
-        for defender, attacker in [(self.blue, self.red), (self.red, self.blue)]:
-            clashed_skill = defender.check_sword_clash(attacker, self.particles)
-            if clashed_skill is not None:
-                self._handle_clash_outcome(defender, attacker, clashed_skill)
-                self._reset_inactivity()
-                self.hit_stop = 3
-                return
-        
-        # Check for Spin Parry
-        for defender, attacker in [(self.blue, self.red), (self.red, self.blue)]:
-            if defender.check_spin_parry(attacker, self.particles):
-                self.hit_stop = PARRY_HITSTOP_FRAMES
-                self.parry_slowmo_frames = PARRY_SLOWMO_FRAMES
-                self.screen_shake = 5
-                self._reset_inactivity()
-                if self.sounds_enabled:
-                    self.clang_sound.play()
-                return
-        
-        # Rotation Sword vs Body Hits
+        # AI Attack Triggering - fighters attack when in range
         for attacker, defender in [(self.blue, self.red), (self.red, self.blue)]:
-            if attacker.active_skill is not None:
-                continue
-            if attacker.attack_cooldown > 0:
-                continue
-            if attacker.attack_recovery > 0:
-                continue
+            dist = math.hypot(attacker.x - defender.x, attacker.y - defender.y)
             
+            # Trigger attack when in range and not on cooldown
+            if dist < self.attack_trigger_range:
+                attacker.start_attack(self.round_timer)
+        
+        # Check for sword hits during attacks
+        for attacker, defender in [(self.blue, self.red), (self.red, self.blue)]:
             hit_pos = self._check_sword_hit(attacker, defender)
             if hit_pos:
-                if defender.has_shield:
-                    defender.has_shield = False
-                    if defender.shield_parry_window > 0:
-                        self.particles.emit_sparks(defender.x, defender.y)
-                        defender.flash_timer = 8
-                    else:
-                        self.particles.emit(defender.x, defender.y, (100, 255, 150), count=10, size=4)
-                    attacker.on_attack_blocked()
-                    self._reset_inactivity()
-                    continue
                 
-                extra_damage = 1.3 if defender.spin_parry_recovery > 0 else 1.0
-                
+                # Apply combo damage multiplier
+                damage_mult = attacker.get_attack_damage_multiplier()
                 angle = math.atan2(defender.y - attacker.y, defender.x - attacker.x)
-                knockback = BASE_KNOCKBACK
-                damage = DAMAGE_PER_HIT * extra_damage
-                hit_stop_frames = HIT_STOP_FRAMES
+                knockback = BASE_KNOCKBACK * (1.0 + (damage_mult - 1.0) * 0.5)  # Slight knockback scaling
+                damage = DAMAGE_PER_HIT * damage_mult
                 
-                if attacker.active_skill == SkillType.DASH_SLASH:
-                    knockback *= 1.8
-                    hit_stop_frames = 4
-                    attacker.flash_timer = 4
-                elif attacker.active_skill == SkillType.SPIN_PARRY:
-                    knockback *= 1.3
-                elif attacker.active_skill == SkillType.BLADE_CYCLONE:
-                    knockback *= 0.5
-                    damage *= 0.6
-                    hit_stop_frames = 2
+                # Pierce (combo stage 2) has more hit-stop
+                hit_stop_frames = HIT_STOP_FRAMES + (2 if attacker.combo_stage == 2 else 0)
                 
                 if defender.take_damage(damage, angle, knockback, self.particles):
                     self._trigger_hit(hit_pos[0], hit_pos[1], attacker.color, hit_stop_frames)
                     self.hit_slowmo_frames = HIT_SLOWMO_FRAMES
-                    attacker.on_rotation_hit(hit_sword=False, frame_count=self.round_timer)
-                    attacker.attack_cooldown = 18
+                    attacker.on_attack_hit(self.round_timer)
                     self._reset_inactivity()
-        
-        # Ground slam area damage
-        for attacker, defender in [(self.blue, self.red), (self.red, self.blue)]:
-            if (attacker.active_skill == SkillType.GROUND_SLAM and 
-                attacker.skill_data.get('phase') == 'impact' and
-                attacker.skill_timer == 23):
-                dist = math.hypot(defender.x - attacker.x, defender.y - attacker.y)
-                if dist < 130:
-                    angle = math.atan2(defender.y - attacker.y, defender.x - attacker.x)
-                    if defender.take_damage(DAMAGE_PER_HIT * 1.5, angle, 18, self.particles):
-                        self._trigger_hit(defender.x, defender.y, attacker.color, 5)
-                        self.hit_slowmo_frames = HIT_SLOWMO_FRAMES
-                        self._reset_inactivity()
 
     def _trigger_hit(self, x, y, color, hit_stop_frames=None):
         """Apply hit effects."""
@@ -334,48 +263,6 @@ class Game:
         
         if self.sounds_enabled:
             self.hit_sound.play()
-    
-    def _handle_sword_parry(self, fighter1, fighter2):
-        """Handle sword-on-sword parry."""
-        mid_x = (fighter1.x + fighter2.x) / 2
-        mid_y = (fighter1.y + fighter2.y) / 2
-        
-        self.particles.emit(mid_x, mid_y, WHITE, count=12, size=5, lifetime=10)
-        self.particles.emit_sparks(mid_x, mid_y)
-        
-        fighter1.on_rotation_hit(hit_sword=True, frame_count=self.round_timer)
-        fighter2.on_rotation_hit(hit_sword=True, frame_count=self.round_timer)
-        
-        fighter1.attack_cooldown = 15
-        fighter2.attack_cooldown = 15
-        
-        dx = fighter2.x - fighter1.x
-        dy = fighter2.y - fighter1.y
-        dist = max(1, math.hypot(dx, dy))
-        push_force = 8
-        
-        fighter1.vx -= (dx / dist) * push_force
-        fighter1.vy -= (dy / dist) * push_force
-        fighter2.vx += (dx / dist) * push_force
-        fighter2.vy += (dy / dist) * push_force
-        
-        self.hit_stop = PARRY_HITSTOP_FRAMES
-        self.parry_slowmo_frames = PARRY_SLOWMO_FRAMES
-        self.screen_shake = 6
-        
-        self._reset_inactivity()
-        
-        if self.sounds_enabled:
-            self.clang_sound.play()
-    
-    def _handle_clash_outcome(self, defender, attacker, skill_type):
-        """Handle skill vs rotation clash."""
-        if skill_type == SkillType.BLADE_CYCLONE:
-            self.particles.emit_sparks(defender.x, defender.y)
-            attacker.on_rotation_hit(hit_sword=True, frame_count=self.round_timer)
-            attacker.attack_cooldown = 20
-        elif skill_type == SkillType.SPIN_PARRY:
-            defender.skill_data['parried'] = True
 
     def _end_round(self, winner, loser):
         """Handle round end."""
@@ -397,10 +284,8 @@ class Game:
         """Reset round."""
         self.blue.reset()
         self.red.reset()
-        self.skill_orbs.clear()
         self.arena_bounds = list(self.base_arena)
         self.arena_shrink_timer = ARENA_SHRINK_INTERVAL * FPS
-        self.powerup_timer = random.uniform(POWERUP_SPAWN_MIN, POWERUP_SPAWN_MAX) * FPS
         self.round_ending = False
         self.winner = None
         self.winner_text = ""
@@ -409,12 +294,8 @@ class Game:
         self.shockwaves.clear()
         self.arena_pulses.clear()
         
-        self.slow_motion = False
-        self.slow_motion_accumulator = 0.0
         self.hit_slowmo_frames = 0
         self.hit_slowmo_accumulator = 0.0
-        self.parry_slowmo_frames = 0
-        self.parry_slowmo_accumulator = 0.0
         
         self.inactivity_timer = 0
         self.escalation_state = 'normal'
@@ -454,13 +335,6 @@ class Game:
         if self.hit_stop > 0:
             self.hit_stop -= 1
             return
-        
-        if self.parry_slowmo_frames > 0:
-            self.parry_slowmo_accumulator += PARRY_SLOWMO_TIMESCALE
-            self.parry_slowmo_frames -= 1
-            if self.parry_slowmo_accumulator < 1.0:
-                return
-            self.parry_slowmo_accumulator -= 1.0
         
         if self.hit_slowmo_frames > 0:
             self.hit_slowmo_accumulator += HIT_SLOWMO_TIMESCALE
@@ -525,21 +399,7 @@ class Game:
                     ah - ARENA_SHRINK_AMOUNT * 2
                 ]
         
-        self.powerup_timer -= 1
-        if self.powerup_timer <= 0:
-            self._spawn_skill_orb()
-            self.powerup_timer = random.uniform(POWERUP_SPAWN_MIN, POWERUP_SPAWN_MAX) * FPS
-        
-        for orb in self.skill_orbs[:]:
-            orb.update()
-            if orb.check_collision(self.blue):
-                self.blue.activate_skill(orb.skill_type, self.red, self.particles, self.shockwaves)
-                self.skill_orbs.remove(orb)
-                self.particles.emit(orb.x, orb.y, orb.color, count=12, size=4)
-            elif orb.check_collision(self.red):
-                self.red.activate_skill(orb.skill_type, self.blue, self.particles, self.shockwaves)
-                self.skill_orbs.remove(orb)
-                self.particles.emit(orb.x, orb.y, orb.color, count=12, size=4)
+        # Skills disabled - orb spawning and collection removed
         
         self.blue.update(self.red, tuple(self.arena_bounds), self.particles, self.shockwaves)
         self.red.update(self.blue, tuple(self.arena_bounds), self.particles, self.shockwaves)
@@ -628,8 +488,7 @@ class Game:
         self.arena_pulses.draw(self.screen, offset)
         self.shockwaves.draw(self.screen, offset)
         
-        for orb in self.skill_orbs:
-            orb.draw(self.screen, offset)
+        # Skills disabled - orb drawing removed
         
         if not self.round_ending or self.winner == self.blue:
             self.blue.draw(self.screen, offset)
