@@ -40,8 +40,8 @@ GLOW_ALPHA = 50
 GLOW_RADIUS_MULT = 1.8
 
 # Chaos System Constants
-CHAOS_MIN_INTERVAL = 5.0  # seconds before event triggers
-CHAOS_MAX_INTERVAL = 8.0  # seconds max wait
+CHAOS_MIN_INTERVAL = 3.0  # seconds before event triggers (high frequency)
+CHAOS_MAX_INTERVAL = 5.0  # seconds max wait
 CHAOS_DURATION = 5.0      # seconds each event lasts
 
 # Motion Trail Settings

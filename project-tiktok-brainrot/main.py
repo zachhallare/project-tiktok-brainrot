@@ -712,7 +712,7 @@ class Game:
                            (0, int(y + oy)), (SCREEN_WIDTH, int(y + oy)), 1)
     
     def _draw_chaos_banner(self):
-        """Draw pulsing chaos event banner."""
+        """Draw pulsing chaos event banner with thick stroke for readability."""
         if not self.chaos.active_event:
             return
         
@@ -723,28 +723,7 @@ class Game:
         
         # Text color (BLACK during Blackout for contrast on white BG)
         text_color = BLACK if self.chaos.is_blackout() else WHITE
-        
-        # Render text
-        text_surface = self.font_chaos.render(event_text, True, text_color)
-        
-        # Scale for pulse effect
-        if pulse != 1.0:
-            new_w = int(text_surface.get_width() * pulse)
-            new_h = int(text_surface.get_height() * pulse)
-            if new_w > 0 and new_h > 0:
-                text_surface = pygame.transform.scale(text_surface, (new_w, new_h))
-        
-        # Position at top of screen
-        text_rect = text_surface.get_rect(center=(SCREEN_WIDTH // 2, 60))
-        
-        # Draw shadow
-        shadow_surface = self.font_chaos.render(event_text, True, (30, 30, 30))
-        if pulse != 1.0:
-            new_w = int(shadow_surface.get_width() * pulse)
-            new_h = int(shadow_surface.get_height() * pulse)
-            if new_w > 0 and new_h > 0:
-                shadow_surface = pygame.transform.scale(shadow_surface, (new_w, new_h))
-        shadow_rect = shadow_surface.get_rect(center=(SCREEN_WIDTH // 2 + 2, 62))
+        stroke_color = WHITE if self.chaos.is_blackout() else BLACK
         
         # Background bar
         bar_rect = pygame.Rect(0, 30, SCREEN_WIDTH, 60)
@@ -752,8 +731,34 @@ class Game:
         pygame.draw.rect(bar_surface, (0, 0, 0, 180), bar_surface.get_rect())
         self.screen.blit(bar_surface, bar_rect)
         
-        # Draw text
-        self.screen.blit(shadow_surface, shadow_rect)
+        # Position at top of screen
+        text_x = SCREEN_WIDTH // 2
+        text_y = 60
+        
+        # Draw THICK STROKE outline (8 offset positions for thick outline)
+        stroke_offsets = [(-2, -2), (0, -2), (2, -2), 
+                          (-2, 0),          (2, 0),
+                          (-2, 2), (0, 2), (2, 2)]
+        
+        for ox, oy in stroke_offsets:
+            stroke_surf = self.font_chaos.render(event_text, True, stroke_color)
+            # Apply pulse scaling
+            if pulse != 1.0:
+                new_w = int(stroke_surf.get_width() * pulse)
+                new_h = int(stroke_surf.get_height() * pulse)
+                if new_w > 0 and new_h > 0:
+                    stroke_surf = pygame.transform.scale(stroke_surf, (new_w, new_h))
+            stroke_rect = stroke_surf.get_rect(center=(text_x + ox, text_y + oy))
+            self.screen.blit(stroke_surf, stroke_rect)
+        
+        # Draw main text on top
+        text_surface = self.font_chaos.render(event_text, True, text_color)
+        if pulse != 1.0:
+            new_w = int(text_surface.get_width() * pulse)
+            new_h = int(text_surface.get_height() * pulse)
+            if new_w > 0 and new_h > 0:
+                text_surface = pygame.transform.scale(text_surface, (new_w, new_h))
+        text_rect = text_surface.get_rect(center=(text_x, text_y))
         self.screen.blit(text_surface, text_rect)
         
         # Progress bar for event duration

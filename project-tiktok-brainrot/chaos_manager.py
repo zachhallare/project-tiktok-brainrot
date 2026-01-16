@@ -29,6 +29,7 @@ class ChaosManager:
     
     def __init__(self):
         self.active_event = None
+        self.last_event = None  # Track last event to prevent repeats
         self.event_timer = 0.0
         self.next_event_time = self._random_interval()
         self.event_duration_remaining = 0.0
@@ -94,8 +95,11 @@ class ChaosManager:
                 self.trigger_event()
     
     def trigger_event(self):
-        """Trigger a random chaos event."""
-        self.active_event = random.choice(self.EVENTS)
+        """Trigger a random chaos event (no repeats)."""
+        # Filter out last event to prevent repeats
+        available_events = [e for e in self.EVENTS if e != self.last_event]
+        self.active_event = random.choice(available_events)
+        self.last_event = self.active_event  # Track for next time
         self.event_duration_remaining = CHAOS_DURATION
         self.event_timer = 0.0
         
