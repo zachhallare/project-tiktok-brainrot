@@ -8,11 +8,11 @@ import math
 import random
 
 from config import (
-    SCREEN_WIDTH, SCREEN_HEIGHT, WHITE, GREEN, YELLOW, BLACK,
+    WHITE, BLACK,
     FIGHTER_RADIUS, SWORD_LENGTH, SWORD_WIDTH, BASE_HEALTH,
-    DRAG, MAX_VELOCITY, MIN_VELOCITY, BOUNCE_ENERGY, ARENA_MARGIN,
+    DRAG, MAX_VELOCITY, MIN_VELOCITY, BOUNCE_ENERGY,
     WALL_BOOST_STRENGTH, TRAIL_LENGTH, TRAIL_FADE_RATE,
-    GLOW_ALPHA, GLOW_RADIUS_MULT, NEON_RED, NEON_BLUE
+    GLOW_ALPHA, GLOW_RADIUS_MULT
 )
 
 
@@ -75,9 +75,6 @@ class Fighter:
         
         # Attack speed multiplier (lower = slower attacks)
         self.attack_speed_multiplier = 1.0
-        
-        # Wall damage cooldown (for Spike Walls)
-        self.wall_damage_cooldown = 0
         
         # Render color (can be overridden by chaos events)
         self.render_color = color
@@ -194,17 +191,6 @@ class Fighter:
         
         return True
     
-    def on_attack_miss(self):
-        """Called when attack misses or is blocked - reset combo."""
-        self.combo_stage = 0
-        self.combo_reset_timer = 0
-        self.sword_length = self.base_sword_length
-    
-    def on_attack_blocked(self):
-        """Called when attack is blocked by shield."""
-        self.on_attack_miss()
-        self.attack_cooldown = 20  # Longer recovery on block
-    
     def update(self, opponent, arena_bounds, particles, shockwaves):
         """Update fighter - bounce-only movement with ninja wall boosts."""
         # Skip update if locked (during countdown)
@@ -229,8 +215,6 @@ class Fighter:
             self.attack_cooldown -= self.attack_speed_multiplier
         if self.invincible > 0:
             self.invincible -= 1
-        if self.wall_damage_cooldown > 0:
-            self.wall_damage_cooldown -= 1
 
         
         # Apply minimal drag (DVD logo - constant velocity)
@@ -449,13 +433,6 @@ class Fighter:
         pygame.draw.rect(surface, border_color,
                         (int(bar_x + ox), int(bar_y + oy), bar_width, bar_height), 1)
     
-    def is_outside_arena(self, arena_bounds):
-        """Check if outside arena (ring-out)."""
-        ax, ay, aw, ah = arena_bounds
-        margin = self.radius * 3
-        return (self.x < ax - margin or self.x > ax + aw + margin or
-                self.y < ay - margin or self.y > ay + ah + margin)
-    
     def take_damage(self, amount, knockback_angle, knockback_force, particles):
         """Take damage and knockback."""
         if self.invincible > 0:
@@ -502,4 +479,3 @@ class Fighter:
         self.render_color = self.color
         self.render_color_bright = self.color_bright
         self.health_bar_color = self.color
-        self.wall_damage_cooldown = 0

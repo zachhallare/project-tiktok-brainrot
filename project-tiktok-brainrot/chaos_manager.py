@@ -6,11 +6,10 @@ Triggers random chaos events every 3-5 seconds to create unpredictable gameplay.
 
 import random
 import math
-import pygame
 
 from config import (
     FPS, CHAOS_MIN_INTERVAL, CHAOS_MAX_INTERVAL, CHAOS_DURATION,
-    NEON_RED, NEON_BLUE, NEON_BG, WHITE, BLACK, ORANGE, SCREEN_WIDTH, SCREEN_HEIGHT
+    NEON_RED, NEON_BLUE, NEON_BG, WHITE, BLACK, SCREEN_WIDTH, SCREEN_HEIGHT
 )
 
 
@@ -272,20 +271,11 @@ class ChaosManager:
     def is_blackout(self):
         return self.active_event == "BLACKOUT"
     
-    def is_disco(self):
-        return self.active_event == "DISCO FEVER"
-    
-    def is_crusher(self):
-        return self.active_event == "THE CRUSHER"
-    
     def is_tron_mode(self):
         return self.active_event == "TRON MODE"
     
     def is_glitch_trap(self):
         return self.active_event == "GLITCH TRAP"
-    
-    def is_breathing_room(self):
-        return self.active_event == "BREATHING ROOM"
     
     def is_moving_walls(self):
         return self.active_event == "MOVING WALLS"
