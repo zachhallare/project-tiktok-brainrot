@@ -255,11 +255,16 @@ class Game:
                 # Apply combo damage multiplier + chaos damage multiplier
                 damage_mult = attacker.get_attack_damage_multiplier()
                 chaos_damage_mult = self.chaos.get_damage_mult()
+                knockback_mult = self.chaos.get_knockback_mult()
                 total_damage_mult = damage_mult * chaos_damage_mult
                 
                 angle = math.atan2(defender.y - attacker.y, defender.x - attacker.x)
-                knockback = BASE_KNOCKBACK * (1.0 + (total_damage_mult - 1.0) * 0.5)
+                knockback = BASE_KNOCKBACK * knockback_mult * (1.0 + (total_damage_mult - 1.0) * 0.5)
                 damage = DAMAGE_PER_HIT * total_damage_mult
+                
+                # ULTRA KNOCKBACK: Massive screen shake
+                if self.chaos.is_ultra_knockback():
+                    self.screen_shake = max(self.screen_shake, SCREEN_SHAKE_INTENSITY * 3)
                 
                 # Pierce (combo stage 2) has more hit-stop
                 hit_stop_frames = HIT_STOP_FRAMES + (2 if attacker.combo_stage == 2 else 0)
@@ -458,42 +463,35 @@ class Game:
             # Apply health bar color (BLACK during Blackout)
             fighter.health_bar_color = self.chaos.get_health_bar_color(fighter.color)
             
-            # Apply Tumble Dryer rotational gravity (VERY STRONG)
-            fx, fy = self.chaos.get_gravity_force(fighter.x, fighter.y, center_x, center_y)
-            fighter.vx += fx
-            fighter.vy += fy
-            
             # Apply speed multiplier to velocity (HYPER SPEED = 3.0x)
             if speed_mult != 1.0:
-                fighter.vx *= (1.0 + (speed_mult - 1.0) * 0.15)  # More aggressive speed scaling
+                fighter.vx *= (1.0 + (speed_mult - 1.0) * 0.15)
                 fighter.vy *= (1.0 + (speed_mult - 1.0) * 0.15)
         
-        # Calculate arena bounds with Crusher modifier
+        # Calculate arena bounds with Crusher/Breathing Room modifier
         arena_mult = self.chaos.get_arena_mult()
-        if arena_mult < 1.0:
-            # Apply Crusher shrinking
-            shrink = (1.0 - arena_mult) * min(self.arena_bounds[2], self.arena_bounds[3]) / 2
+        if arena_mult != 1.0:
+            # Apply arena scaling (shrink for Crusher, pulse for Breathing Room)
+            if arena_mult < 1.0:
+                shrink = (1.0 - arena_mult) * min(self.arena_bounds[2], self.arena_bounds[3]) / 2
+            else:
+                # Expand for Breathing Room
+                shrink = -(arena_mult - 1.0) * min(self.arena_bounds[2], self.arena_bounds[3]) / 2
+            
             effective_arena = (
-                self.arena_bounds[0] + shrink,
-                self.arena_bounds[1] + shrink,
-                max(200, self.arena_bounds[2] - shrink * 2),
-                max(200, self.arena_bounds[3] - shrink * 2)
+                max(10, self.arena_bounds[0] + shrink),
+                max(10, self.arena_bounds[1] + shrink),
+                max(200, min(SCREEN_WIDTH - 20, self.arena_bounds[2] - shrink * 2)),
+                max(200, min(SCREEN_HEIGHT - 20, self.arena_bounds[3] - shrink * 2))
             )
             
-            # Crusher safety push - push fighters inside if they're outside new bounds
+            # Safety push - push fighters inside if outside bounds
             if self.chaos.needs_crusher_safety_push():
                 for fighter in [self.blue, self.red]:
                     ax, ay, aw, ah = effective_arena
-                    # Clamp fighter position inside arena with margin
                     margin = fighter.current_radius + 5
-                    if fighter.x < ax + margin:
-                        fighter.x = ax + margin
-                    elif fighter.x > ax + aw - margin:
-                        fighter.x = ax + aw - margin
-                    if fighter.y < ay + margin:
-                        fighter.y = ay + margin
-                    elif fighter.y > ay + ah - margin:
-                        fighter.y = ay + ah - margin
+                    fighter.x = max(ax + margin, min(ax + aw - margin, fighter.x))
+                    fighter.y = max(ay + margin, min(ay + ah - margin, fighter.y))
         else:
             effective_arena = tuple(self.arena_bounds)
         
@@ -501,9 +499,19 @@ class Game:
         self.blue.update(self.red, effective_arena, self.particles, self.shockwaves)
         self.red.update(self.blue, effective_arena, self.particles, self.shockwaves)
         
-        # Handle Spike Walls damage/knockback
-        if self.chaos.is_spike_walls():
-            self._handle_spike_walls(effective_arena)
+        # ===== CHAOS EVENT HANDLERS =====
+        
+        # TRON MODE: Check trail collisions
+        if self.chaos.is_tron_mode():
+            self._handle_tron_mode(effective_arena)
+        
+        # GLITCH TRAP: Random teleports
+        if self.chaos.is_glitch_trap():
+            self._handle_glitch_trap(effective_arena)
+        
+        # MOVING WALLS: Push fighters
+        if self.chaos.is_moving_walls():
+            self._handle_moving_walls(effective_arena)
         
         self._handle_combat()
         
@@ -527,52 +535,40 @@ class Game:
             else:
                 self._end_round(winner=self.red, loser=self.blue)
     
-    def _handle_spike_walls(self, arena_bounds):
-        """Handle Spike Walls damage and knockback when fighters touch walls."""
-        ax, ay, aw, ah = arena_bounds
-        damage = self.chaos.get_spike_wall_damage()
-        knockback_mult = self.chaos.get_spike_wall_knockback_mult()
-        
+    def _handle_tron_mode(self, arena_bounds):
+        """Handle TRON MODE: Opponent's trail deals damage."""
+        for fighter, other in [(self.blue, self.red), (self.red, self.blue)]:
+            damage = self.chaos.check_tron_collision(fighter, other)
+            if damage > 0 and fighter.invincible <= 0:
+                angle = math.atan2(fighter.y - other.y, fighter.x - other.x)
+                if fighter.take_damage(damage, angle, BASE_KNOCKBACK * 2, self.particles):
+                    self._trigger_hit(fighter.x, fighter.y, other.render_color, 3, damage)
+    
+    def _handle_glitch_trap(self, arena_bounds):
+        """Handle GLITCH TRAP: Random teleports with safe bounds."""
+        if self.chaos.should_glitch_teleport():
+            ax, ay, aw, ah = arena_bounds
+            
+            for fighter in [self.blue, self.red]:
+                dx, dy = self.chaos.get_glitch_teleport_offset()
+                new_x = fighter.x + dx
+                new_y = fighter.y + dy
+                
+                # Safe teleport: clamp to arena bounds
+                margin = fighter.current_radius + 5
+                new_x = max(ax + margin, min(ax + aw - margin, new_x))
+                new_y = max(ay + margin, min(ay + ah - margin, new_y))
+                
+                fighter.x = new_x
+                fighter.y = new_y
+                
+                # Visual glitch effect
+                self.particles.emit(fighter.x, fighter.y, (255, 0, 255), count=8, size=4)
+    
+    def _handle_moving_walls(self, arena_bounds):
+        """Handle MOVING WALLS: Push fighters in wall's movement direction."""
         for fighter in [self.blue, self.red]:
-            if fighter.wall_damage_cooldown > 0:
-                continue
-            
-            r = fighter.current_radius
-            wall_hit = False
-            knockback_angle = 0
-            
-            # Check wall collisions
-            if fighter.x - r <= ax:  # Left wall
-                wall_hit = True
-                knockback_angle = 0  # Push right
-            elif fighter.x + r >= ax + aw:  # Right wall
-                wall_hit = True
-                knockback_angle = math.pi  # Push left
-            elif fighter.y - r <= ay:  # Top wall
-                wall_hit = True
-                knockback_angle = math.pi / 2  # Push down
-            elif fighter.y + r >= ay + ah:  # Bottom wall
-                wall_hit = True
-                knockback_angle = -math.pi / 2  # Push up
-            
-            if wall_hit:
-                # Apply spike damage
-                fighter.health -= damage
-                fighter.flash_timer = 8
-                fighter.wall_damage_cooldown = 30  # Cooldown before next wall damage
-                
-                # Apply 3x knockback (pinball bumper effect)
-                knockback_force = BASE_KNOCKBACK * knockback_mult
-                fighter.vx += math.cos(knockback_angle) * knockback_force
-                fighter.vy += math.sin(knockback_angle) * knockback_force
-                
-                # Visual and audio feedback
-                self.particles.emit(fighter.x, fighter.y, NEON_RED, count=12, size=5)
-                self.screen_shake = max(self.screen_shake, SCREEN_SHAKE_INTENSITY * 1.5)
-                self.damage_numbers.spawn(fighter.x, fighter.y - 20, damage, NEON_RED)
-                
-                if self.sounds_enabled:
-                    self.hit_sound.play()
+            self.chaos.handle_moving_wall_collision(fighter, arena_bounds)
 
     def _draw_title_screen(self):
         """Draw title screen."""
@@ -625,15 +621,18 @@ class Game:
         if not self.chaos.is_blackout():
             self._draw_grid(offset)
         
-        # Calculate effective arena for Crusher
+        # Calculate effective arena for Crusher/Breathing Room
         arena_mult = self.chaos.get_arena_mult()
-        if arena_mult < 1.0:
-            shrink = (1.0 - arena_mult) * min(self.arena_bounds[2], self.arena_bounds[3]) / 2
+        if arena_mult != 1.0:
+            if arena_mult < 1.0:
+                shrink = (1.0 - arena_mult) * min(self.arena_bounds[2], self.arena_bounds[3]) / 2
+            else:
+                shrink = -(arena_mult - 1.0) * min(self.arena_bounds[2], self.arena_bounds[3]) / 2
             draw_arena = (
-                self.arena_bounds[0] + shrink,
-                self.arena_bounds[1] + shrink,
-                max(200, self.arena_bounds[2] - shrink * 2),
-                max(200, self.arena_bounds[3] - shrink * 2)
+                max(10, self.arena_bounds[0] + shrink),
+                max(10, self.arena_bounds[1] + shrink),
+                max(200, min(SCREEN_WIDTH - 20, self.arena_bounds[2] - shrink * 2)),
+                max(200, min(SCREEN_HEIGHT - 20, self.arena_bounds[3] - shrink * 2))
             )
         else:
             draw_arena = self.arena_bounds
@@ -641,25 +640,44 @@ class Game:
         ax, ay, aw, ah = draw_arena
         arena_rect = pygame.Rect(int(ax + offset[0]), int(ay + offset[1]), int(aw), int(ah))
         
-        # Arena fill color (dark or Blackout inverted)
-        arena_fill = WHITE if self.chaos.is_blackout() else BLACK
+        # Arena fill color (dark, Blackout inverted, Tron very dark)
+        if self.chaos.is_blackout():
+            arena_fill = WHITE
+        elif self.chaos.is_tron_mode():
+            arena_fill = (5, 5, 10)
+        else:
+            arena_fill = BLACK
         pygame.draw.rect(self.screen, arena_fill, arena_rect)
         
         # Arena border
-        if self.chaos.is_spike_walls():
-            # SPIKE WALLS: Glowing red/orange pulsing border
-            border_color = self.chaos.get_wall_glow_color()
-            border_width = 8  # Thicker glowing border
-        elif self.escalation_state == 'shrinking' or self.chaos.active_event == "THE CRUSHER":
+        if self.chaos.active_event in ["THE CRUSHER", "BREATHING ROOM"]:
             border_color = NEON_RED if not self.chaos.is_blackout() else BLACK
+            border_width = 6
+        elif self.escalation_state == 'shrinking':
+            border_color = NEON_RED
             border_width = 6
         elif self.escalation_state == 'pulse_triggered':
             border_color = YELLOW
             border_width = 5
+        elif self.chaos.is_tron_mode():
+            border_color = NEON_BLUE
+            border_width = 6
         else:
             border_color = NEON_BLUE if not self.chaos.is_blackout() else GRAY
             border_width = 4
         pygame.draw.rect(self.screen, border_color, arena_rect, border_width)
+        
+        # Draw TRON trails (solid neon walls)
+        if self.chaos.is_tron_mode():
+            self._draw_tron_trails(offset)
+        
+        # Draw GLITCH rectangles
+        if self.chaos.is_glitch_trap():
+            self._draw_glitch_rects()
+        
+        # Draw MOVING WALL
+        if self.chaos.is_moving_walls():
+            self._draw_moving_wall(offset, draw_arena)
         
         self.arena_pulses.draw(self.screen, offset)
         self.shockwaves.draw(self.screen, offset)
@@ -710,6 +728,62 @@ class Game:
         for y in range(0, SCREEN_HEIGHT + grid_spacing, grid_spacing):
             pygame.draw.line(self.screen, NEON_GRID,
                            (0, int(y + oy)), (SCREEN_WIDTH, int(y + oy)), 1)
+    
+    def _draw_tron_trails(self, offset):
+        """Draw TRON MODE solid neon trail walls."""
+        ox, oy = offset
+        trails = self.chaos.get_tron_trails()
+        
+        # Draw blue fighter's trail in neon blue
+        blue_trail = trails.get('blue', [])
+        if len(blue_trail) >= 2:
+            for i in range(1, len(blue_trail)):
+                x1, y1 = blue_trail[i-1]
+                x2, y2 = blue_trail[i]
+                pygame.draw.line(self.screen, NEON_BLUE,
+                               (int(x1 + ox), int(y1 + oy)),
+                               (int(x2 + ox), int(y2 + oy)), 4)
+        
+        # Draw red fighter's trail in neon red
+        red_trail = trails.get('red', [])
+        if len(red_trail) >= 2:
+            for i in range(1, len(red_trail)):
+                x1, y1 = red_trail[i-1]
+                x2, y2 = red_trail[i]
+                pygame.draw.line(self.screen, NEON_RED,
+                               (int(x1 + ox), int(y1 + oy)),
+                               (int(x2 + ox), int(y2 + oy)), 4)
+    
+    def _draw_glitch_rects(self):
+        """Draw GLITCH TRAP visual glitch rectangles."""
+        for x, y, w, h, color in self.chaos.get_glitch_rects():
+            surf = pygame.Surface((w, h), pygame.SRCALPHA)
+            surf.fill((*color, 100))  # Semi-transparent
+            self.screen.blit(surf, (x, y))
+    
+    def _draw_moving_wall(self, offset, arena_bounds):
+        """Draw MOVING WALLS vertical bar."""
+        ox, oy = offset
+        ax, ay, aw, ah = arena_bounds
+        
+        wall_x, wall_width, wall_dir = self.chaos.get_moving_wall()
+        
+        # Draw glowing wall
+        wall_rect = pygame.Rect(
+            int(wall_x - wall_width // 2 + ox),
+            int(ay + oy),
+            wall_width,
+            int(ah)
+        )
+        
+        # Glow effect
+        glow_rect = wall_rect.inflate(8, 0)
+        glow_surf = pygame.Surface((glow_rect.width, glow_rect.height), pygame.SRCALPHA)
+        pygame.draw.rect(glow_surf, (*NEON_BLUE, 60), glow_surf.get_rect())
+        self.screen.blit(glow_surf, glow_rect)
+        
+        # Main wall
+        pygame.draw.rect(self.screen, NEON_BLUE, wall_rect)
     
     def _draw_chaos_banner(self):
         """Draw pulsing chaos event banner with thick stroke for readability."""
