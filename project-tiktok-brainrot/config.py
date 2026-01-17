@@ -80,13 +80,20 @@ SCREEN_SHAKE_DECAY = 0.85
 HIT_SLOWMO_FRAMES = 5          # Duration in frames
 HIT_SLOWMO_TIMESCALE = 0.60    # Time scale (60% speed)
 
+# Critical Hit System
+CRIT_CHANCE = 0.10             # 10% chance per attack (rare but rewarding)
+CRIT_MULTIPLIER = 2.0          # 2x damage and knockback
+CRIT_IMPACT_FRAMES = 12        # Frames of anime impact freeze
+CRIT_IMPACT_TIMESCALE = 0.02   # 2% speed (near-frozen) during impact
+GOLD = (255, 215, 0)           # Gold color for crit damage numbers
+
 # Ninja Wall Boost
 WALL_BOOST_STRENGTH = 4        # Extra velocity toward center on wall hit
 
 
 # Arena Escalation (Inactivity Handling)
-INACTIVITY_PULSE_TIME = 5  # Seconds before Arena Pulse triggers
-INACTIVITY_SHRINK_TIME = 3  # Additional seconds before shrinking starts
+INACTIVITY_PULSE_TIME = 3  # Seconds before Arena Pulse triggers
+INACTIVITY_SHRINK_TIME = 1.5  # Additional seconds before shrinking starts
 ARENA_PULSE_VELOCITY_BOOST = 4  # Velocity nudge toward center
 ARENA_PULSE_SHAKE = 6  # Screen shake intensity for pulse
 ESCALATION_SHRINK_SPEED = 0.3  # Pixels per frame during inactivity shrink

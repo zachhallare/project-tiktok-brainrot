@@ -13,7 +13,8 @@ from config import (
     HIT_SLOWMO_FRAMES, HIT_SLOWMO_TIMESCALE,
     INACTIVITY_PULSE_TIME, INACTIVITY_SHRINK_TIME, ARENA_PULSE_VELOCITY_BOOST,
     ARENA_PULSE_SHAKE, ESCALATION_SHRINK_SPEED,
-    NEON_RED, NEON_BLUE, NEON_BG, NEON_GRID
+    NEON_RED, NEON_BLUE, NEON_BG, NEON_GRID,
+    CRIT_CHANCE, CRIT_MULTIPLIER, CRIT_IMPACT_FRAMES, CRIT_IMPACT_TIMESCALE
 )
 from effects import ParticleSystem, ShockwaveSystem, ArenaPulseSystem, DamageNumberSystem
 from fighter import Fighter
@@ -69,6 +70,11 @@ class Game:
         self.hit_stop = 0
         self.hit_slowmo_frames = 0
         self.hit_slowmo_accumulator = 0.0
+        
+        # Critical Hit Impact Sequence
+        self.crit_impact_frames = 0
+        self.crit_impact_accumulator = 0.0
+        self.crit_flash_phase = 0  # 0=none, 1=black, 2=white, 3+=done
         
         # Attack range for triggering combos
         self.attack_trigger_range = 120  # Distance to trigger attack
@@ -245,11 +251,15 @@ class Game:
             hit_pos = self._check_sword_hit(attacker, defender)
             if hit_pos:
                 
-                # Apply combo damage multiplier + chaos damage multiplier
+                # Roll for critical hit (20% chance)
+                is_crit = random.random() < CRIT_CHANCE
+                crit_mult = CRIT_MULTIPLIER if is_crit else 1.0
+                
+                # Apply combo damage multiplier + chaos damage multiplier + crit
                 damage_mult = attacker.get_attack_damage_multiplier()
                 chaos_damage_mult = self.chaos.get_damage_mult()
-                knockback_mult = self.chaos.get_knockback_mult()
-                total_damage_mult = damage_mult * chaos_damage_mult
+                knockback_mult = self.chaos.get_knockback_mult() * crit_mult
+                total_damage_mult = damage_mult * chaos_damage_mult * crit_mult
                 
                 angle = math.atan2(defender.y - attacker.y, defender.x - attacker.x)
                 knockback = BASE_KNOCKBACK * knockback_mult * (1.0 + (total_damage_mult - 1.0) * 0.5)
@@ -263,10 +273,17 @@ class Game:
                 hit_stop_frames = HIT_STOP_FRAMES + (2 if attacker.combo_stage == 2 else 0)
                 
                 if defender.take_damage(damage, angle, knockback, self.particles):
-                    self._trigger_hit(hit_pos[0], hit_pos[1], attacker.render_color, hit_stop_frames, damage)
+                    self._trigger_hit(hit_pos[0], hit_pos[1], attacker.render_color, hit_stop_frames, damage, is_crit)
                     self.hit_slowmo_frames = HIT_SLOWMO_FRAMES
                     attacker.on_attack_hit(self.round_timer)
                     self._reset_inactivity()
+                    
+                    # Critical Hit: Trigger anime impact sequence
+                    if is_crit:
+                        self.crit_impact_frames = CRIT_IMPACT_FRAMES
+                        self.crit_impact_accumulator = 0.0
+                        self.crit_flash_phase = 1  # Start flash sequence
+                        self.screen_shake = max(self.screen_shake, SCREEN_SHAKE_INTENSITY * 2)
                     
                     # DISCO FEVER: 100% Life Steal (vampirism)
                     life_steal = self.chaos.get_life_steal()
@@ -276,15 +293,15 @@ class Game:
                         # Visual feedback for healing
                         self.particles.emit(attacker.x, attacker.y, (100, 255, 100), count=6, size=3)
 
-    def _trigger_hit(self, x, y, color, hit_stop_frames=None, damage=0):
+    def _trigger_hit(self, x, y, color, hit_stop_frames=None, damage=0, is_crit=False):
         """Apply hit effects including damage numbers."""
-        self.particles.emit(x, y, WHITE, count=10, size=4)
+        self.particles.emit(x, y, WHITE, count=10 if not is_crit else 20, size=4 if not is_crit else 6)
         self.hit_stop = hit_stop_frames if hit_stop_frames else HIT_STOP_FRAMES
         self.screen_shake = SCREEN_SHAKE_INTENSITY
         
-        # Spawn floating damage number
+        # Spawn floating damage number (gold + larger for crits)
         if damage > 0:
-            self.damage_numbers.spawn(x, y - 20, damage, color)
+            self.damage_numbers.spawn(x, y - 20, damage, color, is_crit)
         
         if self.sounds_enabled:
             self.hit_sound.play()
@@ -325,6 +342,11 @@ class Game:
         
         self.hit_slowmo_frames = 0
         self.hit_slowmo_accumulator = 0.0
+        
+        # Reset critical hit impact state
+        self.crit_impact_frames = 0
+        self.crit_impact_accumulator = 0.0
+        self.crit_flash_phase = 0
         
         self.inactivity_timer = 0
         self.escalation_state = 'normal'
@@ -371,6 +393,19 @@ class Game:
             if self.hit_slowmo_accumulator < 1.0:
                 return
             self.hit_slowmo_accumulator -= 1.0
+        
+        # Critical Hit Impact Freeze (anime slowdown at 0.05x speed)
+        if self.crit_impact_frames > 0:
+            self.crit_impact_accumulator += CRIT_IMPACT_TIMESCALE
+            self.crit_impact_frames -= 1
+            # Advance flash phase during impact
+            if self.crit_flash_phase == 1 and self.crit_impact_frames < CRIT_IMPACT_FRAMES - 3:
+                self.crit_flash_phase = 2  # Black -> White
+            elif self.crit_flash_phase == 2 and self.crit_impact_frames < CRIT_IMPACT_FRAMES - 6:
+                self.crit_flash_phase = 3  # White -> Normal
+            if self.crit_impact_accumulator < 1.0:
+                return
+            self.crit_impact_accumulator -= 1.0
         
         if self.screen_shake > 0:
             self.screen_shake *= SCREEN_SHAKE_DECAY
@@ -683,6 +718,15 @@ class Game:
         
         self.particles.draw(self.screen, offset)
         self.damage_numbers.draw(self.screen, offset)
+        
+        # Critical Hit Impact Flash (drawn AFTER fighters, BEFORE UI)
+        if self.crit_flash_phase == 1:
+            # Phase 1: Full screen BLACK flash
+            self.screen.fill(BLACK)
+        elif self.crit_flash_phase == 2:
+            # Phase 2: Full screen WHITE flash
+            self.screen.fill(WHITE)
+        # Phase 3+: Normal render (no flash)
         
         # Draw chaos event banner (always visible, black text during Blackout)
         if self.chaos.active_event:

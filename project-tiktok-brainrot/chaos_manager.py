@@ -309,7 +309,7 @@ class ChaosManager:
         for tx, ty in trail:
             dist = math.hypot(fighter.x - tx, fighter.y - ty)
             if dist < fighter.current_radius + 8:
-                return 10  # Trail damage
+                return 3  # Trail damage (reduced for balance)
         return 0
     
     # ==================== GLITCH TRAP ====================

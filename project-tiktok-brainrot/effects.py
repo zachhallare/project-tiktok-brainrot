@@ -7,7 +7,7 @@ import pygame
 import math
 import random
 
-from config import WHITE, YELLOW, PURPLE, DAMAGE_NUMBER_LIFETIME, DAMAGE_NUMBER_SPEED
+from config import WHITE, YELLOW, PURPLE, GOLD, DAMAGE_NUMBER_LIFETIME, DAMAGE_NUMBER_SPEED
 
 
 class Particle:
@@ -193,14 +193,17 @@ class ArenaPulseSystem:
 class DamageNumber:
     """Floating damage number that rises and fades."""
     
-    def __init__(self, x, y, damage, color):
+    def __init__(self, x, y, damage, color, is_crit=False):
         self.x = x
         self.y = y
         self.damage = int(damage)
-        self.color = color
+        self.is_crit = is_crit
+        # Critical hits: Gold color, 1.5x larger base scale
+        self.color = GOLD if is_crit else color
+        self.base_scale = 1.5 if is_crit else 1.0
         self.lifetime = DAMAGE_NUMBER_LIFETIME
         self.max_lifetime = DAMAGE_NUMBER_LIFETIME
-        self.scale = 1.0
+        self.scale = self.base_scale
         self.vy = -DAMAGE_NUMBER_SPEED
     
     def update(self):
@@ -208,12 +211,12 @@ class DamageNumber:
         self.vy *= 0.95  # Slow down over time
         self.lifetime -= 1
         
-        # Scale up then down
+        # Scale up then down (crits start at 1.5x base)
         progress = 1 - (self.lifetime / self.max_lifetime)
         if progress < 0.2:
-            self.scale = 1.0 + progress * 2  # Scale up to 1.4
+            self.scale = self.base_scale + progress * 2  # Scale up
         else:
-            self.scale = 1.4 - (progress - 0.2) * 0.5  # Scale back down
+            self.scale = (self.base_scale + 0.4) - (progress - 0.2) * 0.5  # Scale back down
         
         return self.lifetime > 0
     
@@ -261,12 +264,12 @@ class DamageNumberSystem:
             except:
                 self.font = pygame.font.Font(None, 32)
     
-    def spawn(self, x, y, damage, color):
+    def spawn(self, x, y, damage, color, is_crit=False):
         """Spawn a new damage number."""
         # Add random offset to prevent stacking
         x += random.uniform(-10, 10)
         y += random.uniform(-5, 5)
-        self.numbers.append(DamageNumber(x, y, damage, color))
+        self.numbers.append(DamageNumber(x, y, damage, color, is_crit))
     
     def update(self):
         self.numbers = [n for n in self.numbers if n.update()]
