@@ -5,7 +5,7 @@ import random
 # Import constants and classes from other modules.
 from config import (
     SCREEN_WIDTH, SCREEN_HEIGHT, FPS,
-    WHITE, PURPLE, BLACK,
+    WHITE, PURPLE, BLACK, DARK_GRAY, GRAY, YELLOW,
     ARENA_MARGIN, ARENA_WIDTH, ARENA_HEIGHT,
     ARENA_SHRINK_INTERVAL, ARENA_SHRINK_AMOUNT,
     ROUND_MAX_TIME, BASE_KNOCKBACK, DAMAGE_PER_HIT, SLOW_MOTION_SPEED,
@@ -17,7 +17,7 @@ from config import (
 )
 from effects import ParticleSystem, ShockwaveSystem, ArenaPulseSystem, DamageNumberSystem
 from fighter import Fighter
-from chaos_manager import ChaosManager
+from chaos_manager import ChaosManager, ChaosTextRenderer
 
 
 # Main game class - DVD logo style combat with rotating swords.
@@ -37,12 +37,6 @@ class Game:
         self.font_large = pygame.font.Font(None, 120)
         self.font_medium = pygame.font.Font(None, 72)
         self.font_small = pygame.font.Font(None, 36)
-        
-        # Bold/Impact font for chaos banner
-        try:
-            self.font_chaos = pygame.font.SysFont("Impact", 48, bold=True)
-        except:
-            self.font_chaos = pygame.font.Font(None, 56)
         
         # Define the base arena square.
         self.base_arena = (ARENA_MARGIN, ARENA_MARGIN, ARENA_WIDTH, ARENA_HEIGHT)
@@ -68,6 +62,7 @@ class Game:
         
         # Chaos Manager for TikTok Brainrot events
         self.chaos = ChaosManager()
+        self.chaos_text = ChaosTextRenderer()
         
         # Screen effects.
         self.screen_shake = 0
@@ -691,7 +686,7 @@ class Game:
         
         # Draw chaos event banner (always visible, black text during Blackout)
         if self.chaos.active_event:
-            self._draw_chaos_banner()
+            self.chaos_text.draw_chaos_banner(self.screen, self.chaos)
         
         # Countdown overlay
         if self.countdown_active:
@@ -782,69 +777,6 @@ class Game:
         
         # Main wall
         pygame.draw.rect(self.screen, NEON_BLUE, wall_rect)
-    
-    def _draw_chaos_banner(self):
-        """Draw pulsing chaos event banner with thick stroke for readability."""
-        if not self.chaos.active_event:
-            return
-        
-        # Pulsing animation
-        pulse = 1.0 + 0.15 * math.sin(pygame.time.get_ticks() * 0.008)
-        
-        event_text = self.chaos.active_event
-        
-        # Text color (BLACK during Blackout for contrast on white BG)
-        text_color = BLACK if self.chaos.is_blackout() else WHITE
-        stroke_color = WHITE if self.chaos.is_blackout() else BLACK
-        
-        # Background bar
-        bar_rect = pygame.Rect(0, 30, SCREEN_WIDTH, 60)
-        bar_surface = pygame.Surface((bar_rect.width, bar_rect.height), pygame.SRCALPHA)
-        pygame.draw.rect(bar_surface, (0, 0, 0, 180), bar_surface.get_rect())
-        self.screen.blit(bar_surface, bar_rect)
-        
-        # Position at top of screen
-        text_x = SCREEN_WIDTH // 2
-        text_y = 60
-        
-        # Draw THICK STROKE outline (8 offset positions for thick outline)
-        stroke_offsets = [(-2, -2), (0, -2), (2, -2), 
-                          (-2, 0),          (2, 0),
-                          (-2, 2), (0, 2), (2, 2)]
-        
-        for ox, oy in stroke_offsets:
-            stroke_surf = self.font_chaos.render(event_text, True, stroke_color)
-            # Apply pulse scaling
-            if pulse != 1.0:
-                new_w = int(stroke_surf.get_width() * pulse)
-                new_h = int(stroke_surf.get_height() * pulse)
-                if new_w > 0 and new_h > 0:
-                    stroke_surf = pygame.transform.scale(stroke_surf, (new_w, new_h))
-            stroke_rect = stroke_surf.get_rect(center=(text_x + ox, text_y + oy))
-            self.screen.blit(stroke_surf, stroke_rect)
-        
-        # Draw main text on top
-        text_surface = self.font_chaos.render(event_text, True, text_color)
-        if pulse != 1.0:
-            new_w = int(text_surface.get_width() * pulse)
-            new_h = int(text_surface.get_height() * pulse)
-            if new_w > 0 and new_h > 0:
-                text_surface = pygame.transform.scale(text_surface, (new_w, new_h))
-        text_rect = text_surface.get_rect(center=(text_x, text_y))
-        self.screen.blit(text_surface, text_rect)
-        
-        # Progress bar for event duration
-        progress = self.chaos.get_event_progress()
-        bar_width = int(SCREEN_WIDTH * 0.6)
-        bar_x = (SCREEN_WIDTH - bar_width) // 2
-        bar_y = 85
-        
-        # Background bar
-        pygame.draw.rect(self.screen, (50, 50, 50), (bar_x, bar_y, bar_width, 6))
-        # Progress fill
-        fill_width = int(bar_width * (1.0 - progress))
-        if fill_width > 0:
-            pygame.draw.rect(self.screen, NEON_BLUE, (bar_x, bar_y, fill_width, 6))
 
     def run(self):
         """Main loop."""

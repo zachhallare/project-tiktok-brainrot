@@ -4,7 +4,7 @@
 
 ---
 
-## 📖 Project Overview
+## Project Overview
 
 **Red vs Blue Battle** is an automated AI-vs-AI combat simulation built for endless, satisfying content loops. The game features two circular fighters—one Red, one Blue—bouncing around a shrinking arena like a DVD screensaver while wielding swords that swing in fluid combo attacks.
 
@@ -114,24 +114,27 @@ Any successful hit pauses the shrink for 2 seconds, rewarding aggression.
 
 ---
 
-## 🎲 Chaos Event System
+## Chaos Event System
 
-Every **5-8 seconds**, a random chaos event triggers that dramatically alters gameplay for **4 seconds**. This keeps fights unpredictable and creates TikTok-worthy moments.
+Every **3-5 seconds**, a random chaos event triggers that dramatically alters gameplay for **5 seconds**. Events never repeat back-to-back. This keeps fights unpredictable and creates TikTok-worthy moments.
 
 | Event | Effect |
 |-------|--------|
-| **HYPER SPEED** | 3.0x physics speed—fighters zoom uncontrollably |
-| **SPIKE WALLS** | Walls deal 15 damage + 3x knockback (pinball bumpers) |
-| **TINY TERROR** | 0.5x body size, normal-length sword, slower attacks, 1.5x damage |
+| **HYPER SPEED** | 50x physics speed—fighters zoom uncontrollably |
+| **TINY TERROR** | 0.5x body size, normal-length sword, 0.5x attack speed, 1.5x damage |
 | **DISCO FEVER** | Rainbow colors, particles, 100% life steal (vampirism) |
-| **TUMBLE DRYER** | Extreme rotational gravity spins fighters clockwise |
 | **THE CRUSHER** | Arena shrinks to 50%, fighters pushed inside |
 | **BLACKOUT** | White background, black fighters + UI |
+| **TRON MODE** | Neon aesthetic, opponent's trail deals 10 damage |
+| **GLITCH TRAP** | Visual glitch effects, 30% chance to random-teleport every 0.5s |
+| **BREATHING ROOM** | Arena pulses 60%-110% in a sine wave pattern |
+| **MOVING WALLS** | Pong-style vertical wall bounces fighters in its direction |
+| **ULTRA KNOCKBACK** | 30x knockback + massive screen shake |
 
 ### Visual Indicators
-- **Banner:** Event name pulses at top of screen
+- **Banner:** Event name pulses at top of screen (rendered by `ChaosTextRenderer`)
 - **Progress Bar:** Shows remaining event duration
-- **Arena Border:** Changes color during Crusher/Spike Walls
+- **Arena Border:** Changes color during Crusher/Breathing Room/Tron Mode
 
 ---
 
@@ -162,7 +165,7 @@ project-tiktok-brainrot/
 ├── fighter.py        # Fighter class with movement and attacks
 ├── config.py         # All tuning constants and physics values
 ├── effects.py        # Particle, shockwave, and slash effects
-├── chaos_manager.py  # Chaos event system (7 random events)
+├── chaos_manager.py  # Chaos event system (10 random events) + ChaosTextRenderer
 ├── sound_manager.py  # Sound generation utilities
 ├── utils.py          # Helper functions
 └── sounds/           # Audio assets directory
@@ -189,7 +192,7 @@ python project-tiktok-brainrot/main.py
 | `SCREEN_WIDTH`        | 600   | Window width in pixels               |
 | `SCREEN_HEIGHT`       | 600   | Window height in pixels              |
 | `FPS`                 | 60    | Target frames per second             |
-| `BASE_HEALTH`         | 240   | Hit points per fighter               |
+| `BASE_HEALTH`         | 300   | Hit points per fighter               |
 | `DAMAGE_PER_HIT`      | 10    | Base damage (before multipliers)     |
 | `FIGHTER_RADIUS`      | 30    | Fighter body size                    |
 | `SWORD_LENGTH`        | 55    | Sword reach in pixels                |
