@@ -50,6 +50,7 @@ class ChaosManager:
         # TRON MODE state
         self.tron_trails = {'blue': [], 'red': []}  # List of (x, y) positions
         self.tron_trail_timer = 0
+        self.tron_damage_cooldown = {'blue': 0.0, 'red': 0.0}  # Cooldown timer per fighter
         
         # GLITCH TRAP state
         self.glitch_teleport_timer = 0.0
@@ -150,6 +151,7 @@ class ChaosManager:
         elif self.active_event == "TRON MODE":
             self.tron_trails = {'blue': [], 'red': []}  # Clear old trails
             self.tron_trail_timer = 0
+            self.tron_damage_cooldown = {'blue': 0.0, 'red': 0.0}  # Reset cooldowns
         
         elif self.active_event == "GLITCH TRAP":
             self.glitch_teleport_timer = 0.0
@@ -298,18 +300,30 @@ class ChaosManager:
         """Get trail positions for drawing."""
         return self.tron_trails
     
-    def check_tron_collision(self, fighter, other_fighter):
-        """Check if fighter collides with opponent's trail. Returns damage or 0."""
+    def check_tron_collision(self, fighter, other_fighter, dt):
+        """Check if fighter collides with opponent's trail. Returns damage or 0.
+        
+        Damage is limited to 1 per second using a cooldown timer.
+        """
         if self.active_event != "TRON MODE":
             return 0
         
+        fighter_key = 'blue' if fighter.is_blue else 'red'
         other_key = 'blue' if other_fighter.is_blue else 'red'
         trail = self.tron_trails[other_key]
+        
+        # Update cooldown timer
+        if self.tron_damage_cooldown[fighter_key] > 0:
+            self.tron_damage_cooldown[fighter_key] -= dt
         
         for tx, ty in trail:
             dist = math.hypot(fighter.x - tx, fighter.y - ty)
             if dist < fighter.current_radius + 8:
-                return 3  # Trail damage (reduced for balance)
+                # Only deal damage if cooldown has expired
+                if self.tron_damage_cooldown[fighter_key] <= 0:
+                    self.tron_damage_cooldown[fighter_key] = 1.0  # 1 second cooldown
+                    return 1  # 1 damage per second
+                return 0  # Collision but on cooldown
         return 0
     
     # ==================== GLITCH TRAP ====================

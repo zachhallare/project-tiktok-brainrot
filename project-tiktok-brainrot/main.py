@@ -564,9 +564,10 @@ class Game:
                 self._end_round(winner=self.red, loser=self.blue)
     
     def _handle_tron_mode(self, arena_bounds):
-        """Handle TRON MODE: Opponent's trail deals damage."""
+        """Handle TRON MODE: Opponent's trail deals damage (1 per second)."""
+        dt = 1.0 / FPS
         for fighter, other in [(self.blue, self.red), (self.red, self.blue)]:
-            damage = self.chaos.check_tron_collision(fighter, other)
+            damage = self.chaos.check_tron_collision(fighter, other, dt)
             if damage > 0 and fighter.invincible <= 0:
                 angle = math.atan2(fighter.y - other.y, fighter.x - other.x)
                 if fighter.take_damage(damage, angle, BASE_KNOCKBACK * 2, self.particles):

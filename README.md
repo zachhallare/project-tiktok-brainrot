@@ -125,7 +125,7 @@ Every **3-5 seconds**, a random chaos event triggers that dramatically alters ga
 | **DISCO FEVER** | Rainbow colors, particles, 100% life steal (vampirism) |
 | **THE CRUSHER** | Arena shrinks to 50%, fighters pushed inside |
 | **BLACKOUT** | White background, black fighters + UI |
-| **TRON MODE** | Neon aesthetic, opponent's trail deals 10 damage |
+| **TRON MODE** | Neon aesthetic, opponent's trail deals 1 damage per second |
 | **GLITCH TRAP** | Visual glitch effects, 30% chance to random-teleport every 0.5s |
 | **BREATHING ROOM** | Arena pulses 60%-110% in a sine wave pattern |
 | **MOVING WALLS** | Pong-style vertical wall bounces fighters in its direction |
