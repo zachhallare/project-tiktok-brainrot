@@ -193,7 +193,7 @@ class ChaosManager:
     def get_speed_mult(self):
         """Get physics/movement speed multiplier."""
         if self.active_event == "HYPER SPEED":
-            return 50.0
+            return 300.0
         return 1.0
     
     def get_body_size_mult(self):
@@ -227,7 +227,7 @@ class ChaosManager:
     def get_knockback_mult(self):
         """Get knockback multiplier."""
         if self.active_event == "ULTRA KNOCKBACK":
-            return 30.0
+            return 300.0
         return 1.0
     
     def get_fighter_color(self, original_color, is_blue=True):

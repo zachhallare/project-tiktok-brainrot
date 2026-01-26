@@ -401,9 +401,16 @@ class Game:
         if self.sounds_enabled and self.death_final_hit_sound:
             self.death_final_hit_sound.play()
         
-        # Stop any chaos sounds
+        # Stop any chaos sounds and reset chaos system
         self._stop_chaos_loops()
         self._stop_escalation_sound()
+        self.chaos.reset_chaos()
+        
+        # Restore original colors for winner so they're visible in their true color
+        winner.render_color = winner.color
+        winner.render_color_bright = winner.color_bright
+        loser.render_color = loser.color
+        loser.render_color_bright = loser.color_bright
 
     def _reset_round(self):
         """Reset round."""
