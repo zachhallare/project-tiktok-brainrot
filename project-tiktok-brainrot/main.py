@@ -141,6 +141,10 @@ class Game:
         self.arena_pulses.add(tuple(self.arena_bounds), PURPLE)
         self.screen_shake = ARENA_PULSE_SHAKE
         
+        # Play arena pulse sound
+        if self.sounds_enabled and self.arena_pulse_sound:
+            self.arena_pulse_sound.play()
+        
         center_x = SCREEN_WIDTH // 2
         center_y = SCREEN_HEIGHT // 2
         
@@ -156,65 +160,133 @@ class Game:
                 fighter.vy *= 1.2
 
     def _setup_sounds(self):
-        """Generate procedural sounds."""
+        """Load all sound effects from audio files."""
+        import os
         try:
-            sample_rate = 44100
-            duration = 0.1
+            base_path = os.path.join(os.path.dirname(__file__), "assets", "audio")
             
-            # Hit sound
-            t = [i / sample_rate for i in range(int(sample_rate * duration))]
-            samples = []
-            for i in t:
-                freq = 200
-                amp = 20000 * math.exp(-i * 25) * math.sin(2 * math.pi * freq * i)
-                samples.append(int(max(-32768, min(32767, amp))))
+            # Helper function to load a sound file
+            def load_sound(subfolder, filename, volume=0.5):
+                path = os.path.join(base_path, subfolder, filename)
+                if os.path.exists(path):
+                    sound = pygame.mixer.Sound(path)
+                    sound.set_volume(volume)
+                    return sound
+                return None
             
-            arr = bytes()
-            for s in samples:
-                arr += s.to_bytes(2, 'little', signed=True)
+            # === COMBAT SOUNDS ===
+            self.hit_sounds = [
+                load_sound("combat", "hit_1.mp3", 0.5),
+                load_sound("combat", "hit_2.mp3", 0.5)
+            ]
+            self.hit_sound_index = 0  # Alternate between hit sounds
+            self.critical_hit_sound = load_sound("combat", "critical_hit.mp3", 0.6)
+            self.knockback_whoosh_sound = load_sound("combat", "knockback_whoosh.mp3", 0.5)
+            self.sword_clash_sound = load_sound("combat", "sword_clash.mp3", 0.5)
+            self.death_final_hit_sound = load_sound("combat", "death_final_hit.mp3", 0.7)
+            self.sword_to_ground_sound = load_sound("combat", "sword_to_the_ground.mp3", 0.6)
             
-            self.hit_sound = pygame.mixer.Sound(buffer=arr)
-            self.hit_sound.set_volume(0.4)
+            # === COUNTDOWN SOUNDS ===
+            self.countdown_beep_sound = load_sound("countdown", "countdown_beep.mp3", 0.6)
+            self.sword_fight_sound = load_sound("countdown", "sword-fight.mp3", 0.5)
             
-            # Explosion sound
-            exp_dur = 0.25
-            t_exp = [i / sample_rate for i in range(int(sample_rate * exp_dur))]
-            exp_samples = []
-            for i in t_exp:
-                noise = random.uniform(-1, 1)
-                amp = 25000 * math.exp(-i * 6) * noise
-                exp_samples.append(int(max(-32768, min(32767, amp))))
+            # === CHAOS EVENT SOUNDS (one-shots on event start) ===
+            self.chaos_sounds = {
+                "HYPER SPEED": load_sound("chaos_event", "hyper_speed.mp3", 0.5),
+                "TINY TERROR": load_sound("chaos_event", "chaos_trigger.mp3", 0.5),  # Use generic trigger
+                "DISCO FEVER": load_sound("chaos_event", "disco_fever.mp3", 0.5),
+                "THE CRUSHER": load_sound("chaos_event", "the_crusher.mp3", 0.5),
+                "BLACKOUT": load_sound("chaos_event", "blackout_start.mp3", 0.5),
+                "TRON MODE": load_sound("chaos_event", "tron_mode.mp3", 0.5),
+                "GLITCH TRAP": load_sound("chaos_event", "glitch_trap.mp3", 0.5),
+                "BREATHING ROOM": load_sound("chaos_event", "breathing_room.mp3", 0.5),
+                "MOVING WALLS": load_sound("chaos_event", "moving_walls.mp3", 0.5),
+                "ULTRA KNOCKBACK": load_sound("chaos_event", "ultra_knockback.mp3", 0.5),
+            }
+            self.chaos_trigger_sound = load_sound("chaos_event", "chaos_trigger.mp3", 0.6)
             
-            exp_arr = bytes()
-            for s in exp_samples:
-                exp_arr += s.to_bytes(2, 'little', signed=True)
+            # === CONTINUOUS/LOOP SOUNDS ===
+            self.arena_shrink_warning_sound = load_sound("continuous", "arena_shrink_warning.mp3", 0.4)
+            self.disco_beat_sound = load_sound("continuous", "disco_beat.mp3", 0.4)
+            self.tron_trail_hum_sound = load_sound("continuous", "tron_trail_hum.mp3", 0.3)
             
-            self.explosion_sound = pygame.mixer.Sound(buffer=exp_arr)
-            self.explosion_sound.set_volume(0.5)
+            # === FEEDBACK SOUNDS ===
+            self.arena_pulse_sound = load_sound("feedback", "arena_pulse.mp3", 0.5)
+            self.damage_tick_sound = load_sound("feedback", "damage_tick.mp3", 0.4)
+            self.healing_life_steal_sound = load_sound("feedback", "healing_life_steal.mp3", 0.4)
+            self.wall_boost_sound = load_sound("feedback", "wall_boost.mp3", 0.3)
+            self.wall_bounce_sound = load_sound("feedback", "wall_bounce.mp3", 0.25)
             
-            # Clang sound for parries
-            clang_dur = 0.08
-            t_clang = [i / sample_rate for i in range(int(sample_rate * clang_dur))]
-            clang_samples = []
-            for i in t_clang:
-                freq1 = 800
-                freq2 = 1200
-                amp = 18000 * math.exp(-i * 40) * (
-                    math.sin(2 * math.pi * freq1 * i) +
-                    0.5 * math.sin(2 * math.pi * freq2 * i)
-                )
-                clang_samples.append(int(max(-32768, min(32767, amp))))
+            # Track currently playing looping sounds for chaos events
+            self.active_loop_channel = None  # Channel for looping chaos sounds
+            self.active_chaos_event_sound = None  # Currently playing event name
+            self.escalation_loop_channel = None  # Channel for arena shrink warning
             
-            clang_arr = bytes()
-            for s in clang_samples:
-                clang_arr += s.to_bytes(2, 'little', signed=True)
+            # Track countdown sound state
+            self.countdown_beep_played = [False, False, False]  # For 3, 2, 1
+            self.fight_sound_played = False
             
-            self.clang_sound = pygame.mixer.Sound(buffer=clang_arr)
-            self.clang_sound.set_volume(0.5)
+            # Track death sequence sound state
+            self.death_sound_phase = 0  # 0=none, 1=final_hit_played, 2=sword_to_ground_played
             
             self.sounds_enabled = True
-        except Exception:
+        except Exception as e:
+            print(f"Sound loading error: {e}")
             self.sounds_enabled = False
+    
+    def _play_hit_sound(self, is_crit=False):
+        """Play appropriate hit sound."""
+        if not self.sounds_enabled:
+            return
+        if is_crit and self.critical_hit_sound:
+            self.critical_hit_sound.play()
+        elif self.hit_sounds[0] and self.hit_sounds[1]:
+            self.hit_sounds[self.hit_sound_index].play()
+            self.hit_sound_index = (self.hit_sound_index + 1) % 2
+    
+    def _play_chaos_event_sound(self, event_name):
+        """Play chaos event sound and start loops if needed."""
+        if not self.sounds_enabled:
+            return
+        
+        # Stop any currently playing chaos loops
+        self._stop_chaos_loops()
+        
+        # Play the trigger sound
+        if self.chaos_trigger_sound:
+            self.chaos_trigger_sound.play()
+        
+        # Play event-specific sound
+        if event_name in self.chaos_sounds and self.chaos_sounds[event_name]:
+            self.chaos_sounds[event_name].play()
+        
+        # Start continuous loops for specific events
+        if event_name == "DISCO FEVER" and self.disco_beat_sound:
+            self.active_loop_channel = self.disco_beat_sound.play(loops=-1)
+            self.active_chaos_event_sound = event_name
+        elif event_name == "TRON MODE" and self.tron_trail_hum_sound:
+            self.active_loop_channel = self.tron_trail_hum_sound.play(loops=-1)
+            self.active_chaos_event_sound = event_name
+    
+    def _stop_chaos_loops(self):
+        """Stop any chaos-related looping sounds."""
+        if self.active_loop_channel:
+            self.active_loop_channel.stop()
+            self.active_loop_channel = None
+        self.active_chaos_event_sound = None
+    
+    def _start_escalation_sound(self):
+        """Start the escalation shrink warning loop."""
+        if not self.sounds_enabled or not self.arena_shrink_warning_sound:
+            return
+        if self.escalation_loop_channel is None:
+            self.escalation_loop_channel = self.arena_shrink_warning_sound.play(loops=-1)
+    
+    def _stop_escalation_sound(self):
+        """Stop the escalation shrink warning loop."""
+        if self.escalation_loop_channel:
+            self.escalation_loop_channel.stop()
+            self.escalation_loop_channel = None
 
     # Skills disabled - _spawn_skill_orb removed
 
@@ -265,9 +337,11 @@ class Game:
                 knockback = BASE_KNOCKBACK * knockback_mult * (1.0 + (total_damage_mult - 1.0) * 0.5)
                 damage = DAMAGE_PER_HIT * total_damage_mult
                 
-                # ULTRA KNOCKBACK: Massive screen shake
+                # ULTRA KNOCKBACK: Massive screen shake + knockback whoosh
                 if self.chaos.is_ultra_knockback():
                     self.screen_shake = max(self.screen_shake, SCREEN_SHAKE_INTENSITY * 3)
+                    if self.sounds_enabled and self.knockback_whoosh_sound:
+                        self.knockback_whoosh_sound.play()
                 
                 # Pierce (combo stage 2) has more hit-stop
                 hit_stop_frames = HIT_STOP_FRAMES + (2 if attacker.combo_stage == 2 else 0)
@@ -292,6 +366,9 @@ class Game:
                         attacker.health = min(attacker.max_health, attacker.health + heal_amount)
                         # Visual feedback for healing
                         self.particles.emit(attacker.x, attacker.y, (100, 255, 100), count=6, size=3)
+                        # Play life steal sound
+                        if self.sounds_enabled and self.healing_life_steal_sound:
+                            self.healing_life_steal_sound.play()
 
     def _trigger_hit(self, x, y, color, hit_stop_frames=None, damage=0, is_crit=False):
         """Apply hit effects including damage numbers."""
@@ -303,8 +380,8 @@ class Game:
         if damage > 0:
             self.damage_numbers.spawn(x, y - 20, damage, color, is_crit)
         
-        if self.sounds_enabled:
-            self.hit_sound.play()
+        # Play hit sound (alternating hit_1/hit_2, or critical_hit for crits)
+        self._play_hit_sound(is_crit)
 
     def _end_round(self, winner, loser):
         """Handle round end."""
@@ -319,8 +396,14 @@ class Game:
         self.slow_motion = True
         self.slow_motion_accumulator = 0.0
         
-        if self.sounds_enabled:
-            self.explosion_sound.play()
+        # Death sound sequence: death_final_hit first, sword_to_ground after freeze
+        self.death_sound_phase = 1
+        if self.sounds_enabled and self.death_final_hit_sound:
+            self.death_final_hit_sound.play()
+        
+        # Stop any chaos sounds
+        self._stop_chaos_loops()
+        self._stop_escalation_sound()
 
     def _reset_round(self):
         """Reset round."""
@@ -337,8 +420,10 @@ class Game:
         self.arena_pulses.clear()
         self.damage_numbers.clear()
         
-        # Reset chaos system
+        # Reset chaos system and stop all chaos sounds
         self.chaos.reset_chaos()
+        self._stop_chaos_loops()
+        self._stop_escalation_sound()
         
         self.hit_slowmo_frames = 0
         self.hit_slowmo_accumulator = 0.0
@@ -356,6 +441,11 @@ class Game:
         self.countdown_stage = 0
         self.countdown_timer = 0
         self.countdown_active = True
+        
+        # Reset countdown and death sound state
+        self.countdown_beep_played = [False, False, False]
+        self.fight_sound_played = False
+        self.death_sound_phase = 0
 
     def update(self):
         """Main update loop."""
@@ -365,6 +455,20 @@ class Game:
         if self.countdown_active:
             self.countdown_timer += 1
             duration = self.fight_duration if self.countdown_stage == 3 else self.countdown_duration
+            
+            # Play countdown beep sounds for stages 0, 1, 2 ("3", "2", "1")
+            if self.countdown_stage < 3 and self.countdown_timer == 1:
+                if not self.countdown_beep_played[self.countdown_stage]:
+                    self.countdown_beep_played[self.countdown_stage] = True
+                    if self.sounds_enabled and self.countdown_beep_sound:
+                        self.countdown_beep_sound.play()
+            
+            # Play sword-fight sound when "FIGHT" appears
+            if self.countdown_stage == 3 and self.countdown_timer == 1:
+                if not self.fight_sound_played:
+                    self.fight_sound_played = True
+                    if self.sounds_enabled and self.sword_fight_sound:
+                        self.sword_fight_sound.play()
             
             if self.countdown_timer >= duration:
                 self.countdown_timer = 0
@@ -414,6 +518,13 @@ class Game:
         
         if self.round_ending:
             self.reset_timer -= 1
+            
+            # Play sword_to_ground sound partway through the freeze
+            if self.death_sound_phase == 1 and self.reset_timer < 80:
+                self.death_sound_phase = 2
+                if self.sounds_enabled and self.sword_to_ground_sound:
+                    self.sword_to_ground_sound.play()
+            
             if self.reset_timer <= 0:
                 self._reset_round()
             self.particles.update()
@@ -436,6 +547,7 @@ class Game:
             if self.inactivity_timer >= INACTIVITY_SHRINK_TIME * FPS:
                 self.escalation_state = 'shrinking'
                 self.escalation_shrink_paused = False
+                self._start_escalation_sound()  # Start shrink warning loop
         
         elif self.escalation_state == 'shrinking':
             if not self.escalation_shrink_paused:
@@ -447,6 +559,8 @@ class Game:
                         aw - ESCALATION_SHRINK_SPEED * 2,
                         ah - ESCALATION_SHRINK_SPEED * 2
                     ]
+                else:
+                    self._stop_escalation_sound()  # Stop when minimum size reached
             else:
                 if self.inactivity_timer >= FPS * 2:
                     self.escalation_shrink_paused = False
@@ -465,7 +579,16 @@ class Game:
         
         # ===== CHAOS SYSTEM UPDATE =====
         dt = 1.0 / FPS
+        prev_event = self.chaos.active_event  # Track for sound trigger
         self.chaos.update(dt, self.particles, [self.blue, self.red])
+        
+        # Trigger chaos event sound when new event starts
+        current_event = self.chaos.active_event
+        if current_event and current_event != prev_event:
+            self._play_chaos_event_sound(current_event)
+        elif prev_event and not current_event:
+            # Event ended, stop any loops
+            self._stop_chaos_loops()
         
         # Get chaos modifiers
         speed_mult = self.chaos.get_speed_mult()
@@ -572,6 +695,9 @@ class Game:
                 angle = math.atan2(fighter.y - other.y, fighter.x - other.x)
                 if fighter.take_damage(damage, angle, BASE_KNOCKBACK * 2, self.particles):
                     self._trigger_hit(fighter.x, fighter.y, other.render_color, 3, damage)
+                    # Play damage tick sound for TRON trail damage
+                    if self.sounds_enabled and self.damage_tick_sound:
+                        self.damage_tick_sound.play()
     
     def _handle_glitch_trap(self, arena_bounds):
         """Handle GLITCH TRAP: Random teleports with safe bounds."""
@@ -597,7 +723,10 @@ class Game:
     def _handle_moving_walls(self, arena_bounds):
         """Handle MOVING WALLS: Push fighters in wall's movement direction."""
         for fighter in [self.blue, self.red]:
-            self.chaos.handle_moving_wall_collision(fighter, arena_bounds)
+            was_pushed = self.chaos.handle_moving_wall_collision(fighter, arena_bounds)
+            # Play moving walls sound only when fighter is pushed
+            if was_pushed and self.sounds_enabled and self.wall_bounce_sound:
+                self.wall_bounce_sound.play()
 
     def _draw_title_screen(self):
         """Draw title screen."""

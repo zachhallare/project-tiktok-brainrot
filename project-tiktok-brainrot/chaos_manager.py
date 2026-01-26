@@ -364,9 +364,13 @@ class ChaosManager:
         return (self.moving_wall_x, self.moving_wall_width, self.moving_wall_dir)
     
     def handle_moving_wall_collision(self, fighter, arena_bounds):
-        """Push fighter away from moving wall. Direction matches wall movement."""
+        """Push fighter away from moving wall. Direction matches wall movement.
+        
+        Returns:
+            True if fighter was pushed, False otherwise (for sound trigger).
+        """
         if self.active_event != "MOVING WALLS":
-            return
+            return False
         
         wall_x = self.moving_wall_x
         wall_half = self.moving_wall_width // 2
@@ -377,6 +381,8 @@ class ChaosManager:
             push_strength = 8
             fighter.x += self.moving_wall_dir * push_strength
             fighter.vx = self.moving_wall_dir * abs(fighter.vx) * 0.5 + self.moving_wall_dir * 5
+            return True
+        return False
     
     # ==================== UTILITY ====================
     
