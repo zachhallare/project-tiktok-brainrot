@@ -37,6 +37,8 @@ class Fighter:
         self.sword_angle = 0
         self.sword_length = SWORD_LENGTH
         self.base_sword_length = SWORD_LENGTH
+        self.last_sword_angle = 0
+        self.sword_angular_velocity = 0.0
         
         # Visual
         self.flash_timer = 0
@@ -205,7 +207,12 @@ class Fighter:
         if len(self.trail) > TRAIL_LENGTH:
             self.trail.pop()
         
+        self.last_sword_angle = self.sword_angle
         self.update_rotation(opponent, 0)  # Sword faces opponent with combo offset
+        
+        # Calculate angular velocity (handles pi wraparound perfectly)
+        delta_angle = (self.sword_angle - self.last_sword_angle + math.pi) % (2 * math.pi) - math.pi
+        self.sword_angular_velocity = delta_angle
         
         # Decrease timers
         if self.flash_timer > 0:
@@ -389,20 +396,77 @@ class Fighter:
             surface.blit(trail_surf, (int(tx + ox) - trail_r, int(ty + oy) - trail_r))
     
     def _draw_sword(self, surface, offset):
-        """Draw sword with proper sizing."""
+        """Draw sword with proper sizing and dynamic neon smear frames."""
         ox, oy = offset
         r = self.current_radius
-        # Use SWORD size multiplier (stays normal during Tiny Terror)
-        scaled_sword_length = self.sword_length * self.sword_size_multiplier
+        
+        # Calculate dynamic visual stretch based on velocity
+        velocity = getattr(self, 'sword_angular_velocity', 0.0)
+        stretch_factor = 1.0
+        if self.is_attacking:
+            # Stretch the sword up to 80% based on swing speed
+            stretch_factor += min(0.8, abs(velocity) * 2.0)
+            
+        visual_sword_length = self.sword_length * self.sword_size_multiplier * stretch_factor
         
         base_x = self.x + math.cos(self.sword_angle) * (r + 3)
         base_y = self.y + math.sin(self.sword_angle) * (r + 3)
-        tip_x = base_x + math.cos(self.sword_angle) * scaled_sword_length
-        tip_y = base_y + math.sin(self.sword_angle) * scaled_sword_length
+        tip_x = base_x + math.cos(self.sword_angle) * visual_sword_length
+        tip_y = base_y + math.sin(self.sword_angle) * visual_sword_length
         
         sword_color = WHITE if self.flash_timer > 0 else self.render_color_bright
         
-        # Sword width stays normal (doesn't scale with body size)
+        # ===== NEON SMEAR FRAME RENDERING =====
+        # Only draw the smear if attacking and moving fast enough
+        if self.is_attacking and abs(velocity) > 0.02:
+            # Create a small local surface for alpha blending
+            smear_size = int((visual_sword_length + r) * 2.5)
+            smear_size = max(smear_size, 20)  # Prevent 0-size crash
+            smear_surf = pygame.Surface((smear_size, smear_size), pygame.SRCALPHA)
+            cx, cy = smear_size // 2, smear_size // 2
+            
+            # Local coordinates of current sword position
+            lbx = cx + math.cos(self.sword_angle) * (r + 3)
+            lby = cy + math.sin(self.sword_angle) * (r + 3)
+            ltx = cx + math.cos(self.sword_angle) * visual_sword_length
+            lty = cy + math.sin(self.sword_angle) * visual_sword_length
+            
+            # Exaggerate tail backward along the swing trajectory
+            smear_angle_mult = 3.5  
+            tail_angle = self.sword_angle - (velocity * smear_angle_mult)
+            
+            # Tail base
+            tbx = cx + math.cos(tail_angle) * (r + 3)
+            tby = cy + math.sin(tail_angle) * (r + 3)
+            
+            # Tail tip stretches outward for that kinetic "swoosh" look
+            tail_stretch = visual_sword_length * (1.0 + min(0.5, abs(velocity)))
+            ttx = cx + math.cos(tail_angle) * tail_stretch
+            tty = cy + math.sin(tail_angle) * tail_stretch
+            
+            # Draw layered polygons for a glowing fade effect
+            layers = 4
+            for i in range(layers, 0, -1):
+                t_ratio = i / layers
+                # Fade alpha towards the end of the tail
+                alpha = int(100 * (1.0 - (i / layers) * 0.6))
+                s_color = (*self.render_color[:3], alpha)
+                
+                mid_tx = ltx + (ttx - ltx) * t_ratio
+                mid_ty = lty + (tty - lty) * t_ratio
+                mid_bx = lbx + (tbx - lbx) * t_ratio
+                mid_by = lby + (tby - lby) * t_ratio
+                
+                pygame.draw.polygon(smear_surf, s_color, [
+                    (lbx, lby), (ltx, lty), (mid_tx, mid_ty), (mid_bx, mid_by)
+                ])
+                
+            # Blit the smear directly behind the sword
+            blit_x = int(self.x + ox) - cx
+            blit_y = int(self.y + oy) - cy
+            surface.blit(smear_surf, (blit_x, blit_y))
+        
+        # Draw the solid crisp sword line on top
         sword_w = max(2, int(SWORD_WIDTH * self.sword_size_multiplier))
         
         pygame.draw.line(surface, sword_color,
@@ -456,6 +520,8 @@ class Fighter:
         self.radius = FIGHTER_RADIUS
         self.health = BASE_HEALTH
         self.sword_angle = 0
+        self.last_sword_angle = 0
+        self.sword_angular_velocity = 0.0
         self.sword_length = self.base_sword_length
         
         self.flash_timer = 0
