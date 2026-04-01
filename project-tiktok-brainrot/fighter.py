@@ -78,6 +78,9 @@ class Fighter:
         # Attack speed multiplier (lower = slower attacks)
         self.attack_speed_multiplier = 1.0
         
+        # Physics movement speed multiplier
+        self.speed_multiplier = 1.0
+        
         # Render color (can be overridden by chaos events)
         self.render_color = color
         self.render_color_bright = color_bright
@@ -228,22 +231,23 @@ class Fighter:
         self.vx *= DRAG
         self.vy *= DRAG
         
-        # Clamp velocity
+        # Clamp velocity (scaling limits with speed_multiplier)
         speed = math.hypot(self.vx, self.vy)
-        max_vel = MAX_VELOCITY
+        max_vel = MAX_VELOCITY * self.speed_multiplier
         if speed > max_vel:
             self.vx = (self.vx / speed) * max_vel
             self.vy = (self.vy / speed) * max_vel
         
         # Ensure minimum velocity (DVD logo always moving)
-        if speed < MIN_VELOCITY and speed > 0:
-            self.vx = (self.vx / speed) * MIN_VELOCITY
-            self.vy = (self.vy / speed) * MIN_VELOCITY
+        min_vel = MIN_VELOCITY * self.speed_multiplier
+        if speed < min_vel and speed > 0:
+            self.vx = (self.vx / speed) * min_vel
+            self.vy = (self.vy / speed) * min_vel
         elif speed == 0:
             # Give random velocity if stopped
             angle = random.uniform(0, 2 * math.pi)
-            self.vx = math.cos(angle) * MIN_VELOCITY
-            self.vy = math.sin(angle) * MIN_VELOCITY
+            self.vx = math.cos(angle) * min_vel
+            self.vy = math.sin(angle) * min_vel
         
         # Update position
         self.x += self.vx
@@ -541,6 +545,7 @@ class Fighter:
         self.body_size_multiplier = 1.0
         self.sword_size_multiplier = 1.0
         self.attack_speed_multiplier = 1.0
+        self.speed_multiplier = 1.0
         self.current_radius = self.radius
         self.render_color = self.color
         self.render_color_bright = self.color_bright

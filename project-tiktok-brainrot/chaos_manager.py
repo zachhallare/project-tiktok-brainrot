@@ -193,7 +193,7 @@ class ChaosManager:
     def get_speed_mult(self):
         """Get physics/movement speed multiplier."""
         if self.active_event == "HYPER SPEED":
-            return 300.0
+            return 5.0 # Adjusted for much faster movement
         return 1.0
     
     def get_body_size_mult(self):
@@ -422,10 +422,8 @@ class ChaosTextRenderer:
     
     def __init__(self):
         """Initialize fonts for chaos banner."""
-        try:
-            self.font_chaos = pygame.font.SysFont("Impact", 48, bold=True)
-        except:
-            self.font_chaos = pygame.font.Font(None, 56)
+        # Use default pygame font for better visibility
+        self.font_chaos = pygame.font.Font(None, 72)
     
     def draw_chaos_banner(self, screen, chaos_manager):
         """Draw pulsing chaos event banner with thick stroke for readability.

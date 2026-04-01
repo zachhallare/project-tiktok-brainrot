@@ -387,10 +387,35 @@ class Game:
         """Handle round end."""
         self.round_ending = True
         self.winner = winner
-        self.reset_timer = 120
+        # Extended from 120 to 300 to allow delay before displaying win text
+        self.reset_timer = 300
         
-        self.particles.emit_explosion(loser.x, loser.y, loser.color, count=40)
-        self.shockwaves.add(loser.x, loser.y, loser.color, 100)
+        if winner == self.blue:
+            self.winner_text = "BLUE WINS"
+        else:
+            self.winner_text = "RED WINS"
+        
+        # Color state reversion and death animation rules
+        if self.chaos.is_blackout():
+            # Blackout Exception: Allow animation to run under blackout visual rules
+            # Do NOT reset chaos, use either flashing white or current blackout color for chunks
+            death_color = WHITE if loser.flash_timer > 0 else loser.render_color
+        else:
+            # Forcefully revert color state from critical hit white back to base default
+            loser.flash_timer = 0
+            death_color = loser.color
+            
+            # Reset chaos back to normal lighting/colors for physics death sequence
+            self.chaos.reset_chaos()
+            
+            # Ensure render colors revert from any modified values back to defaults
+            winner.render_color = winner.color
+            winner.render_color_bright = winner.color_bright
+            loser.render_color = loser.color
+            loser.render_color_bright = loser.color_bright
+            
+        self.particles.emit_explosion(loser.x, loser.y, death_color, count=40)
+        self.shockwaves.add(loser.x, loser.y, death_color, 100)
         winner.victory_bounce = 40
         
         self.slow_motion = True
@@ -401,16 +426,9 @@ class Game:
         if self.sounds_enabled and self.death_final_hit_sound:
             self.death_final_hit_sound.play()
         
-        # Stop any chaos sounds and reset chaos system
+        # Stop any chaos sounds
         self._stop_chaos_loops()
         self._stop_escalation_sound()
-        self.chaos.reset_chaos()
-        
-        # Restore original colors for winner so they're visible in their true color
-        winner.render_color = winner.color
-        winner.render_color_bright = winner.color_bright
-        loser.render_color = loser.color
-        loser.render_color_bright = loser.color_bright
 
     def _reset_round(self):
         """Reset round."""
@@ -526,8 +544,8 @@ class Game:
         if self.round_ending:
             self.reset_timer -= 1
             
-            # Play sword_to_ground sound partway through the freeze
-            if self.death_sound_phase == 1 and self.reset_timer < 80:
+            # Play sword_to_ground sound partway through the freeze (40 frames in)
+            if self.death_sound_phase == 1 and self.reset_timer < 260:
                 self.death_sound_phase = 2
                 if self.sounds_enabled and self.sword_to_ground_sound:
                     self.sword_to_ground_sound.play()
@@ -614,6 +632,9 @@ class Game:
             # Apply attack speed multiplier
             fighter.attack_speed_multiplier = attack_speed_mult
             
+            # Apply speed multiplier
+            fighter.speed_multiplier = speed_mult
+            
             # Apply chaos color overrides
             fighter.render_color = self.chaos.get_fighter_color(fighter.color, fighter.is_blue)
             fighter.render_color_bright = self.chaos.get_fighter_color(fighter.color_bright, fighter.is_blue)
@@ -621,7 +642,7 @@ class Game:
             # Apply health bar color (BLACK during Blackout)
             fighter.health_bar_color = self.chaos.get_health_bar_color(fighter.color)
             
-            # Apply speed multiplier to velocity (HYPER SPEED = 3.0x)
+            # Apply speed multiplier to velocity (acceleration boost when entering HYPER SPEED)
             if speed_mult != 1.0:
                 fighter.vx *= (1.0 + (speed_mult - 1.0) * 0.15)
                 fighter.vy *= (1.0 + (speed_mult - 1.0) * 0.15)
@@ -887,6 +908,24 @@ class Game:
             pygame.draw.rect(self.screen, border_color, bg_rect, 4)
             
             self.screen.blit(text_surface, text_rect)
+        
+        # Winner UI Announcement
+        # Wait until after death animation (when reset_timer < 240, i.e., after 1 second)
+        if self.round_ending and self.winner_text and self.reset_timer < 240:
+            winner_surface = self.font_large.render(self.winner_text, True, WHITE)
+            winner_rect = winner_surface.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2))
+            
+            border_color = NEON_BLUE if "BLUE" in self.winner_text else NEON_RED
+            
+            # Pulsing box effect
+            pulse = abs(math.sin(self.reset_timer * 0.05))
+            bg_rect = winner_rect.inflate(60 + 30 * pulse, 40 + 30 * pulse)
+            
+            # Give UI text a dark backing
+            pygame.draw.rect(self.screen, NEON_BG, bg_rect)
+            pygame.draw.rect(self.screen, border_color, bg_rect, max(4, int(6 + 4 * pulse)))
+            
+            self.screen.blit(winner_surface, winner_rect)
         
         pygame.display.flip()
     
