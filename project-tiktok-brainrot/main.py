@@ -107,6 +107,20 @@ class Game:
         # Game State
         self.game_state = 'TITLE'
         
+        # Load Arena Watermark Logo
+        import os
+        logo_path = os.path.join(os.path.dirname(__file__), "assets", "images", "logo-dark-grey-text.png")
+        try:
+            logo_img = pygame.image.load(logo_path).convert_alpha()
+            # Scale down to be a watermark (max ~400px wide)
+            scale_factor = 400.0 / max(logo_img.get_width(), 1)
+            new_size = (int(logo_img.get_width() * scale_factor), int(logo_img.get_height() * scale_factor))
+            self.bg_logo = pygame.transform.scale(logo_img, new_size)
+            self.bg_logo.set_alpha(80) # Semi-transparent watermark
+        except Exception as e:
+            print(f"Failed to load background logo: {e}")
+            self.bg_logo = None
+        
         # Load sounds.
         self._setup_sounds()
     
@@ -834,6 +848,12 @@ class Game:
         else:
             arena_fill = BLACK
         pygame.draw.rect(self.screen, arena_fill, arena_rect)
+        
+        # Draw background logo watermark
+        if hasattr(self, 'bg_logo') and self.bg_logo:
+            # Center logo in current drawn arena
+            logo_rect = self.bg_logo.get_rect(center=(int(ax + aw/2 + offset[0]), int(ay + ah/2 + offset[1])))
+            self.screen.blit(self.bg_logo, logo_rect)
         
         # Arena border
         if self.chaos.active_event in ["THE CRUSHER", "BREATHING ROOM"]:
