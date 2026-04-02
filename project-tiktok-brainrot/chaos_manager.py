@@ -193,7 +193,7 @@ class ChaosManager:
     def get_speed_mult(self):
         """Get physics/movement speed multiplier."""
         if self.active_event == "HYPER SPEED":
-            return 5.0 # Adjusted for much faster movement
+            return 4.0 # Adjusted for much faster movement
         return 1.0
     
     def get_body_size_mult(self):

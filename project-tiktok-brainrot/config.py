@@ -3,9 +3,17 @@ Configuration constants for the Anime Sword Battle game.
 DVD logo style - constant velocity bounce with rotating swords.
 """
 
-# Screen dimensions (1:1 square for simplified visuals)
+# Game logic resolution (1:1 square for simplified visuals and physics)
 SCREEN_WIDTH = 600
 SCREEN_HEIGHT = 600
+
+# High-resolution render canvas (9:16 vertical ratio)
+CANVAS_WIDTH = 600
+CANVAS_HEIGHT = 1067
+
+# Actual window display resolution (Scaled down to fit comfortably on 1920x1080 screen)
+DISPLAY_WIDTH = 540
+DISPLAY_HEIGHT = 960
 
 # Arena (square, smaller)
 ARENA_MARGIN = 40

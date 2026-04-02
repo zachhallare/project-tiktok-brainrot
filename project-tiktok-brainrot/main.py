@@ -4,7 +4,7 @@ import random
 
 # Import constants and classes from other modules.
 from config import (
-    SCREEN_WIDTH, SCREEN_HEIGHT, FPS,
+    SCREEN_WIDTH, SCREEN_HEIGHT, CANVAS_WIDTH, CANVAS_HEIGHT, DISPLAY_WIDTH, DISPLAY_HEIGHT, FPS,
     WHITE, PURPLE, BLACK, DARK_GRAY, GRAY, YELLOW,
     ARENA_MARGIN, ARENA_WIDTH, ARENA_HEIGHT,
     ARENA_SHRINK_INTERVAL, ARENA_SHRINK_AMOUNT,
@@ -30,7 +30,9 @@ class Game:
         pygame.font.init()
         
         # Create the game window.
-        self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+        self.window = pygame.display.set_mode((DISPLAY_WIDTH, DISPLAY_HEIGHT))
+        self.canvas = pygame.Surface((CANVAS_WIDTH, CANVAS_HEIGHT))
+        self.screen = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
         pygame.display.set_caption("Red vs Blue Battle - TikTok Brainrot Edition")
         self.clock = pygame.time.Clock()
         
@@ -803,6 +805,14 @@ class Game:
         controls_surface = self.font_small.render(controls, True, GRAY)
         controls_rect = controls_surface.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT - 40))
         self.screen.blit(controls_surface, controls_rect)
+        # Draw game surface to high-res canvas
+        self.canvas.fill((15, 15, 15))  # Dark background for dead space
+        y_offset = (CANVAS_HEIGHT - SCREEN_HEIGHT) // 2
+        self.canvas.blit(self.screen, (0, y_offset))
+        
+        # Scale down and present to the laptop display window
+        scaled_preview = pygame.transform.smoothscale(self.canvas, (DISPLAY_WIDTH, DISPLAY_HEIGHT))
+        self.window.blit(scaled_preview, (0, 0))
         
         pygame.display.flip()
 
@@ -946,6 +956,15 @@ class Game:
             pygame.draw.rect(self.screen, border_color, bg_rect, max(4, int(6 + 4 * pulse)))
             
             self.screen.blit(winner_surface, winner_rect)
+        
+        # Draw game surface to high-res canvas
+        self.canvas.fill((15, 15, 15))  # Dark background for dead space
+        y_offset = (CANVAS_HEIGHT - SCREEN_HEIGHT) // 2
+        self.canvas.blit(self.screen, (0, y_offset))
+        
+        # Scale down and present to the laptop display window
+        scaled_preview = pygame.transform.smoothscale(self.canvas, (DISPLAY_WIDTH, DISPLAY_HEIGHT))
+        self.window.blit(scaled_preview, (0, 0))
         
         pygame.display.flip()
     

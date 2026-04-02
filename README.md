@@ -1,4 +1,4 @@
-# 🔴 Red vs Blue Battle 🔵
+# Red vs Blue Battle by AlgoRot
 
 > A fast-paced, minimalist 2D sword fighting simulation inspired by DVD screensaver physics. Watch as two AI-controlled fighters bounce around an arena, trading blows with swinging swords in epic, bite-sized battles perfect for social media content.
 
