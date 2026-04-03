@@ -42,10 +42,10 @@ class Game:
         pygame.font.init()
         
         # Create the game window.
-        self.window = pygame.display.set_mode((DISPLAY_WIDTH, DISPLAY_HEIGHT))
+        self.window = pygame.display.set_mode((DISPLAY_WIDTH, DISPLAY_HEIGHT), pygame.NOFRAME)
         self.canvas = pygame.Surface((CANVAS_WIDTH, CANVAS_HEIGHT))
         self.screen = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
-        pygame.display.set_caption("Red vs Blue Battle - TikTok Brainrot Edition")
+        pygame.display.set_caption("Red vs Blue Battle - YT Shorts Edition")
         self.clock = pygame.time.Clock()
         
         # Fonts for UI text
@@ -627,7 +627,7 @@ class Game:
                 if self.sounds_enabled and self.sword_to_ground_sound:
                     self.sword_to_ground_sound.play()
             
-            if self.reset_timer <= 120:  # End it automatically 2 seconds after the winner text appears (at 240)
+            if self.reset_timer <= 180:  # End it automatically 1 second after the winner text appears (at 240)
                 pygame.event.post(pygame.event.Event(pygame.QUIT))
                 return
             self.particles.update()
