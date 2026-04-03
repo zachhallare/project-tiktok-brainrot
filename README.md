@@ -160,7 +160,7 @@ Every **3-5 seconds**, a random chaos event triggers that dramatically alters ga
 
 ### Project Structure
 ```
-project-tiktok-brainrot/
+src/
 ├── main.py           # Game loop, combat handling, rendering
 ├── fighter.py        # Fighter class with movement and attacks
 ├── config.py         # All tuning constants and physics values
@@ -176,12 +176,34 @@ project-tiktok-brainrot/
 ## Quick Start
 
 ```bash
-# Install dependencies
-pip install pygame
+# 1. Install dependencies
+pip install pygame obsws-python python-dotenv
 
-# Run the game
-python project-tiktok-brainrot/main.py
+# 2. Setup your .env file in the root directory (for Auto-Recording)
+# OBS_PASSWORD=your_websocket_password
+# OBS_PORT=4455
+
+# 3. Run the game
+python src/main.py
 ```
+
+---
+
+## OBS Auto-Recording Integration (TikTok Automation)
+
+This project is built to automate the creation of TikTok content! It includes a built-in integration with **OBS Studio** via WebSockets to perfectly capture clips without manual editing.
+
+### How it works:
+1. When you press **SPACE** to start the game, the screen flashes a **bright green sync marker** for 15 frames to help you easily cut the footage in your video editor.
+2. The game then sends a command directly to OBS in the background to **Start Recording**.
+3. Two seconds after the Winner text appears, the application will automatically close, and command OBS to **Stop Recording** and save your clip. 
+
+### OBS Setup Instructions:
+1. Open OBS Studio.
+2. Add a **Window Capture** source and select the Python game window (`Red vs Blue Battle`).
+3. In OBS, go to **Tools > WebSocket Server Settings**, enable it, and set a password.
+4. Add your password and port to your `.env` file (see Quick Start).
+5. Simply leave OBS open in the background, run `python src/main.py`, and hit space!
 
 ---
 

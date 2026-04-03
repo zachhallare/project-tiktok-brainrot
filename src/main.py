@@ -1,6 +1,18 @@
 import pygame
 import math
 import random
+import os
+
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
+try:
+    import obsws_python as obs
+except ImportError:
+    obs = None
 
 # Import constants and classes from other modules.
 from config import (
@@ -108,6 +120,7 @@ class Game:
         
         # Game State
         self.game_state = 'TITLE'
+        self.sync_marker_timer = 0
         
         # Load Arena Watermark Logo
         import os
@@ -123,8 +136,53 @@ class Game:
             print(f"Failed to load background logo: {e}")
             self.bg_logo = None
         
+        # OBS Integration
+        self.obs_client = None
+        self.is_recording = False
+        self._init_obs_client()
+        
         # Load sounds.
         self._setup_sounds()
+        
+    def _init_obs_client(self):
+        """Initialize connection to OBS WebSocket server."""
+        if obs is None:
+            print("[OBS] obsws-python library not found. Auto-recording disabled.")
+            return
+            
+        try:
+            port = int(os.getenv("OBS_PORT", "4455"))
+            password = os.getenv("OBS_PASSWORD", "")
+            
+            if not password:
+                print("[OBS] No OBS_PASSWORD found in .env. Auto-recording disabled.")
+                return
+                
+            self.obs_client = obs.ReqClient(host='localhost', port=port, password=password)
+            print("[OBS] Successfully hooked into OBS Studio!")
+        except Exception as e:
+            print(f"[OBS] Failed to connect: {e} (Is OBS open?)")
+            self.obs_client = None
+            
+    def _start_obs_recording(self):
+        """Start OBS recording if connected."""
+        if self.obs_client and not self.is_recording:
+            try:
+                self.obs_client.start_record()
+                self.is_recording = True
+                print("[OBS] 🎥 Camera Rolling! Recording Started.")
+            except Exception as e:
+                print(f"[OBS] Start recording failed: {e}")
+                
+    def _stop_obs_recording(self):
+        """Stop OBS recording if connected."""
+        if self.obs_client and self.is_recording:
+            try:
+                self.obs_client.stop_record()
+                self.is_recording = False
+                print("[OBS] ⏹️ CUT! Recording Saved.")
+            except Exception as e:
+                print(f"[OBS] Stop recording failed: {e}")
     
     def _lock_fighters_for_countdown(self):
         """Lock fighters in place for countdown."""
@@ -487,6 +545,9 @@ class Game:
         self.countdown_beep_played = [False, False, False]
         self.fight_sound_played = False
         self.death_sound_phase = 0
+        
+        # Flash green sync marker between rounds
+        self.sync_marker_timer = 15
 
     def update(self):
         """Main update loop."""
@@ -566,8 +627,9 @@ class Game:
                 if self.sounds_enabled and self.sword_to_ground_sound:
                     self.sword_to_ground_sound.play()
             
-            if self.reset_timer <= 0:
-                self._reset_round()
+            if self.reset_timer <= 120:  # End it automatically 2 seconds after the winner text appears (at 240)
+                pygame.event.post(pygame.event.Event(pygame.QUIT))
+                return
             self.particles.update()
             self.shockwaves.update()
             self.arena_pulses.update()
@@ -962,6 +1024,11 @@ class Game:
         y_offset = (CANVAS_HEIGHT - SCREEN_HEIGHT) // 2
         self.canvas.blit(self.screen, (0, y_offset))
         
+        # --- SYNC MARKER (Green Screen Flash) ---
+        if hasattr(self, 'sync_marker_timer') and self.sync_marker_timer > 0:
+            self.sync_marker_timer -= 1
+            self.canvas.fill((0, 255, 0))  # BRIGHT GREEN for video editing sync
+        
         # Scale down and present to the laptop display window
         scaled_preview = pygame.transform.smoothscale(self.canvas, (DISPLAY_WIDTH, DISPLAY_HEIGHT))
         self.window.blit(scaled_preview, (0, 0))
@@ -1050,13 +1117,20 @@ class Game:
                     elif event.key == pygame.K_SPACE:
                         if self.game_state == 'TITLE':
                             self.game_state = 'PLAYING'
+                            self.sync_marker_timer = 15  # Flash green marker on start
+                            self._start_obs_recording()  # Start OBS
                         else:
                             self.paused = not self.paused
+                    elif event.key == pygame.K_m:
+                        # Manual sync marker
+                        self.sync_marker_timer = 15
                     elif event.key == pygame.K_r:
                         self._reset_round()
                 elif event.type == pygame.MOUSEBUTTONDOWN:
                     if self.game_state == 'TITLE':
                         self.game_state = 'PLAYING'
+                        self.sync_marker_timer = 15  # Flash green marker on start
+                        self._start_obs_recording()  # Start OBS
             
             if self.game_state == 'TITLE':
                 self._draw_title_screen()
@@ -1065,6 +1139,8 @@ class Game:
                 self.draw()
             self.clock.tick(FPS)
         
+        # Stop OBS before shutting down entirely
+        self._stop_obs_recording()
         pygame.quit()
 
 
