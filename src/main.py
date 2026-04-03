@@ -1106,6 +1106,12 @@ class Game:
 
     def run(self):
         """Main loop."""
+        import sys
+        if "--auto-start" in sys.argv:
+            self.game_state = 'PLAYING'
+            self.sync_marker_timer = 15
+            self._start_obs_recording()
+
         running = True
         while running:
             for event in pygame.event.get():

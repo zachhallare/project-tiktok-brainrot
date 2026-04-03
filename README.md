@@ -183,8 +183,11 @@ pip install pygame obsws-python python-dotenv
 # OBS_PASSWORD=your_websocket_password
 # OBS_PORT=4455
 
-# 3. Run the game
+# 3. Run the game for a single round
 python src/main.py
+
+# OR: Run the batch recorder for multiple automated rounds (Max: 15 videos)
+python record_batch.py
 ```
 
 ---
@@ -203,7 +206,7 @@ This project is built to automate the creation of TikTok content! It includes a 
 2. Add a **Window Capture** source and select the Python game window (`Red vs Blue Battle`).
 3. In OBS, go to **Tools > WebSocket Server Settings**, enable it, and set a password.
 4. Add your password and port to your `.env` file (see Quick Start).
-5. Simply leave OBS open in the background, run `python src/main.py`, and hit space!
+5. Simply leave OBS open in the background, run `python src/main.py`, and hit space! Or run `python record_batch.py` for fully automated batch recording.
 
 ---
 
