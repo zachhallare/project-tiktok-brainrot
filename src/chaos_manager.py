@@ -31,7 +31,9 @@ class ChaosManager:
         "ULTRA KNOCKBACK"   # 5x knockback, massive shake
     ]
     
-    def __init__(self):
+    def __init__(self, f1_color=NEON_BLUE, f2_color=NEON_RED):
+        self.f1_color = f1_color
+        self.f2_color = f2_color
         self.active_event = None
         self.last_event = None  # Track to prevent repeat
         self.event_timer = 0.0
@@ -239,7 +241,7 @@ class ChaosManager:
             return self._hue_to_rgb((self.disco_hue + offset) % 360)
         elif self.active_event == "TRON MODE":
             # Brighter neon for Tron
-            return NEON_BLUE if is_blue else NEON_RED
+            return self.f1_color if is_blue else self.f2_color
         return original_color
     
     def get_health_bar_color(self, original_color):
@@ -354,7 +356,7 @@ class ChaosManager:
             y = random.randint(0, SCREEN_HEIGHT)
             w = random.randint(20, 150)
             h = random.randint(5, 30)
-            color = random.choice([NEON_RED, NEON_BLUE, (255, 0, 255), (0, 255, 0)])
+            color = random.choice([self.f2_color, self.f1_color, (255, 0, 255), (0, 255, 0)])
             self.glitch_rects.append((x, y, w, h, color))
     
     # ==================== MOVING WALLS ====================
@@ -491,4 +493,4 @@ class ChaosTextRenderer:
         # Progress fill
         fill_width = int(bar_width * (1.0 - progress))
         if fill_width > 0:
-            pygame.draw.rect(screen, NEON_BLUE, (bar_x, bar_y, fill_width, 6))
+            pygame.draw.rect(screen, chaos_manager.f1_color, (bar_x, bar_y, fill_width, 6))

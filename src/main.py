@@ -35,7 +35,19 @@ from chaos_manager import ChaosManager, ChaosTextRenderer
 
 # Main game class - DVD logo style combat with rotating swords.
 class Game:    
-    def __init__(self):
+    def __init__(self, f1_key='5', f2_key='1'):
+        from config import NEON_PALETTE
+        
+        f1_name, f1_col, f1_bright = NEON_PALETTE.get(f1_key, NEON_PALETTE['5'])
+        f2_name, f2_col, f2_bright = NEON_PALETTE.get(f2_key, NEON_PALETTE['1'])
+        
+        self.f1_color = f1_col
+        self.f1_bright = f1_bright
+        self.f1_name = f1_name
+        self.f2_color = f2_col
+        self.f2_bright = f2_bright
+        self.f2_name = f2_name
+        
         # Initialize pygame modules
         pygame.init()
         pygame.mixer.init()
@@ -62,9 +74,9 @@ class Game:
         spawn_margin = 100
         center_y = SCREEN_HEIGHT // 2
         self.blue = Fighter(ARENA_MARGIN + spawn_margin, center_y, 
-                            NEON_BLUE, (100, 255, 255), is_blue=True)
+                            self.f1_color, self.f1_bright, is_blue=True)
         self.red = Fighter(SCREEN_WIDTH - ARENA_MARGIN - spawn_margin, center_y, 
-                            NEON_RED, (255, 100, 120), is_blue=False)
+                            self.f2_color, self.f2_bright, is_blue=False)
         
         # Lock fighters for countdown
         self._lock_fighters_for_countdown()
@@ -76,7 +88,7 @@ class Game:
         self.damage_numbers = DamageNumberSystem()
         
         # Chaos Manager for TikTok Brainrot events
-        self.chaos = ChaosManager()
+        self.chaos = ChaosManager(self.f1_color, self.f2_color)
         self.chaos_text = ChaosTextRenderer()
         
         # Screen effects.
@@ -465,9 +477,9 @@ class Game:
         self.reset_timer = 300
         
         if winner == self.blue:
-            self.winner_text = "BLUE WINS"
+            self.winner_text = "WINS"
         else:
-            self.winner_text = "RED WINS"
+            self.winner_text = "WINS"
         
         # Color state reversion and death animation rules
         if self.chaos.is_blackout():
@@ -927,21 +939,24 @@ class Game:
             logo_rect = self.bg_logo.get_rect(center=(int(ax + aw/2 + offset[0]), int(ay + ah/2 + offset[1])))
             self.screen.blit(self.bg_logo, logo_rect)
         
+        # Base swap logic for border color (180 frames = 3 seconds at 60fps)
+        base_border_color = self.f1_color if (self.round_timer // 180) % 2 == 0 else self.f2_color
+        
         # Arena border
         if self.chaos.active_event in ["THE CRUSHER", "BREATHING ROOM"]:
-            border_color = NEON_RED if not self.chaos.is_blackout() else BLACK
+            border_color = self.f2_color if not self.chaos.is_blackout() else BLACK
             border_width = 6
         elif self.escalation_state == 'shrinking':
-            border_color = NEON_RED
+            border_color = self.f2_color
             border_width = 6
         elif self.escalation_state == 'pulse_triggered':
             border_color = YELLOW
             border_width = 5
         elif self.chaos.is_tron_mode():
-            border_color = NEON_BLUE
+            border_color = base_border_color
             border_width = 6
         else:
-            border_color = NEON_BLUE if not self.chaos.is_blackout() else GRAY
+            border_color = base_border_color if not self.chaos.is_blackout() else GRAY
             border_width = 4
         pygame.draw.rect(self.screen, border_color, arena_rect, border_width)
         
@@ -988,10 +1003,10 @@ class Game:
             
             if countdown_text == "FIGHT":
                 text_surface = self.font_medium.render(countdown_text, True, WHITE)
-                border_color = NEON_BLUE
+                border_color = self.f1_color
             else:
                 text_surface = self.font_large.render(countdown_text, True, WHITE)
-                border_color = NEON_RED
+                border_color = self.f2_color
             
             text_rect = text_surface.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2))
             
@@ -1004,20 +1019,41 @@ class Game:
         # Winner UI Announcement
         # Wait until after death animation (when reset_timer < 240, i.e., after 1 second)
         if self.round_ending and self.winner_text and self.reset_timer < 240:
-            winner_surface = self.font_large.render(self.winner_text, True, WHITE)
-            winner_rect = winner_surface.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2))
+            text_surface = self.font_large.render(self.winner_text, True, WHITE)
             
-            border_color = NEON_BLUE if "BLUE" in self.winner_text else NEON_RED
+            # Winner color info
+            win_color = self.f1_color if self.winner == self.blue else self.f2_color
+            win_color_bright = self.f1_bright if self.winner == self.blue else self.f2_bright
+            border_color = win_color
+            
+            # Layout calculation
+            circle_radius = 25
+            gap = 15
+            total_width = (circle_radius * 2) + gap + text_surface.get_width()
+            
+            cx = SCREEN_WIDTH // 2
+            cy = SCREEN_HEIGHT // 2
+            start_x = cx - total_width // 2
+            
+            text_rect = text_surface.get_rect(midleft=(start_x + circle_radius * 2 + gap, cy))
             
             # Pulsing box effect
             pulse = abs(math.sin(self.reset_timer * 0.05))
-            bg_rect = winner_rect.inflate(60 + 30 * pulse, 40 + 30 * pulse)
+            pulse_inflate_w = 60 + 30 * pulse
+            pulse_inflate_h = 40 + 30 * pulse
+            
+            bg_rect = pygame.Rect(0, 0, total_width + pulse_inflate_w, max(text_surface.get_height(), circle_radius * 2) + pulse_inflate_h)
+            bg_rect.center = (cx, cy)
             
             # Give UI text a dark backing
             pygame.draw.rect(self.screen, NEON_BG, bg_rect)
             pygame.draw.rect(self.screen, border_color, bg_rect, max(4, int(6 + 4 * pulse)))
             
-            self.screen.blit(winner_surface, winner_rect)
+            # Draw circle indicator
+            pygame.draw.circle(self.screen, win_color, (int(start_x + circle_radius), cy), circle_radius)
+            pygame.draw.circle(self.screen, win_color_bright, (int(start_x + circle_radius), cy), int(circle_radius * 0.6))
+            
+            self.screen.blit(text_surface, text_rect)
         
         # Draw game surface to high-res canvas
         self.canvas.fill((15, 15, 15))  # Dark background for dead space
@@ -1059,7 +1095,7 @@ class Game:
             for i in range(1, len(blue_trail)):
                 x1, y1 = blue_trail[i-1]
                 x2, y2 = blue_trail[i]
-                pygame.draw.line(self.screen, NEON_BLUE,
+                pygame.draw.line(self.screen, self.f1_color,
                                (int(x1 + ox), int(y1 + oy)),
                                (int(x2 + ox), int(y2 + oy)), 4)
         
@@ -1069,7 +1105,7 @@ class Game:
             for i in range(1, len(red_trail)):
                 x1, y1 = red_trail[i-1]
                 x2, y2 = red_trail[i]
-                pygame.draw.line(self.screen, NEON_RED,
+                pygame.draw.line(self.screen, self.f2_color,
                                (int(x1 + ox), int(y1 + oy)),
                                (int(x2 + ox), int(y2 + oy)), 4)
     
@@ -1098,11 +1134,11 @@ class Game:
         # Glow effect
         glow_rect = wall_rect.inflate(8, 0)
         glow_surf = pygame.Surface((glow_rect.width, glow_rect.height), pygame.SRCALPHA)
-        pygame.draw.rect(glow_surf, (*NEON_BLUE, 60), glow_surf.get_rect())
+        pygame.draw.rect(glow_surf, (*self.f1_color, 60), glow_surf.get_rect())
         self.screen.blit(glow_surf, glow_rect)
         
         # Main wall
-        pygame.draw.rect(self.screen, NEON_BLUE, wall_rect)
+        pygame.draw.rect(self.screen, self.f1_color, wall_rect)
 
     def run(self):
         """Main loop."""
@@ -1151,5 +1187,62 @@ class Game:
 
 
 if __name__ == "__main__":
-    game = Game()
+    import sys
+    import random
+    from config import NEON_PALETTE
+    
+    f1_key = None
+    f2_key = None
+    
+    if "--auto-start" in sys.argv:
+        # Check if f1/f2 are provided in args
+        if "--f1" in sys.argv:
+            f1_idx = sys.argv.index("--f1")
+            f1_key = sys.argv[f1_idx+1]
+        
+        if "--f2" in sys.argv:
+            f2_idx = sys.argv.index("--f2")
+            f2_key = sys.argv[f2_idx+1]
+            
+        # If not provided, randomize
+        if f1_key not in NEON_PALETTE:
+            f1_key = random.choice(list(NEON_PALETTE.keys()))
+            
+        if f2_key not in NEON_PALETTE or f2_key == f1_key:
+            available = [k for k in NEON_PALETTE.keys() if k != f1_key]
+            f2_key = random.choice(available)
+            
+    else:
+        # Interactively ask for colors
+        print("="*40)
+        print(" FIGHTER 1 COLOR (Blue/Left)")
+        for k, v in NEON_PALETTE.items():
+            print(f" {k}: {v[0]}")
+        c1 = input("Choose (1-6) or Enter for random: ").strip()
+        f1_key = c1 if c1 in NEON_PALETTE else random.choice(list(NEON_PALETTE.keys()))
+        
+        print("\n" + "="*40)
+        print(" FIGHTER 2 COLOR (Red/Right)")
+        for k, v in NEON_PALETTE.items():
+            print(f" {k}: {v[0]}")
+        
+        while True:
+            c2 = input("Choose (1-6) or Enter for random: ").strip()
+            if c2 in NEON_PALETTE:
+                if c2 == f1_key:
+                    print(f"[!] Fighter 1 is already {NEON_PALETTE[f1_key][0]}. Pick a different color.")
+                    continue
+                f2_key = c2
+                break
+            else:
+                available = [k for k in NEON_PALETTE.keys() if k != f1_key]
+                f2_key = random.choice(available)
+                break
+        
+        print("\n[MATCH STARTING]")
+        print(f"Fighter 1: {NEON_PALETTE[f1_key][0]}")
+        print(f"Fighter 2: {NEON_PALETTE[f2_key][0]}")
+        print("="*40)
+
+    game = Game(f1_key, f2_key)
     game.run()

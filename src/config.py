@@ -37,9 +37,23 @@ ORANGE = (255, 180, 80)
 
 # Cyberpunk/Neon Color Palette (TikTok Brainrot Style)
 NEON_RED = (255, 0, 60)
+NEON_ORANGE = (255, 120, 20)
+NEON_YELLOW = (255, 230, 20)
+NEON_GREEN = (50, 255, 50)
 NEON_BLUE = (0, 240, 255)
+NEON_VIOLET = (200, 50, 255)
+
 NEON_BG = (20, 20, 25)
 NEON_GRID = (35, 35, 45)
+
+NEON_PALETTE = {
+    '1': ('RED', NEON_RED, (255, 100, 120)),
+    '2': ('ORANGE', NEON_ORANGE, (255, 180, 100)),
+    '3': ('YELLOW', NEON_YELLOW, (255, 255, 150)),
+    '4': ('GREEN', NEON_GREEN, (150, 255, 150)),
+    '5': ('BLUE', NEON_BLUE, (100, 255, 255)),
+    '6': ('VIOLET', NEON_VIOLET, (220, 150, 255))
+}
 
 # Glow/Bloom settings
 GLOW_ALPHA = 50

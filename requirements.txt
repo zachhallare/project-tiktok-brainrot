@@ -1,0 +1,3 @@
+pygame
+obsws-python
+python-dotenv

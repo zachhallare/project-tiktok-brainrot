@@ -6,7 +6,7 @@
 
 ## Project Overview
 
-**Red vs Blue Battle** is an automated AI-vs-AI combat simulation built for endless, satisfying content loops. The game features two circular fighters—one Red, one Blue—bouncing around a shrinking arena like a DVD screensaver while wielding swords that swing in fluid combo attacks.
+**Red vs Blue Battle** is an automated AI-vs-AI combat simulation built for endless, satisfying content loops. The game features two circular fighters bouncing around a shrinking arena like a DVD screensaver while wielding swords that swing in fluid combo attacks. Out of the box, it supports a dynamic 6-color Neon Palette selector prior to initialization.
 
 ### Core Loop
 1. **Countdown** → "3-2-1-FIGHT" initiates each round
@@ -177,24 +177,35 @@ src/
 
 ```bash
 # 1. Install dependencies
-pip install pygame obsws-python python-dotenv
+pip install -r requirements.txt
 
 # 2. Setup your .env file in the root directory (for Auto-Recording)
 # OBS_PASSWORD=your_websocket_password
 # OBS_PORT=4455
 
-# 3. Run the game for a single round
+# 3. Run the game for a single round (Interactive Color Selection)
 python src/main.py
 
+# CLI Bypass: Pass colors directly (1=Red, 2=Orange, 3=Yellow, 4=Green, 5=Blue, 6=Violet)
+python src/main.py --auto-start --f1 5 --f2 1
+
 # OR: Run the batch recorder for multiple automated rounds (Max: 15 videos)
+# This will queue you to select Fighter 1 and Fighter 2 colors for *each video* before launching OBS sequences!
 python record_batch.py
 ```
 
 ---
 
+## Dynamic Color Casting
+
+Fighter colors are strictly limited to a customized 6-color high-contrast `NEON_PALETTE` for aesthetics. When you run `main.py` or the batch recorder, the terminal will dynamically alter the program’s memory. The chosen colors don't just change the fighters—they globally cascade and replace visual variables across the simulation:
+- The game's neon **UI layout** and standard arena borders dynamically swap between Fighter 1 and Fighter 2 colors every 3 seconds to represent both sides.
+- Chaos events like **TRON MODE** explicitly draw neon trails matching the active fighters instead of default colors.
+- The **Winner Announcer** dynamically renders a sleek, color-coded dot corresponding to the winning fighter followed by "WINS" to keep text sizing absolutely uniform across all outcomes.
+
 ## OBS Auto-Recording Integration (TikTok Automation)
 
-This project is built to automate the creation of TikTok content! It includes a built-in integration with **OBS Studio** via WebSockets to perfectly capture clips without manual editing.
+This project is built to automate the creation of YouTube shorts content. It includes a built-in integration with **OBS Studio** via WebSockets to perfectly capture clips without manual editing.
 
 ### How it works:
 1. When you press **SPACE** to start the game, the screen flashes a **bright green sync marker** for 15 frames to help you easily cut the footage in your video editor.
