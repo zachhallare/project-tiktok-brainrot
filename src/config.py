@@ -59,10 +59,10 @@ NEON_PALETTE = {
 GLOW_ALPHA = 50
 GLOW_RADIUS_MULT = 1.8
 
-# Chaos System Constants
-CHAOS_MIN_INTERVAL = 3.0  # seconds before event triggers (high frequency)
-CHAOS_MAX_INTERVAL = 5.0  # seconds max wait
-CHAOS_DURATION = 5.0      # seconds each event lasts
+# Chaos System Constants (tuned for ~15s matches)
+CHAOS_MIN_INTERVAL = 1.5  # seconds before event triggers (high frequency)
+CHAOS_MAX_INTERVAL = 3.0  # seconds max wait
+CHAOS_DURATION = 3.5      # seconds each event lasts
 
 # Motion Trail Settings
 TRAIL_LENGTH = 8          # Number of trail positions to store
@@ -74,21 +74,21 @@ DAMAGE_NUMBER_SPEED = 2      # float up speed
 
 # Physics constants - DVD logo style (constant velocity, no drag)
 DRAG = 1.0  # No drag - constant velocity like DVD logo
-MAX_VELOCITY = 20  # Faster gameplay
-MIN_VELOCITY = 10  # Higher minimum speed
+MAX_VELOCITY = 28  # 40% faster for denser collisions
+MIN_VELOCITY = 14  # Ensure constant high-energy motion
 BASE_KNOCKBACK = 10
 BOUNCE_ENERGY = 1.0  # Full energy retained on wall bounce
 
-# Game constants
+# Game constants (tuned for ~15s matches)
 FPS = 60
 FIGHTER_RADIUS = 30  # Smaller fighters
 SWORD_LENGTH = 55
 SWORD_WIDTH = 6
-BASE_HEALTH = 300  # Increased for ~30 second fights
-DAMAGE_PER_HIT = 10  # Reduced damage for longer fights
-ARENA_SHRINK_INTERVAL = 10
+BASE_HEALTH = 150  # Halved for ~15 second fights
+DAMAGE_PER_HIT = 15  # +50% damage for faster kills
+ARENA_SHRINK_INTERVAL = 5  # Arena closes in faster
 ARENA_SHRINK_AMOUNT = 12
-ROUND_MAX_TIME = 45  # Longer max time
+ROUND_MAX_TIME = 18  # Hard cap prevents stalling
 
 # Slow motion for death sequence
 SLOW_MOTION_SPEED = 0.20  # 20% of normal speed
@@ -103,7 +103,7 @@ HIT_SLOWMO_FRAMES = 5          # Duration in frames
 HIT_SLOWMO_TIMESCALE = 0.60    # Time scale (60% speed)
 
 # Critical Hit System
-CRIT_CHANCE = 0.10             # 10% chance per attack (rare but rewarding)
+CRIT_CHANCE = 0.15             # 15% chance per attack (more spectacle in short matches)
 CRIT_MULTIPLIER = 2.0          # 2x damage and knockback
 CRIT_IMPACT_FRAMES = 12        # Frames of anime impact freeze
 CRIT_IMPACT_TIMESCALE = 0.02   # 2% speed (near-frozen) during impact
@@ -114,8 +114,8 @@ WALL_BOOST_STRENGTH = 4        # Extra velocity toward center on wall hit
 
 
 # Arena Escalation (Inactivity Handling)
-INACTIVITY_PULSE_TIME = 3  # Seconds before Arena Pulse triggers
-INACTIVITY_SHRINK_TIME = 1.5  # Additional seconds before shrinking starts
+INACTIVITY_PULSE_TIME = 1.5  # Seconds before Arena Pulse triggers (faster escalation)
+INACTIVITY_SHRINK_TIME = 0.75  # Additional seconds before shrinking starts
 ARENA_PULSE_VELOCITY_BOOST = 4  # Velocity nudge toward center
 ARENA_PULSE_SHAKE = 6  # Screen shake intensity for pulse
 ESCALATION_SHRINK_SPEED = 0.3  # Pixels per frame during inactivity shrink

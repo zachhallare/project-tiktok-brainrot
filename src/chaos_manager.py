@@ -136,6 +136,19 @@ class ChaosManager:
         """Trigger a random chaos event (no repeats)."""
         available_events = [e for e in self.EVENTS if e != self.last_event]
         self.active_event = random.choice(available_events)
+        self._init_event_state()
+        return self.active_event
+    
+    def trigger_specific_event(self, event_name):
+        """Force-trigger a specific chaos event by name."""
+        if event_name not in self.EVENTS:
+            return None
+        self.active_event = event_name
+        self._init_event_state()
+        return self.active_event
+    
+    def _init_event_state(self):
+        """Initialize state for the currently active event."""
         self.last_event = self.active_event
         self.event_duration_remaining = CHAOS_DURATION
         self.event_timer = 0.0
@@ -166,8 +179,6 @@ class ChaosManager:
         elif self.active_event == "MOVING WALLS":
             self.moving_wall_x = SCREEN_WIDTH // 2
             self.moving_wall_dir = random.choice([1, -1])
-        
-        return self.active_event
     
     def reset_chaos(self):
         """Reset all chaos modifiers to default."""

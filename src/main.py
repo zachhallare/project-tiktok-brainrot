@@ -117,13 +117,22 @@ class Game:
         self.slow_motion = False
         self.slow_motion_accumulator = 0.0
         
-        # Pre-fight countdown
+        # Pre-fight countdown (rapid 0.25s ticks for Shorts retention)
         self.countdown_stage = 0
         self.countdown_timer = 0
         self.countdown_active = True
         self.countdown_texts = ["3", "2", "1", "FIGHT"]
-        self.countdown_duration = 45
-        self.fight_duration = 30
+        self.countdown_duration = 15   # 0.25s per tick (was 45 = 0.75s)
+        self.fight_duration = 15       # 0.25s for FIGHT text (was 30 = 0.5s)
+        
+        # Opening chaos event pool (high-impact visual openers)
+        self.OPENING_CHAOS_POOL = [
+            "HYPER SPEED",
+            "BLACKOUT",
+            "ULTRA KNOCKBACK",
+            "DISCO FEVER",
+            "THE CRUSHER"
+        ]
         
         # Arena Escalation System
         self.inactivity_timer = 0
@@ -133,6 +142,17 @@ class Game:
         # Game State
         self.game_state = 'TITLE'
         self.sync_marker_timer = 0
+        
+        # Seamless Loop Wipe System
+        # Phases: 0=none, 1=flash_in (opacity rising), 2=solid (reset behind),
+        #         3=flash_out (opacity falling, reveals new state)
+        self.loop_wipe_phase = 0
+        self.loop_wipe_timer = 0
+        self.WIPE_FLASH_IN_FRAMES = 6
+        self.WIPE_SOLID_FRAMES = 3
+        self.WIPE_FLASH_OUT_FRAMES = 6
+        self.loop_wipe_done = False  # True after end-of-match wipe completes (for single-run exit)
+        self.loop_wipe_is_closing = False  # Only True when wipe is triggered by end-of-match
         
         # Load Arena Watermark Logo
         import os
@@ -215,6 +235,12 @@ class Game:
         self.blue.vy = random.uniform(-6, 6)
         self.red.vx = random.uniform(-6, 6)
         self.red.vy = random.uniform(-6, 6)
+    
+    def _trigger_opening_chaos(self):
+        """Immediately trigger a random high-impact chaos event at match start."""
+        opener = random.choice(self.OPENING_CHAOS_POOL)
+        self.chaos.trigger_specific_event(opener)
+        self._play_chaos_event_sound(opener)
     
     def _reset_inactivity(self):
         """Reset inactivity timer."""
@@ -474,7 +500,7 @@ class Game:
         self.round_ending = True
         self.winner = winner
         # Extended from 120 to 300 to allow delay before displaying win text
-        self.reset_timer = 300
+        self.reset_timer = 60  # 1 second end sequence (60 frames at 60fps)
         
         if winner == self.blue:
             self.winner_text = "WINS"
@@ -590,6 +616,7 @@ class Game:
                 if self.countdown_stage > 3:
                     self.countdown_active = False
                     self._unlock_fighters()
+                    self._trigger_opening_chaos()  # Instant chaos at second 0
             return
         
         if self.slow_motion and not self.round_ending:
@@ -630,17 +657,55 @@ class Game:
             if self.screen_shake < 0.5:
                 self.screen_shake = 0
         
+        # === LOOP WIPE STATE MACHINE ===
+        if self.loop_wipe_phase > 0:
+            self.loop_wipe_timer += 1
+            
+            if self.loop_wipe_phase == 1:  # Flash in
+                if self.loop_wipe_timer >= self.WIPE_FLASH_IN_FRAMES:
+                    self.loop_wipe_phase = 2
+                    self.loop_wipe_timer = 0
+            
+            elif self.loop_wipe_phase == 2:  # Solid (reset behind the white screen)
+                if self.loop_wipe_timer == 1:
+                    # Reset the arena state while screen is fully obscured
+                    self.round_ending = False
+                    self.winner = None
+                    self.winner_text = ""
+                    self.slow_motion = False
+                    self._reset_round()
+                if self.loop_wipe_timer >= self.WIPE_SOLID_FRAMES:
+                    self.loop_wipe_phase = 3
+                    self.loop_wipe_timer = 0
+            
+            elif self.loop_wipe_phase == 3:  # Flash out
+                if self.loop_wipe_timer >= self.WIPE_FLASH_OUT_FRAMES:
+                    self.loop_wipe_phase = 0
+                    self.loop_wipe_timer = 0
+                    # Only signal exit if this was the end-of-match wipe
+                    if self.loop_wipe_is_closing:
+                        self.loop_wipe_done = True
+                    self.loop_wipe_is_closing = False
+            return  # Don't run normal update during wipe
+        
+        # Single-run: exit after the wipe completes
+        if self.loop_wipe_done:
+            pygame.event.post(pygame.event.Event(pygame.QUIT))
+            return
+        
         if self.round_ending:
             self.reset_timer -= 1
             
             # Play sword_to_ground sound partway through the freeze (40 frames in)
-            if self.death_sound_phase == 1 and self.reset_timer < 260:
+            if self.death_sound_phase == 1 and self.reset_timer < 50:
                 self.death_sound_phase = 2
                 if self.sounds_enabled and self.sword_to_ground_sound:
                     self.sword_to_ground_sound.play()
             
-            if self.reset_timer <= 180:  # End it automatically 1 second after the winner text appears (at 240)
-                pygame.event.post(pygame.event.Event(pygame.QUIT))
+            if self.reset_timer <= 0:  # Trigger loop wipe instead of quitting
+                self.loop_wipe_phase = 1
+                self.loop_wipe_timer = 0
+                self.loop_wipe_is_closing = True  # Mark this as the end-of-match wipe
                 return
             self.particles.update()
             self.shockwaves.update()
@@ -1017,8 +1082,8 @@ class Game:
             self.screen.blit(text_surface, text_rect)
         
         # Winner UI Announcement
-        # Wait until after death animation (when reset_timer < 240, i.e., after 1 second)
-        if self.round_ending and self.winner_text and self.reset_timer < 240:
+        # Show winner text almost immediately after death (0.17s delay)
+        if self.round_ending and self.winner_text and self.reset_timer < 50:
             text_surface = self.font_large.render(self.winner_text, True, WHITE)
             
             # Winner color info
@@ -1064,6 +1129,23 @@ class Game:
         if hasattr(self, 'sync_marker_timer') and self.sync_marker_timer > 0:
             self.sync_marker_timer -= 1
             self.canvas.fill((0, 255, 0))  # BRIGHT GREEN for video editing sync
+        
+        # === SEAMLESS LOOP WIPE OVERLAY ===
+        if self.loop_wipe_phase > 0:
+            wipe_surf = pygame.Surface((CANVAS_WIDTH, CANVAS_HEIGHT), pygame.SRCALPHA)
+            
+            if self.loop_wipe_phase == 1:  # Flash in: opacity ramps 0 -> 255
+                progress = self.loop_wipe_timer / self.WIPE_FLASH_IN_FRAMES
+                alpha = int(255 * progress)
+                wipe_surf.fill((255, 255, 255, min(255, alpha)))
+            elif self.loop_wipe_phase == 2:  # Solid: fully opaque white
+                wipe_surf.fill((255, 255, 255, 255))
+            elif self.loop_wipe_phase == 3:  # Flash out: opacity fades 255 -> 0
+                progress = self.loop_wipe_timer / self.WIPE_FLASH_OUT_FRAMES
+                alpha = int(255 * (1.0 - progress))
+                wipe_surf.fill((255, 255, 255, max(0, alpha)))
+            
+            self.canvas.blit(wipe_surf, (0, 0))
         
         # Scale down and present to the laptop display window
         scaled_preview = pygame.transform.smoothscale(self.canvas, (DISPLAY_WIDTH, DISPLAY_HEIGHT))
@@ -1146,6 +1228,9 @@ class Game:
         if "--auto-start" in sys.argv:
             self.game_state = 'PLAYING'
             self.sync_marker_timer = 15
+            # Start with flash-out so the opening matches the loop wipe
+            self.loop_wipe_phase = 3
+            self.loop_wipe_timer = 0
             self._start_obs_recording()
 
         running = True
@@ -1160,6 +1245,9 @@ class Game:
                         if self.game_state == 'TITLE':
                             self.game_state = 'PLAYING'
                             self.sync_marker_timer = 15  # Flash green marker on start
+                            # Start with flash-out so the opening matches the loop wipe
+                            self.loop_wipe_phase = 3
+                            self.loop_wipe_timer = 0
                             self._start_obs_recording()  # Start OBS
                         else:
                             self.paused = not self.paused
@@ -1172,6 +1260,9 @@ class Game:
                     if self.game_state == 'TITLE':
                         self.game_state = 'PLAYING'
                         self.sync_marker_timer = 15  # Flash green marker on start
+                        # Start with flash-out so the opening matches the loop wipe
+                        self.loop_wipe_phase = 3
+                        self.loop_wipe_timer = 0
                         self._start_obs_recording()  # Start OBS
             
             if self.game_state == 'TITLE':
