@@ -35,24 +35,28 @@ PURPLE = (200, 100, 255)
 CYAN = (100, 255, 255)
 ORANGE = (255, 180, 80)
 
-# Cyberpunk/Neon Color Palette (TikTok Brainrot Style)
-NEON_RED = (255, 0, 60)
-NEON_ORANGE = (255, 120, 20)
-NEON_YELLOW = (255, 230, 20)
-NEON_GREEN = (50, 255, 50)
-NEON_BLUE = (0, 240, 255)
-NEON_VIOLET = (200, 50, 255)
+# Cyberpunk/Neon Color Palette (YT Shorts Brainrot Style)
+NEON_PINK = (255, 110, 255)
+NEON_BLUE = (0, 255, 255)
+NEON_YELLOW = (255, 255, 0)
+NEON_ORANGE = (255, 94, 0)
+NEON_MAGENTA = (255, 0, 204)
+NEON_GREEN = (204, 255, 0)
+NEON_RED = (255, 53, 94)
+NEON_PURPLE = (191, 0, 255)
 
 NEON_BG = (20, 20, 25)
 NEON_GRID = (35, 35, 45)
 
 NEON_PALETTE = {
-    '1': ('RED', NEON_RED, (255, 100, 120)),
-    '2': ('ORANGE', NEON_ORANGE, (255, 180, 100)),
+    '1': ('PINK', NEON_PINK, (255, 180, 255)),
+    '2': ('BLUE', NEON_BLUE, (150, 255, 255)),
     '3': ('YELLOW', NEON_YELLOW, (255, 255, 150)),
-    '4': ('GREEN', NEON_GREEN, (150, 255, 150)),
-    '5': ('BLUE', NEON_BLUE, (100, 255, 255)),
-    '6': ('VIOLET', NEON_VIOLET, (220, 150, 255))
+    '4': ('ORANGE', NEON_ORANGE, (255, 170, 120)),
+    '5': ('MAGENTA', NEON_MAGENTA, (255, 120, 230)),
+    '6': ('GREEN', NEON_GREEN, (230, 255, 150)),
+    '7': ('RED', NEON_RED, (255, 140, 160)),
+    '8': ('PURPLE', NEON_PURPLE, (220, 130, 255))
 }
 
 # Glow/Bloom settings

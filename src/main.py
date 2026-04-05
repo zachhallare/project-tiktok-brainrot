@@ -1309,7 +1309,7 @@ if __name__ == "__main__":
         print(" FIGHTER 1 COLOR (Blue/Left)")
         for k, v in NEON_PALETTE.items():
             print(f" {k}: {v[0]}")
-        c1 = input("Choose (1-6) or Enter for random: ").strip()
+        c1 = input("Choose (1-8) or Enter for random: ").strip()
         f1_key = c1 if c1 in NEON_PALETTE else random.choice(list(NEON_PALETTE.keys()))
         
         print("\n" + "="*40)
@@ -1318,7 +1318,7 @@ if __name__ == "__main__":
             print(f" {k}: {v[0]}")
         
         while True:
-            c2 = input("Choose (1-6) or Enter for random: ").strip()
+            c2 = input("Choose (1-8) or Enter for random: ").strip()
             if c2 in NEON_PALETTE:
                 if c2 == f1_key:
                     print(f"[!] Fighter 1 is already {NEON_PALETTE[f1_key][0]}. Pick a different color.")

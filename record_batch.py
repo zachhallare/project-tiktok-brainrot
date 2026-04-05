@@ -24,12 +24,12 @@ def main():
     print("[INFO] Please ensure OBS Studio is open in the background.\n")
     
     print("[INFO] Configure Colors for each video:")
-    print("Options: 1=Red, 2=Orange, 3=Yellow, 4=Green, 5=Blue, 6=Violet")
+    print("Options: 1=Pink, 2=Blue, 3=Yellow, 4=Orange, 5=Magenta, 6=Green, 7=Red, 8=Purple")
     queue = []
     for i in range(count):
         print(f"\n--- Video {i+1} ---")
-        c1 = input("Fighter 1 Color (1-6, Enter for random): ").strip()
-        c2 = input("Fighter 2 Color (1-6, Enter for random): ").strip()
+        c1 = input("Fighter 1 Color (1-8, Enter for random): ").strip()
+        c2 = input("Fighter 2 Color (1-8, Enter for random): ").strip()
         queue.append((c1, c2))
     
     # Calculate path to main.py dynamically to ensure it runs from any directory config
