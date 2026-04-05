@@ -134,6 +134,9 @@ class Game:
             "THE CRUSHER"
         ]
         
+        # Delay before first chaos event (1 second = 60 frames at 60 FPS)
+        self.opening_chaos_delay = 0  # 0 = not pending
+        
         # Arena Escalation System
         self.inactivity_timer = 0
         self.escalation_state = 'normal'
@@ -583,6 +586,7 @@ class Game:
         self.countdown_beep_played = [False, False, False]
         self.fight_sound_played = False
         self.death_sound_phase = 0
+        self.opening_chaos_delay = 0
         
         # Flash green sync marker between rounds
         self.sync_marker_timer = 15
@@ -616,7 +620,7 @@ class Game:
                 if self.countdown_stage > 3:
                     self.countdown_active = False
                     self._unlock_fighters()
-                    self._trigger_opening_chaos()  # Instant chaos at second 0
+                    self.opening_chaos_delay = FPS  # 1-second delay before first chaos event
             return
         
         if self.slow_motion and not self.round_ending:
@@ -657,41 +661,7 @@ class Game:
             if self.screen_shake < 0.5:
                 self.screen_shake = 0
         
-        # === LOOP WIPE STATE MACHINE ===
-        if self.loop_wipe_phase > 0:
-            self.loop_wipe_timer += 1
-            
-            if self.loop_wipe_phase == 1:  # Flash in
-                if self.loop_wipe_timer >= self.WIPE_FLASH_IN_FRAMES:
-                    self.loop_wipe_phase = 2
-                    self.loop_wipe_timer = 0
-            
-            elif self.loop_wipe_phase == 2:  # Solid (reset behind the white screen)
-                if self.loop_wipe_timer == 1:
-                    # Reset the arena state while screen is fully obscured
-                    self.round_ending = False
-                    self.winner = None
-                    self.winner_text = ""
-                    self.slow_motion = False
-                    self._reset_round()
-                if self.loop_wipe_timer >= self.WIPE_SOLID_FRAMES:
-                    self.loop_wipe_phase = 3
-                    self.loop_wipe_timer = 0
-            
-            elif self.loop_wipe_phase == 3:  # Flash out
-                if self.loop_wipe_timer >= self.WIPE_FLASH_OUT_FRAMES:
-                    self.loop_wipe_phase = 0
-                    self.loop_wipe_timer = 0
-                    # Only signal exit if this was the end-of-match wipe
-                    if self.loop_wipe_is_closing:
-                        self.loop_wipe_done = True
-                    self.loop_wipe_is_closing = False
-            return  # Don't run normal update during wipe
-        
-        # Single-run: exit after the wipe completes
-        if self.loop_wipe_done:
-            pygame.event.post(pygame.event.Event(pygame.QUIT))
-            return
+
         
         if self.round_ending:
             self.reset_timer -= 1
@@ -702,10 +672,9 @@ class Game:
                 if self.sounds_enabled and self.sword_to_ground_sound:
                     self.sword_to_ground_sound.play()
             
-            if self.reset_timer <= 0:  # Trigger loop wipe instead of quitting
-                self.loop_wipe_phase = 1
-                self.loop_wipe_timer = 0
-                self.loop_wipe_is_closing = True  # Mark this as the end-of-match wipe
+            if self.reset_timer <= 0:
+                # Game over — quit after the winner message
+                pygame.event.post(pygame.event.Event(pygame.QUIT))
                 return
             self.particles.update()
             self.shockwaves.update()
@@ -713,6 +682,12 @@ class Game:
             return
         
         self.round_timer += 1
+        
+        # Opening chaos event delay timer
+        if self.opening_chaos_delay > 0:
+            self.opening_chaos_delay -= 1
+            if self.opening_chaos_delay <= 0:
+                self._trigger_opening_chaos()
         
         # Arena Escalation
         self.inactivity_timer += 1
@@ -1130,22 +1105,7 @@ class Game:
             self.sync_marker_timer -= 1
             self.canvas.fill((0, 255, 0))  # BRIGHT GREEN for video editing sync
         
-        # === SEAMLESS LOOP WIPE OVERLAY ===
-        if self.loop_wipe_phase > 0:
-            wipe_surf = pygame.Surface((CANVAS_WIDTH, CANVAS_HEIGHT), pygame.SRCALPHA)
-            
-            if self.loop_wipe_phase == 1:  # Flash in: opacity ramps 0 -> 255
-                progress = self.loop_wipe_timer / self.WIPE_FLASH_IN_FRAMES
-                alpha = int(255 * progress)
-                wipe_surf.fill((255, 255, 255, min(255, alpha)))
-            elif self.loop_wipe_phase == 2:  # Solid: fully opaque white
-                wipe_surf.fill((255, 255, 255, 255))
-            elif self.loop_wipe_phase == 3:  # Flash out: opacity fades 255 -> 0
-                progress = self.loop_wipe_timer / self.WIPE_FLASH_OUT_FRAMES
-                alpha = int(255 * (1.0 - progress))
-                wipe_surf.fill((255, 255, 255, max(0, alpha)))
-            
-            self.canvas.blit(wipe_surf, (0, 0))
+
         
         # Scale down and present to the laptop display window
         scaled_preview = pygame.transform.smoothscale(self.canvas, (DISPLAY_WIDTH, DISPLAY_HEIGHT))
@@ -1228,9 +1188,6 @@ class Game:
         if "--auto-start" in sys.argv:
             self.game_state = 'PLAYING'
             self.sync_marker_timer = 15
-            # Start with flash-out so the opening matches the loop wipe
-            self.loop_wipe_phase = 3
-            self.loop_wipe_timer = 0
             self._start_obs_recording()
 
         running = True
@@ -1245,9 +1202,6 @@ class Game:
                         if self.game_state == 'TITLE':
                             self.game_state = 'PLAYING'
                             self.sync_marker_timer = 15  # Flash green marker on start
-                            # Start with flash-out so the opening matches the loop wipe
-                            self.loop_wipe_phase = 3
-                            self.loop_wipe_timer = 0
                             self._start_obs_recording()  # Start OBS
                         else:
                             self.paused = not self.paused
@@ -1260,9 +1214,6 @@ class Game:
                     if self.game_state == 'TITLE':
                         self.game_state = 'PLAYING'
                         self.sync_marker_timer = 15  # Flash green marker on start
-                        # Start with flash-out so the opening matches the loop wipe
-                        self.loop_wipe_phase = 3
-                        self.loop_wipe_timer = 0
                         self._start_obs_recording()  # Start OBS
             
             if self.game_state == 'TITLE':
@@ -1282,58 +1233,14 @@ if __name__ == "__main__":
     import random
     from config import NEON_PALETTE
     
-    f1_key = None
-    f2_key = None
+    # Randomize two distinct fighter colors
+    f1_key = random.choice(list(NEON_PALETTE.keys()))
+    available = [k for k in NEON_PALETTE.keys() if k != f1_key]
+    f2_key = random.choice(available)
     
-    if "--auto-start" in sys.argv:
-        # Check if f1/f2 are provided in args
-        if "--f1" in sys.argv:
-            f1_idx = sys.argv.index("--f1")
-            f1_key = sys.argv[f1_idx+1]
-        
-        if "--f2" in sys.argv:
-            f2_idx = sys.argv.index("--f2")
-            f2_key = sys.argv[f2_idx+1]
-            
-        # If not provided, randomize
-        if f1_key not in NEON_PALETTE:
-            f1_key = random.choice(list(NEON_PALETTE.keys()))
-            
-        if f2_key not in NEON_PALETTE or f2_key == f1_key:
-            available = [k for k in NEON_PALETTE.keys() if k != f1_key]
-            f2_key = random.choice(available)
-            
-    else:
-        # Interactively ask for colors
-        print("="*40)
-        print(" FIGHTER 1 COLOR (Blue/Left)")
-        for k, v in NEON_PALETTE.items():
-            print(f" {k}: {v[0]}")
-        c1 = input("Choose (1-8) or Enter for random: ").strip()
-        f1_key = c1 if c1 in NEON_PALETTE else random.choice(list(NEON_PALETTE.keys()))
-        
-        print("\n" + "="*40)
-        print(" FIGHTER 2 COLOR (Red/Right)")
-        for k, v in NEON_PALETTE.items():
-            print(f" {k}: {v[0]}")
-        
-        while True:
-            c2 = input("Choose (1-8) or Enter for random: ").strip()
-            if c2 in NEON_PALETTE:
-                if c2 == f1_key:
-                    print(f"[!] Fighter 1 is already {NEON_PALETTE[f1_key][0]}. Pick a different color.")
-                    continue
-                f2_key = c2
-                break
-            else:
-                available = [k for k in NEON_PALETTE.keys() if k != f1_key]
-                f2_key = random.choice(available)
-                break
-        
-        print("\n[MATCH STARTING]")
-        print(f"Fighter 1: {NEON_PALETTE[f1_key][0]}")
-        print(f"Fighter 2: {NEON_PALETTE[f2_key][0]}")
-        print("="*40)
-
+    print(f"[MATCH STARTING]")
+    print(f"Fighter 1: {NEON_PALETTE[f1_key][0]}")
+    print(f"Fighter 2: {NEON_PALETTE[f2_key][0]}")
+    
     game = Game(f1_key, f2_key)
     game.run()
