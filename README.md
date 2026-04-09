@@ -220,7 +220,7 @@ This project is built to automate the creation of YouTube shorts content. It inc
 
 ### OBS Setup Instructions:
 1. Open OBS Studio.
-2. Add a **Window Capture** source and select the Python game window (`Red vs Blue Battle`).
+2. Add a **Window Capture** source and select the Python game window (`Color Battle`).
 3. In OBS, go to **Tools > WebSocket Server Settings**, enable it, and set a password.
 4. Add your password and port to your `.env` file (see Quick Start).
 5. Simply leave OBS open in the background, run `python src/main.py`, and hit space! Or run `python record_batch.py` for fully automated batch recording.

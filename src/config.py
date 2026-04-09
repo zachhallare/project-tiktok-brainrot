@@ -78,8 +78,8 @@ DAMAGE_NUMBER_SPEED = 2      # float up speed
 
 # Physics constants - DVD logo style (constant velocity, no drag)
 DRAG = 1.0  # No drag - constant velocity like DVD logo
-MAX_VELOCITY = 28  # 40% faster for denser collisions
-MIN_VELOCITY = 14  # Ensure constant high-energy motion
+MAX_VELOCITY = 15  # 40% faster for denser collisions
+MIN_VELOCITY = 6  # Ensure constant high-energy motion
 BASE_KNOCKBACK = 10
 BOUNCE_ENERGY = 1.0  # Full energy retained on wall bounce
 
@@ -98,8 +98,8 @@ ROUND_MAX_TIME = 18  # Hard cap prevents stalling
 SLOW_MOTION_SPEED = 0.20  # 20% of normal speed
 
 # Hit effects
-HIT_STOP_FRAMES = 3
-SCREEN_SHAKE_INTENSITY = 8
+HIT_STOP_FRAMES = 8
+SCREEN_SHAKE_INTENSITY = 15
 SCREEN_SHAKE_DECAY = 0.85
 
 # Hit Slow-Motion Effect (sword-body hit)

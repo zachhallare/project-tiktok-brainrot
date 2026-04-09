@@ -62,8 +62,8 @@ class Fighter:
         self.combo_reset_timer = 0     # Timer to reset combo on miss/timeout
         
         # Attack timing constants (base values - modified by chaos)
-        self.ATTACK_DURATION = 12      # Frames per swing
-        self.ATTACK_COOLDOWN = 8       # Frames between attacks
+        self.ATTACK_DURATION = 15      # Frames per swing
+        self.ATTACK_COOLDOWN = 20      # Frames between attacks
         self.COMBO_TIMEOUT = 45        # Frames before combo resets
         
         # Motion trail (list of previous positions)
@@ -107,21 +107,52 @@ class Fighter:
         if self.is_attacking:
             # Currently swinging
             self.attack_timer += 1
-            progress = min(1.0, self.attack_timer / self.ATTACK_DURATION)
             
-            # Ease-out for snappy feel
-            eased = 1 - (1 - progress) ** 2
-            
-            # Interpolate from start to end angle
+            # MULTI-PHASE ANIMATION SYSTEM
+            # Determine swing direction (1 for clockwise, -1 for counter-clockwise)
             angle_diff = self.swing_end_angle - self.swing_start_angle
-            # Handle wraparound
             if angle_diff > math.pi:
                 angle_diff -= 2 * math.pi
             elif angle_diff < -math.pi:
                 angle_diff += 2 * math.pi
             
-            self.sword_angle = self.swing_start_angle + angle_diff * eased
+            swing_dir = 1 if angle_diff > 0 else -1
+            if abs(angle_diff) < 0.1:  # Pierce attack edge case
+                swing_dir = 1
+                
+            wind_up_offset = -0.5 * swing_dir
+            wind_up_pos = self.swing_start_angle + wind_up_offset
+            follow_through_pos = self.swing_end_angle + 0.2 * swing_dir
             
+            if self.attack_timer <= 5:
+                # Phase 1: Anticipation / Wind-up (Frames 0 to 4)
+                progress = self.attack_timer / 5.0
+                self.sword_angle = self.swing_start_angle + wind_up_offset * progress
+            elif self.attack_timer <= 7:
+                # Phase 2: The Hold (Frames 5 to 6)
+                self.sword_angle = wind_up_pos
+            elif self.attack_timer <= 9:
+                # Phase 3: The Swing (Frames 7 to 8)
+                progress = (self.attack_timer - 7) / 2.0
+                total_swing_diff = self.swing_end_angle - wind_up_pos
+                if total_swing_diff > math.pi:
+                    total_swing_diff -= 2 * math.pi
+                elif total_swing_diff < -math.pi:
+                    total_swing_diff += 2 * math.pi
+                self.sword_angle = wind_up_pos + total_swing_diff * progress
+            elif self.attack_timer <= 12:
+                # Phase 4a: Impact Hold (Frames 9 to 11)
+                self.sword_angle = self.swing_end_angle
+            elif self.attack_timer <= 15:
+                # Phase 4b: Follow-Through (Frames 12 to 14)
+                progress = (self.attack_timer - 12) / 3.0
+                follow_diff = follow_through_pos - self.swing_end_angle
+                if follow_diff > math.pi:
+                    follow_diff -= 2 * math.pi
+                elif follow_diff < -math.pi:
+                    follow_diff += 2 * math.pi
+                self.sword_angle = self.swing_end_angle + follow_diff * progress
+
             # Attack finished
             if self.attack_timer >= self.ATTACK_DURATION:
                 self.is_attacking = False
