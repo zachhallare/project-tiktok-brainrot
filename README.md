@@ -1,4 +1,4 @@
-# Red vs Blue Battle by AlgoRot
+# Color Battle by AlgoRot
 
 > A fast-paced, minimalist 2D sword fighting simulation inspired by DVD screensaver physics. Watch as two AI-controlled fighters bounce around an arena, trading blows with swinging swords in epic, bite-sized battles perfect for social media content.
 
@@ -6,14 +6,14 @@
 
 ## Project Overview
 
-**Red vs Blue Battle** is an automated AI-vs-AI combat simulation built for endless, satisfying content loops. The game features two circular fighters bouncing around a shrinking arena like a DVD screensaver while wielding swords that swing in fluid combo attacks. Out of the box, it supports a dynamic 6-color Neon Palette selector prior to initialization.
+**Color Battle** is an automated AI-vs-AI combat simulation built for endless, satisfying content loops. The game features two circular fighters bouncing around a shrinking arena like a DVD screensaver while wielding swords that swing in fluid combo attacks. Out of the box, it supports a dynamic 6-color Neon Palette selector prior to initialization.
 
 ### Core Loop
-1. **Countdown** → "3-2-1-FIGHT" initiates each round
+1. **Countdown** → "3-2-1-FIGHT" initiates each round (accompanied by audio beeps)
 2. **Battle Phase** → Fighters autonomously bounce, collide, and attack
 3. **Escalation** → The arena shrinks over time, forcing combat
 4. **Resolution** → Slow-motion death sequence with particle explosion
-5. **Repeat** → Auto-reset for the next round
+5. **Finish** → The game terminates to finalize OBS recording or advance batch
 
 The aesthetic is intentionally minimalist—solid-colored circles with inner highlights, simple line swords, and health bars—but the combat *feels* punchy thanks to hit-stop, screen shake, and slow-motion effects.
 
@@ -29,7 +29,7 @@ A fighter wins when their opponent's **health drops to zero**. When this happens
 - The round resets after a brief delay
 
 ### Timeout Condition
-If neither fighter is eliminated within **45 seconds** (`ROUND_MAX_TIME`), the fighter **closest to the arena center** wins the round. This prevents stalemates and rewards aggressive, center-controlling play.
+If neither fighter is eliminated within **18 seconds** (`ROUND_MAX_TIME`), the fighter **closest to the arena center** wins the round. This prevents stalemates and rewards aggressive, center-controlling play.
 
 ### Failure State
 There is no player failure state—this is an automated simulation. Both fighters are AI-controlled, so rounds always resolve naturally.
@@ -116,7 +116,7 @@ Any successful hit pauses the shrink for 2 seconds, rewarding aggression.
 
 ## Chaos Event System
 
-Every **3-5 seconds**, a random chaos event triggers that dramatically alters gameplay for **5 seconds**. Events never repeat back-to-back. This keeps fights unpredictable and creates TikTok-worthy moments.
+After an initial **1-second delay** at the start of a match to let combat begin, a random chaos event triggers every **1.5-3.0 seconds** that dramatically alters gameplay for **3.5 seconds**. Events never repeat back-to-back. This keeps fights unpredictable and creates TikTok-worthy moments.
 
 | Event | Effect |
 |-------|--------|
@@ -159,16 +159,19 @@ Every **3-5 seconds**, a random chaos event triggers that dramatically alters ga
 | **Physics**  | Custom bounce-based movement      |
 
 ### Project Structure
-```
-src/
-├── main.py           # Game loop, combat handling, rendering
-├── fighter.py        # Fighter class with movement and attacks
-├── config.py         # All tuning constants and physics values
-├── effects.py        # Particle, shockwave, and slash effects
-├── chaos_manager.py  # Chaos event system (10 random events) + ChaosTextRenderer
-├── sound_manager.py  # Sound generation utilities
-├── utils.py          # Helper functions
-└── sounds/           # Audio assets directory
+```text
+project_root/
+├── assets/           # Media assets (audio, images) extracted to root
+├── src/
+│   ├── main.py           # Game loop, combat handling, rendering
+│   ├── fighter.py        # Fighter class with movement and attacks
+│   ├── config.py         # All tuning constants and physics values
+│   ├── effects.py        # Particle, shockwave, and slash effects
+│   ├── chaos_manager.py  # Chaos event system (10 random events) + ChaosTextRenderer
+│   ├── sound_manager.py  # Sound generation utilities
+│   └── utils.py          # Helper functions
+├── record_batch.py   # Batch OBS recording script
+└── test.py           # Simulation testing mode (No OBS context)
 ```
 
 ---
@@ -189,16 +192,19 @@ python src/main.py
 # CLI Bypass: Pass colors directly (1=Red, 2=Orange, 3=Yellow, 4=Green, 5=Blue, 6=Violet)
 python src/main.py --auto-start --f1 5 --f2 1
 
-# OR: Run the batch recorder for multiple automated rounds (Max: 15 videos)
-# This will queue you to select Fighter 1 and Fighter 2 colors for *each video* before launching OBS sequences!
+# OR: Run the batch recorder for multiple automated rounds
+# Fighter colors are fully randomized for each video before launching OBS sequences!
 python record_batch.py
+
+# To run test loops WITHOUT triggering OBS recording, use test mode:
+python test.py
 ```
 
 ---
 
 ## Dynamic Color Casting
 
-Fighter colors are strictly limited to a customized 6-color high-contrast `NEON_PALETTE` for aesthetics. When you run `main.py` or the batch recorder, the terminal will dynamically alter the program’s memory. The chosen colors don't just change the fighters—they globally cascade and replace visual variables across the simulation:
+Fighter colors are strictly limited to a customized 8-color high-contrast `NEON_PALETTE` for aesthetics. When you run `main.py` or the batch recorder, colors are dynamically injected. The batch recorder fully randomizes these colors automatically. The chosen colors don't just change the fighters—they globally cascade and replace visual variables across the simulation:
 - The game's neon **UI layout** and standard arena borders dynamically swap between Fighter 1 and Fighter 2 colors every 3 seconds to represent both sides.
 - Chaos events like **TRON MODE** explicitly draw neon trails matching the active fighters instead of default colors.
 - The **Winner Announcer** dynamically renders a sleek, color-coded dot corresponding to the winning fighter followed by "WINS" to keep text sizing absolutely uniform across all outcomes.
@@ -228,11 +234,11 @@ This project is built to automate the creation of YouTube shorts content. It inc
 | `SCREEN_WIDTH`        | 600   | Window width in pixels               |
 | `SCREEN_HEIGHT`       | 600   | Window height in pixels              |
 | `FPS`                 | 60    | Target frames per second             |
-| `BASE_HEALTH`         | 300   | Hit points per fighter               |
-| `DAMAGE_PER_HIT`      | 10    | Base damage (before multipliers)     |
+| `BASE_HEALTH`         | 250   | Hit points per fighter               |
+| `DAMAGE_PER_HIT`      | 15    | Base damage (before multipliers)     |
 | `FIGHTER_RADIUS`      | 30    | Fighter body size                    |
 | `SWORD_LENGTH`        | 55    | Sword reach in pixels                |
-| `ROUND_MAX_TIME`      | 45    | Force resolution after 45 seconds    |
+| `ROUND_MAX_TIME`      | 18    | Force resolution after 18 seconds    |
 
 ---
 
