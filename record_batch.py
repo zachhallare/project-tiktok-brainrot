@@ -9,13 +9,13 @@ def main():
     print("=" * 50)
     
     try:
-        count = int(input("How many videos would you like to record automatically? (Max: 15) "))
+        count = int(input("How many videos would you like to record automatically? (Max: 30) "))
         if count <= 0:
             print("Please enter a number greater than 0.")
             return
-        if count > 15:
-            print("[INFO] To prevent system instability, limiting to a maximum of 15 videos.")
-            count = 15
+        if count > 30:
+            print("[INFO] To prevent system instability, limiting to a maximum of 30 videos.")
+            count = 30
     except ValueError:
         print("Invalid input. Please enter a number.")
         return

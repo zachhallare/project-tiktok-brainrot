@@ -589,11 +589,15 @@ class Game:
         self.opening_chaos_delay = 0
         
         # Flash green sync marker between rounds
-        self.sync_marker_timer = 15
+        self.sync_marker_timer = 60
 
     def update(self):
         """Main update loop."""
         if self.paused:
+            return
+        
+        # Wait for sync marker (green screen/OBS startup) to finish before starting countdown
+        if getattr(self, 'sync_marker_timer', 0) > 0:
             return
         
         if self.countdown_active:
@@ -1187,8 +1191,8 @@ class Game:
         import sys
         if "--auto-start" in sys.argv:
             self.game_state = 'PLAYING'
-            self.sync_marker_timer = 15
             self._start_obs_recording()
+            self.sync_marker_timer = 60
 
         running = True
         while running:
@@ -1201,20 +1205,20 @@ class Game:
                     elif event.key == pygame.K_SPACE:
                         if self.game_state == 'TITLE':
                             self.game_state = 'PLAYING'
-                            self.sync_marker_timer = 15  # Flash green marker on start
                             self._start_obs_recording()  # Start OBS
+                            self.sync_marker_timer = 60  # Flash green marker on start
                         else:
                             self.paused = not self.paused
                     elif event.key == pygame.K_m:
                         # Manual sync marker
-                        self.sync_marker_timer = 15
+                        self.sync_marker_timer = 60
                     elif event.key == pygame.K_r:
                         self._reset_round()
                 elif event.type == pygame.MOUSEBUTTONDOWN:
                     if self.game_state == 'TITLE':
                         self.game_state = 'PLAYING'
-                        self.sync_marker_timer = 15  # Flash green marker on start
                         self._start_obs_recording()  # Start OBS
+                        self.sync_marker_timer = 60  # Flash green marker on start
             
             if self.game_state == 'TITLE':
                 self._draw_title_screen()
