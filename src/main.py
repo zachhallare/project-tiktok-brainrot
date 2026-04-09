@@ -159,7 +159,7 @@ class Game:
         
         # Load Arena Watermark Logo
         import os
-        logo_path = os.path.join(os.path.dirname(__file__), "assets", "images", "logo-dark-grey-text.png")
+        logo_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "images", "logo-dark-grey-text.png")
         try:
             logo_img = pygame.image.load(logo_path).convert_alpha()
             # Scale down to be a watermark (max ~400px wide)
@@ -278,7 +278,7 @@ class Game:
         """Load all sound effects from audio files."""
         import os
         try:
-            base_path = os.path.join(os.path.dirname(__file__), "assets", "audio")
+            base_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "audio")
             
             # Helper function to load a sound file
             def load_sound(subfolder, filename, volume=0.5):
@@ -1193,6 +1193,8 @@ class Game:
             self.game_state = 'PLAYING'
             self._start_obs_recording()
             self.sync_marker_timer = 60
+        elif "--test-mode" in sys.argv:
+            self.game_state = 'PLAYING'
 
         running = True
         while running:
