@@ -6,12 +6,12 @@
 
 ## Project Overview
 
-**Color Battle** is an automated AI-vs-AI combat simulation built for endless, satisfying content loops. The game features two circular fighters bouncing around a shrinking arena like a DVD screensaver while wielding swords that swing in fluid combo attacks. Out of the box, it supports a dynamic 6-color Neon Palette selector prior to initialization.
+**Color Battle** is an automated AI-vs-AI combat simulation built for endless, satisfying content loops. The game features two circular fighters bouncing around an arena like a DVD screensaver while wielding swords in a continuous "Beyblade-style" spin. Out of the box, it supports a dynamic 6-color Neon Palette selector prior to initialization.
 
 ### Core Loop
 1. **Countdown** → "3-2-1-FIGHT" initiates each round (accompanied by audio beeps)
-2. **Battle Phase** → Fighters autonomously bounce, collide, and attack
-3. **Escalation** → The arena shrinks over time, forcing combat
+2. **Battle Phase** → Fighters autonomously bounce, collide, and attack via a permanent spin
+3. **Escalation** → Arena Pulse pushes fighters together after 2 seconds of inactivity
 4. **Resolution** → Slow-motion death sequence with particle explosion
 5. **Finish** → The game terminates to finalize OBS recording or advance batch
 
@@ -22,7 +22,7 @@ The aesthetic features a sharp **cel-shaded** style—solid neon colors with cen
 ## Objective & Win/Lose Conditions
 
 ### Victory Condition
-A fighter wins when their opponent's **health drops to zero**. When this happens:
+A fighter wins when their opponent's **health drops to zero** on the Tekken-style top HUD. When this happens:
 - Slow-motion kicks in at 20% speed
 - The loser explodes in a burst of colored particles
 - The winner performs a celebratory bounce animation
@@ -39,7 +39,7 @@ There is no player failure state—this is an automated simulation. Both fighter
 ## Combat Mechanics
 
 ### Weapon System: Beyblade Auto-Battler
-The combat has been overhauled into a **"Beyblade" style auto-battler**. There are no directional slash attacks; instead, fighters spin continuously with persistent, always-active sword hitboxes.
+The combat is a **"Beyblade" style auto-battler**. There are no directional slash attacks; instead, fighters spin continuously with persistent, always-active sword hitboxes.
 
 - **Constant Rotation:** Fighters maintain a continuous 360-degree spin.
 - **Sword Parry System:** Persistent sword-to-sword collision creates a dynamic parry system with high-knockback ricochet physics.
@@ -67,9 +67,9 @@ Fighters use a unique **constant-velocity bounce** system inspired by DVD screen
 
 - **Drag:** `1.0` (no drag—velocity is maintained)
 - **Bounce Energy:** `1.0` (perfect elastic bounces)
-- **Minimum Velocity:** 10 pixels/frame
-- **Maximum Velocity:** 20 pixels/frame
-- **Initial Velocity:** Random between -8 and +8 on both axes
+- **Minimum Velocity:** 6 pixels/frame
+- **Maximum Velocity:** 15 pixels/frame
+- **Initial Velocity:** Random between -6 and +6 on both axes
 
 If a fighter ever stops moving (velocity = 0), they're given a random directional nudge to keep the action flowing.
 
@@ -77,43 +77,18 @@ If a fighter ever stops moving (velocity = 0), they're given a random directiona
 When bouncing off walls, fighters receive a **4 pixel/frame velocity boost toward the arena center**. This prevents corner camping and naturally guides fighters back into combat.
 
 ### Sword Orientation & Rotation
-The sword rotates 360 degrees. The weapon leaves a smooth, fading, semi-transparent light trail at the tip to emphasize the speed and direction of the spin.
+The sword rotates 360 degrees constantly. The weapon leaves a smooth, fading, semi-transparent light trail at the tip to emphasize the speed and direction of the spin, with a thick cel-shaded black outline.
 
 ---
 
 ## Arena Escalation System
 
-To prevent stalemates and keep the action flowing, the arena features an inactivity pressure mechanic (arena wall shrinking has been removed):
+To prevent stalemates and keep the action flowing, the arena features an inactivity pressure mechanic:
 
 ### Arena Pulse
 If no combat occurs for **2 seconds**, an **Arena Pulse** triggers.
 - A radial shockwave fires, abruptly pushing both fighters toward the center of the arena to force combat.
 - This pulse repeats every 2 seconds of inactivity, ensuring the action is constant.
-
----
-
-## Chaos Event System
-> **Note:** The Chaos Event system is currently temporarily disabled to focus on the balance and core physics of the new Beyblade combat system.
-
-After an initial **1-second delay** at the start of a match to let combat begin, a random chaos event triggers every **1.5-3.0 seconds** that dramatically alters gameplay for **3.5 seconds**. Events never repeat back-to-back. This keeps fights unpredictable and creates TikTok-worthy moments.
-
-| Event | Effect |
-|-------|--------|
-| **HYPER SPEED** | 50x physics speed—fighters zoom uncontrollably |
-| **TINY TERROR** | 0.5x body size, normal-length sword, 0.5x attack speed, 1.5x damage |
-| **DISCO FEVER** | Rainbow colors, particles, 100% life steal (vampirism) |
-| **THE CRUSHER** | Arena shrinks to 50%, fighters pushed inside |
-| **BLACKOUT** | White background, black fighters + UI |
-| **TRON MODE** | Neon aesthetic, opponent's trail deals 1 damage per second |
-| **GLITCH TRAP** | Visual glitch effects, 30% chance to random-teleport every 0.5s |
-| **BREATHING ROOM** | Arena pulses 60%-110% in a sine wave pattern |
-| **MOVING WALLS** | Pong-style vertical wall bounces fighters in its direction |
-| **ULTRA KNOCKBACK** | 30x knockback + massive screen shake |
-
-### Visual Indicators
-- **Banner:** Event name pulses at top of screen (rendered by `ChaosTextRenderer`)
-- **Progress Bar:** Shows remaining event duration
-- **Arena Border:** Changes color during Crusher/Breathing Room/Tron Mode
 
 ---
 
@@ -146,7 +121,6 @@ project_root/
 │   ├── fighter.py        # Fighter class with movement and attacks
 │   ├── config.py         # All tuning constants and physics values
 │   ├── effects.py        # Particle, shockwave, and slash effects
-│   ├── chaos_manager.py  # Chaos event system (10 random events) + ChaosTextRenderer
 │   ├── sound_manager.py  # Sound generation utilities
 │   └── utils.py          # Helper functions
 ├── record_batch.py   # Batch OBS recording script
@@ -184,18 +158,19 @@ python test.py
 ## Dynamic Color Casting
 
 Fighter colors are strictly limited to a customized 8-color high-contrast `NEON_PALETTE` for aesthetics. When you run `main.py` or the batch recorder, colors are dynamically injected. The batch recorder fully randomizes these colors automatically. The chosen colors don't just change the fighters—they globally cascade and replace visual variables across the simulation:
-- The game's neon **UI layout** and standard arena borders dynamically swap between Fighter 1 and Fighter 2 colors every 3 seconds to represent both sides.
-- Chaos events like **TRON MODE** explicitly draw neon trails matching the active fighters instead of default colors.
+- The game's standard arena borders dynamically swap between Fighter 1 and Fighter 2 colors every 3 seconds.
+- The UI features a persistent, flush, **Tekken-style HUD** displaying robust health bars dynamically themed to the chosen fighters' colors, bordered with a dark cel-shaded outline.
 - The **Winner Announcer** dynamically renders a sleek, color-coded dot corresponding to the winning fighter followed by "WINS" to keep text sizing absolutely uniform across all outcomes.
+
+---
 
 ## OBS Auto-Recording Integration (TikTok Automation)
 
-This project is built to automate the creation of YouTube shorts content. It includes a built-in integration with **OBS Studio** via WebSockets to perfectly capture clips without manual editing.
+This project is built to automate the creation of YouTube shorts content. It includes a built-in integration with **OBS Studio** via WebSockets perfectly configured to capture clips without manual editing.
 
 ### How it works:
-1. When you press **SPACE** to start the game, the screen flashes a **bright green sync marker** for 15 frames to help you easily cut the footage in your video editor.
-2. The game then sends a command directly to OBS in the background to **Start Recording**.
-3. Two seconds after the Winner text appears, the application will automatically close, and command OBS to **Stop Recording** and save your clip. 
+1. The game sends a command directly to OBS in the background to **Start Recording**.
+2. Two seconds after the Winner text appears, the application will automatically close, and command OBS to **Stop Recording** and save your clip. 
 
 ### OBS Setup Instructions:
 1. Open OBS Studio.
