@@ -745,7 +745,7 @@ class Game:
         self.inactivity_timer += 1
         if self.inactivity_timer >= INACTIVITY_PULSE_TIME * FPS:
             self._trigger_arena_pulse()
-            self.inactivity_timer = 0  # Reset so it pulses again in 3 seconds if still inactive
+            self.inactivity_timer = 0  # Reset so it pulses again in 2 seconds if still inactive
         
         # ===== CHAOS SYSTEM UPDATE (TEMPORARILY DISABLED for slash testing) =====
         dt = 1.0 / FPS

@@ -15,7 +15,7 @@
 4. **Resolution** → Slow-motion death sequence with particle explosion
 5. **Finish** → The game terminates to finalize OBS recording or advance batch
 
-The aesthetic is intentionally minimalist—solid-colored circles with inner highlights, simple line swords, and health bars—but the combat *feels* punchy thanks to hit-stop, screen shake, and slow-motion effects.
+The aesthetic features a sharp **cel-shaded** style—solid neon colors with centralized dark outlines, chunky bordered swords, and elegant fading tip trails. The combat *feels* incredibly punchy thanks to dramatic ricochet physics, hit-stop, screen shake, and slow-motion effects.
 
 ---
 
@@ -38,37 +38,25 @@ There is no player failure state—this is an automated simulation. Both fighter
 
 ## Combat Mechanics
 
-### Attack Triggering
-Attacks are triggered **automatically** when fighters are within **120 pixels** of each other (`attack_trigger_range`). There are no player inputs—the AI decides when to swing based on proximity.
+### Weapon System: Beyblade Auto-Battler
+The combat has been overhauled into a **"Beyblade" style auto-battler**. There are no directional slash attacks; instead, fighters spin continuously with persistent, always-active sword hitboxes.
 
-### Weapon System: Combo Sword Attacks
-The combat uses a **3-hit combo system** with escalating damage:
-
-| Combo Stage | Attack Type | Arc Width | Damage Multiplier |
-|-------------|-------------|-----------|-------------------|
-| **1st Hit** | Left Slash  | ~120°     | 1.0x (10 damage)  |
-| **2nd Hit** | Right Slash | ~90°      | 1.2x (12 damage)  |
-| **3rd Hit** | Pierce      | ~30°      | 1.5x (15 damage)  |
-
-#### Attack Mechanics
-- **Attack Duration:** 12 frames per swing
-- **Attack Cooldown:** 8 frames between attacks
-- **Combo Timeout:** 45 frames to land the next hit or the combo resets
-- **Pierce Extended Reach:** The 3rd hit extends sword length by 30%
+- **Constant Rotation:** Fighters maintain a continuous 360-degree spin.
+- **Sword Parry System:** Persistent sword-to-sword collision creates a dynamic parry system with high-knockback ricochet physics.
+- **Always-Active Damage:** Damage is driven exclusively by physical sword-to-body intersection. 
 
 ### Damage & Collision
-- **Hitbox:** Sword collision is checked at 50%, 75%, and 100% of sword length
-- **Hit Detection:** If any hitbox point is within the defender's body radius + 8 pixels, damage is dealt
-- **Invincibility Frames:** 10 frames of immunity after taking damage
-- **Knockback:** Varies slightly based on combo stage (1.0x to 1.25x)
+- **Hit Detection:** If any point along the chunky sword intersects the opponent's body, damage is dealt.
+- **Invincibility Frames:** Increased immunity frames after taking damage prevent unintended instant-death multi-hits from the continuous spinning blade.
+- **Ricochet Physics:** Extreme, dramatic knockback is applied upon impact, bouncing fighters off each other like spinning tops.
 
 ### Hit Feedback
 Each successful hit triggers:
-- **Hit-Stop:** 3 frames (5 frames for pierce attacks)
-- **Hit Slow-Mo:** 5 frames at 60% speed
-- **Screen Shake:** Intensity 8, decaying at 85% per frame
-- **Particle Burst:** 10 white particles
-- **Sound Effect:** Procedurally generated hit sound
+- **Hit-Stop:** Momentarily freezes the action to add weight to the impact.
+- **Hit Slow-Mo:** 5 frames at 60% speed.
+- **Screen Shake:** Massive screen shake, decaying at 85% per frame.
+- **Particle Burst:** White particles erupting from the impact point.
+- **Sound Effect:** Procedurally generated hit sound.
 
 ---
 
@@ -88,33 +76,24 @@ If a fighter ever stops moving (velocity = 0), they're given a random directiona
 ### Ninja Wall Boosts
 When bouncing off walls, fighters receive a **4 pixel/frame velocity boost toward the arena center**. This prevents corner camping and naturally guides fighters back into combat.
 
-### Sword Orientation
-The sword **always points toward the opponent**, with an angular offset based on the current combo stage:
-- **Left Slash Ready:** Sword angled 0.6 radians to the left
-- **Right Slash Ready:** Sword angled 0.6 radians to the right  
-- **Pierce Ready:** Sword straight ahead
+### Sword Orientation & Rotation
+The sword rotates 360 degrees. The weapon leaves a smooth, fading, semi-transparent light trail at the tip to emphasize the speed and direction of the spin.
 
 ---
 
 ## Arena Escalation System
 
-To prevent stalemates and keep battles short, the arena features multiple escalation mechanics:
+To prevent stalemates and keep the action flowing, the arena features an inactivity pressure mechanic (arena wall shrinking has been removed):
 
-### Time-Based Shrinking
-- Every **10 seconds**, the arena shrinks by 12 pixels per side
-- Minimum arena size: 300x300 pixels
-
-### Inactivity Pressure
-If no combat occurs for **5 seconds**:
-1. **Arena Pulse** — Purple shockwave pushes fighters toward center (4 velocity boost)
-2. **Warning Phase** — Arena border turns yellow (3 additional seconds)
-3. **Rapid Shrink** — Arena border turns orange and shrinks at 0.3 px/frame continuously
-
-Any successful hit pauses the shrink for 2 seconds, rewarding aggression.
+### Arena Pulse
+If no combat occurs for **2 seconds**, an **Arena Pulse** triggers.
+- A radial shockwave fires, abruptly pushing both fighters toward the center of the arena to force combat.
+- This pulse repeats every 2 seconds of inactivity, ensuring the action is constant.
 
 ---
 
 ## Chaos Event System
+> **Note:** The Chaos Event system is currently temporarily disabled to focus on the balance and core physics of the new Beyblade combat system.
 
 After an initial **1-second delay** at the start of a match to let combat begin, a random chaos event triggers every **1.5-3.0 seconds** that dramatically alters gameplay for **3.5 seconds**. Events never repeat back-to-back. This keeps fights unpredictable and creates TikTok-worthy moments.
 

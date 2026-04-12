@@ -117,7 +117,7 @@ WALL_BOOST_STRENGTH = 4        # Extra velocity toward center on wall hit
 
 
 # Arena Escalation (Inactivity Handling)
-INACTIVITY_PULSE_TIME = 3.0  # Seconds of inactivity before Arena Pulse triggers
+INACTIVITY_PULSE_TIME = 2.0  # Seconds of inactivity before Arena Pulse triggers
 ARENA_PULSE_VELOCITY_BOOST = 4  # Velocity nudge toward center
 ARENA_PULSE_SHAKE = 6  # Screen shake intensity for pulse
 
