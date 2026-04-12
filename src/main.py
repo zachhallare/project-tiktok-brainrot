@@ -19,12 +19,11 @@ from config import (
     SCREEN_WIDTH, SCREEN_HEIGHT, CANVAS_WIDTH, CANVAS_HEIGHT, DISPLAY_WIDTH, DISPLAY_HEIGHT, FPS,
     WHITE, PURPLE, BLACK, DARK_GRAY, GRAY, YELLOW,
     ARENA_MARGIN, ARENA_WIDTH, ARENA_HEIGHT,
-    ARENA_SHRINK_INTERVAL, ARENA_SHRINK_AMOUNT,
     ROUND_MAX_TIME, BASE_KNOCKBACK, DAMAGE_PER_HIT, SLOW_MOTION_SPEED,
     HIT_STOP_FRAMES, SCREEN_SHAKE_INTENSITY, SCREEN_SHAKE_DECAY,
     HIT_SLOWMO_FRAMES, HIT_SLOWMO_TIMESCALE,
-    INACTIVITY_PULSE_TIME, INACTIVITY_SHRINK_TIME, ARENA_PULSE_VELOCITY_BOOST,
-    ARENA_PULSE_SHAKE, ESCALATION_SHRINK_SPEED,
+    INACTIVITY_PULSE_TIME, ARENA_PULSE_VELOCITY_BOOST,
+    ARENA_PULSE_SHAKE,
     NEON_RED, NEON_BLUE, NEON_BG, NEON_GRID,
     CRIT_CHANCE, CRIT_MULTIPLIER, CRIT_IMPACT_FRAMES, CRIT_IMPACT_TIMESCALE
 )
@@ -68,7 +67,6 @@ class Game:
         # Define the base arena square.
         self.base_arena = (ARENA_MARGIN, ARENA_MARGIN, ARENA_WIDTH, ARENA_HEIGHT)
         self.arena_bounds = list(self.base_arena)
-        self.arena_shrink_timer = ARENA_SHRINK_INTERVAL * FPS
         
         # Use neon colors for fighters
         spawn_margin = 100
@@ -101,9 +99,6 @@ class Game:
         self.crit_impact_frames = 0
         self.crit_impact_accumulator = 0.0
         self.crit_flash_phase = 0  # 0=none, 1=black, 2=white, 3+=done
-        
-        # Attack range for triggering combos
-        self.attack_trigger_range = 120  # Distance to trigger attack
         
         # Round state tracking.
         self.round_timer = 0
@@ -139,8 +134,6 @@ class Game:
         
         # Arena Escalation System
         self.inactivity_timer = 0
-        self.escalation_state = 'normal'
-        self.escalation_shrink_paused = False
         
         # Game State
         self.game_state = 'TITLE'
@@ -241,15 +234,15 @@ class Game:
     
     def _trigger_opening_chaos(self):
         """Immediately trigger a random high-impact chaos event at match start."""
-        opener = random.choice(self.OPENING_CHAOS_POOL)
-        self.chaos.trigger_specific_event(opener)
-        self._play_chaos_event_sound(opener)
+        # TEMPORARILY DISABLED for slash testing
+        # opener = random.choice(self.OPENING_CHAOS_POOL)
+        # self.chaos.trigger_specific_event(opener)
+        # self._play_chaos_event_sound(opener)
+        pass
     
     def _reset_inactivity(self):
         """Reset inactivity timer."""
         self.inactivity_timer = 0
-        if self.escalation_state == 'shrinking':
-            self.escalation_shrink_paused = True
     
     def _trigger_arena_pulse(self):
         """Trigger Arena Pulse."""
@@ -406,34 +399,93 @@ class Game:
     # Skills disabled - _spawn_skill_orb removed
 
     def _check_sword_hit(self, attacker, defender):
-        """Check if sword tip hits defender body during attack."""
-        if not attacker.is_attacking:
+        """Check if sword tip hits defender body (always active in Beyblade mode)."""
+        
+        # Early-out: skip if defender is too far for any sword point to reach
+        fighter_dist = math.hypot(attacker.x - defender.x, attacker.y - defender.y)
+        scaled_sword_length = attacker.sword_length * attacker.sword_size_multiplier
+        max_reach = attacker.current_radius + 3 + scaled_sword_length + defender.current_radius + 3
+        if fighter_dist > max_reach:
             return None
         
         (base_x, base_y), (tip_x, tip_y) = attacker.get_sword_hitbox()
         
-        # Check multiple points along sword
-        for t in [0.5, 0.75, 1.0]:
+        # Check outer portion of blade only (skip midpoint to avoid body-overlap phantom hits)
+        for t in [0.75, 1.0]:
             check_x = base_x + (tip_x - base_x) * t
             check_y = base_y + (tip_y - base_y) * t
             dist = math.hypot(check_x - defender.x, check_y - defender.y)
-            # Use current_radius for proper chaos event sizing
-            if dist < defender.current_radius + 8:
+            # Tighter tolerance: current_radius + 3 (was +8)
+            if dist < defender.current_radius + 3:
                 return (check_x, check_y)
         return None
 
+    @staticmethod
+    def _cross(o, a, b):
+        """2D cross product of vectors OA and OB."""
+        return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
+    
+    def _segments_intersect(self, p1, p2, p3, p4):
+        """Check if line segment p1-p2 intersects p3-p4 using cross products."""
+        d1 = self._cross(p3, p4, p1)
+        d2 = self._cross(p3, p4, p2)
+        d3 = self._cross(p1, p2, p3)
+        d4 = self._cross(p1, p2, p4)
+        
+        if ((d1 > 0 and d2 < 0) or (d1 < 0 and d2 > 0)) and \
+           ((d3 > 0 and d4 < 0) or (d3 < 0 and d4 > 0)):
+            return True
+        
+        return False
+    
+    def _get_intersection_point(self, p1, p2, p3, p4):
+        """Get the intersection point of segments p1-p2 and p3-p4."""
+        x1, y1 = p1
+        x2, y2 = p2
+        x3, y3 = p3
+        x4, y4 = p4
+        
+        denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4)
+        if abs(denom) < 1e-10:
+            return None
+        
+        t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denom
+        
+        ix = x1 + t * (x2 - x1)
+        iy = y1 + t * (y2 - y1)
+        return (ix, iy)
+
     def _handle_combat(self):
-        """Detect and resolve combat interactions."""
+        """Detect and resolve combat interactions with sword-to-sword parry."""
         
-        # AI Attack Triggering - fighters attack when in range
-        for attacker, defender in [(self.blue, self.red), (self.red, self.blue)]:
-            dist = math.hypot(attacker.x - defender.x, attacker.y - defender.y)
-            
-            # Trigger attack when in range and not on cooldown
-            if dist < self.attack_trigger_range:
-                attacker.start_attack(self.round_timer)
+        # === PARRY CHECK: Sword-to-Sword intersection ===
+        blue_base, blue_tip = self.blue.get_sword_hitbox()
+        red_base, red_tip = self.red.get_sword_hitbox()
         
-        # Check for sword hits during attacks
+        if self._segments_intersect(blue_base, blue_tip, red_base, red_tip):
+            if self.blue.parry_cooldown <= 0 and self.red.parry_cooldown <= 0:
+                # Reverse both spin directions
+                self.blue.spin_direction *= -1
+                self.red.spin_direction *= -1
+                
+                # Set parry cooldown
+                self.blue.parry_cooldown = 15
+                self.red.parry_cooldown = 15
+                
+                # Hit-stop and screen shake
+                self.hit_stop = 8
+                self.screen_shake = 12
+                
+                # Sparks at intersection point
+                ix_point = self._get_intersection_point(blue_base, blue_tip, red_base, red_tip)
+                if ix_point:
+                    self.particles.emit(ix_point[0], ix_point[1], (255, 255, 200), count=20, size=4)
+                
+                # Play sword clash sound
+                if self.sounds_enabled and self.sword_clash_sound:
+                    self.sword_clash_sound.play()
+        
+        # === BODY HIT CHECK: Sword vs body (always active - Beyblade mode) ===
         for attacker, defender in [(self.blue, self.red), (self.red, self.blue)]:
             hit_pos = self._check_sword_hit(attacker, defender)
             if hit_pos:
@@ -449,7 +501,7 @@ class Game:
                 total_damage_mult = damage_mult * chaos_damage_mult * crit_mult
                 
                 angle = math.atan2(defender.y - attacker.y, defender.x - attacker.x)
-                knockback = BASE_KNOCKBACK * knockback_mult * (1.0 + (total_damage_mult - 1.0) * 0.5)
+                knockback = BASE_KNOCKBACK * knockback_mult * (1.0 + (total_damage_mult - 1.0) * 0.5) * 1.5
                 damage = DAMAGE_PER_HIT * total_damage_mult
                 
                 # ULTRA KNOCKBACK: Massive screen shake + knockback whoosh
@@ -458,13 +510,12 @@ class Game:
                     if self.sounds_enabled and self.knockback_whoosh_sound:
                         self.knockback_whoosh_sound.play()
                 
-                # Pierce (combo stage 2) has more hit-stop
-                hit_stop_frames = HIT_STOP_FRAMES + (2 if attacker.combo_stage == 2 else 0)
+                # Fixed hit-stop frames (no combo system)
+                hit_stop_frames = HIT_STOP_FRAMES
                 
                 if defender.take_damage(damage, angle, knockback, self.particles):
                     self._trigger_hit(hit_pos[0], hit_pos[1], attacker.render_color, hit_stop_frames, damage, is_crit)
                     self.hit_slowmo_frames = HIT_SLOWMO_FRAMES
-                    attacker.on_attack_hit(self.round_timer)
                     self._reset_inactivity()
                     
                     # Critical Hit: Trigger anime impact sequence
@@ -550,7 +601,6 @@ class Game:
         self.blue.reset()
         self.red.reset()
         self.arena_bounds = list(self.base_arena)
-        self.arena_shrink_timer = ARENA_SHRINK_INTERVAL * FPS
         self.round_ending = False
         self.winner = None
         self.winner_text = ""
@@ -574,8 +624,6 @@ class Game:
         self.crit_flash_phase = 0
         
         self.inactivity_timer = 0
-        self.escalation_state = 'normal'
-        self.escalation_shrink_paused = False
         
         self._lock_fighters_for_countdown()
         self.countdown_stage = 0
@@ -693,93 +741,34 @@ class Game:
             if self.opening_chaos_delay <= 0:
                 self._trigger_opening_chaos()
         
-        # Arena Escalation
+        # Arena Escalation (Repeating Pulse)
         self.inactivity_timer += 1
+        if self.inactivity_timer >= INACTIVITY_PULSE_TIME * FPS:
+            self._trigger_arena_pulse()
+            self.inactivity_timer = 0  # Reset so it pulses again in 3 seconds if still inactive
         
-        if self.escalation_state == 'normal':
-            if self.inactivity_timer >= INACTIVITY_PULSE_TIME * FPS:
-                self._trigger_arena_pulse()
-                self.escalation_state = 'pulse_triggered'
-                self.inactivity_timer = 0
-        
-        elif self.escalation_state == 'pulse_triggered':
-            if self.inactivity_timer >= INACTIVITY_SHRINK_TIME * FPS:
-                self.escalation_state = 'shrinking'
-                self.escalation_shrink_paused = False
-                self._start_escalation_sound()  # Start shrink warning loop
-        
-        elif self.escalation_state == 'shrinking':
-            if not self.escalation_shrink_paused:
-                ax, ay, aw, ah = self.arena_bounds
-                if aw > 250 and ah > 250:
-                    self.arena_bounds = [
-                        ax + ESCALATION_SHRINK_SPEED,
-                        ay + ESCALATION_SHRINK_SPEED,
-                        aw - ESCALATION_SHRINK_SPEED * 2,
-                        ah - ESCALATION_SHRINK_SPEED * 2
-                    ]
-                else:
-                    self._stop_escalation_sound()  # Stop when minimum size reached
-            else:
-                if self.inactivity_timer >= FPS * 2:
-                    self.escalation_shrink_paused = False
-        
-        self.arena_shrink_timer -= 1
-        if self.arena_shrink_timer <= 0:
-            self.arena_shrink_timer = ARENA_SHRINK_INTERVAL * FPS
-            ax, ay, aw, ah = self.arena_bounds
-            if aw > 300 and ah > 300:
-                self.arena_bounds = [
-                    ax + ARENA_SHRINK_AMOUNT,
-                    ay + ARENA_SHRINK_AMOUNT,
-                    aw - ARENA_SHRINK_AMOUNT * 2,
-                    ah - ARENA_SHRINK_AMOUNT * 2
-                ]
-        
-        # ===== CHAOS SYSTEM UPDATE =====
+        # ===== CHAOS SYSTEM UPDATE (TEMPORARILY DISABLED for slash testing) =====
         dt = 1.0 / FPS
-        prev_event = self.chaos.active_event  # Track for sound trigger
-        self.chaos.update(dt, self.particles, [self.blue, self.red])
+        # prev_event = self.chaos.active_event  # Track for sound trigger
+        # self.chaos.update(dt, self.particles, [self.blue, self.red])
         
-        # Trigger chaos event sound when new event starts
-        current_event = self.chaos.active_event
-        if current_event and current_event != prev_event:
-            self._play_chaos_event_sound(current_event)
-        elif prev_event and not current_event:
-            # Event ended, stop any loops
-            self._stop_chaos_loops()
+        # # Trigger chaos event sound when new event starts
+        # current_event = self.chaos.active_event
+        # if current_event and current_event != prev_event:
+        #     self._play_chaos_event_sound(current_event)
+        # elif prev_event and not current_event:
+        #     # Event ended, stop any loops
+        #     self._stop_chaos_loops()
         
-        # Get chaos modifiers
-        speed_mult = self.chaos.get_speed_mult()
-        body_size_mult = self.chaos.get_body_size_mult()
-        sword_size_mult = self.chaos.get_sword_size_mult()
-        attack_speed_mult = self.chaos.get_attack_speed_mult()
-        center_x = SCREEN_WIDTH // 2
-        center_y = SCREEN_HEIGHT // 2
-        
-        # Apply chaos modifiers to fighters
+        # Ensure fighters use default colors and sizes (no chaos modifiers)
         for fighter in [self.blue, self.red]:
-            # Apply separate body and sword size multipliers
-            fighter.body_size_multiplier = body_size_mult
-            fighter.sword_size_multiplier = sword_size_mult
-            
-            # Apply attack speed multiplier
-            fighter.attack_speed_multiplier = attack_speed_mult
-            
-            # Apply speed multiplier
-            fighter.speed_multiplier = speed_mult
-            
-            # Apply chaos color overrides
-            fighter.render_color = self.chaos.get_fighter_color(fighter.color, fighter.is_blue)
-            fighter.render_color_bright = self.chaos.get_fighter_color(fighter.color_bright, fighter.is_blue)
-            
-            # Apply health bar color (BLACK during Blackout)
-            fighter.health_bar_color = self.chaos.get_health_bar_color(fighter.color)
-            
-            # Apply speed multiplier to velocity (acceleration boost when entering HYPER SPEED)
-            if speed_mult != 1.0:
-                fighter.vx *= (1.0 + (speed_mult - 1.0) * 0.15)
-                fighter.vy *= (1.0 + (speed_mult - 1.0) * 0.15)
+            fighter.body_size_multiplier = 1.0
+            fighter.sword_size_multiplier = 1.0
+            fighter.attack_speed_multiplier = 1.0
+            fighter.speed_multiplier = 1.0
+            fighter.render_color = fighter.color
+            fighter.render_color_bright = fighter.color_bright
+            fighter.health_bar_color = fighter.color
         
         # Calculate arena bounds with Crusher/Breathing Room modifier
         arena_mult = self.chaos.get_arena_mult()
@@ -812,6 +801,20 @@ class Game:
         self.blue.update(self.red, effective_arena, self.particles, self.shockwaves)
         self.red.update(self.blue, effective_arena, self.particles, self.shockwaves)
         
+        # Body-to-body collision separation (prevent overlap that causes phantom sword hits)
+        dx = self.red.x - self.blue.x
+        dy = self.red.y - self.blue.y
+        body_dist = math.hypot(dx, dy)
+        min_sep = self.blue.current_radius + self.red.current_radius
+        if body_dist < min_sep and body_dist > 0:
+            overlap = (min_sep - body_dist) / 2.0
+            nx = dx / body_dist
+            ny = dy / body_dist
+            self.blue.x -= nx * overlap
+            self.blue.y -= ny * overlap
+            self.red.x += nx * overlap
+            self.red.y += ny * overlap
+        
         # ===== CHAOS EVENT HANDLERS =====
         
         # TRON MODE: Check trail collisions
@@ -837,17 +840,6 @@ class Game:
             self._end_round(winner=self.red, loser=self.blue)
         elif self.red.health <= 0:
             self._end_round(winner=self.blue, loser=self.red)
-        
-        if self.round_timer > ROUND_MAX_TIME * FPS:
-            cx = SCREEN_WIDTH // 2
-            cy = SCREEN_HEIGHT // 2
-            blue_dist = math.hypot(self.blue.x - cx, self.blue.y - cy)
-            red_dist = math.hypot(self.red.x - cx, self.red.y - cy)
-            if blue_dist < red_dist:
-                self._end_round(winner=self.blue, loser=self.red)
-            else:
-                self._end_round(winner=self.red, loser=self.blue)
-    
     def _handle_tron_mode(self, arena_bounds):
         """Handle TRON MODE: Opponent's trail deals damage (1 per second)."""
         dt = 1.0 / FPS
@@ -990,12 +982,6 @@ class Game:
         if self.chaos.active_event in ["THE CRUSHER", "BREATHING ROOM"]:
             border_color = self.f2_color if not self.chaos.is_blackout() else BLACK
             border_width = 6
-        elif self.escalation_state == 'shrinking':
-            border_color = self.f2_color
-            border_width = 6
-        elif self.escalation_state == 'pulse_triggered':
-            border_color = YELLOW
-            border_width = 5
         elif self.chaos.is_tron_mode():
             border_color = base_border_color
             border_width = 6

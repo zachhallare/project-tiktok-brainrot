@@ -90,8 +90,7 @@ SWORD_LENGTH = 55
 SWORD_WIDTH = 6
 BASE_HEALTH = 250  # Increased for longer, more exciting fights
 DAMAGE_PER_HIT = 15  # +50% damage for faster kills
-ARENA_SHRINK_INTERVAL = 5  # Arena closes in faster
-ARENA_SHRINK_AMOUNT = 12
+
 ROUND_MAX_TIME = 18  # Hard cap prevents stalling
 
 # Slow motion for death sequence
@@ -118,11 +117,9 @@ WALL_BOOST_STRENGTH = 4        # Extra velocity toward center on wall hit
 
 
 # Arena Escalation (Inactivity Handling)
-INACTIVITY_PULSE_TIME = 1.5  # Seconds before Arena Pulse triggers (faster escalation)
-INACTIVITY_SHRINK_TIME = 0.75  # Additional seconds before shrinking starts
+INACTIVITY_PULSE_TIME = 3.0  # Seconds of inactivity before Arena Pulse triggers
 ARENA_PULSE_VELOCITY_BOOST = 4  # Velocity nudge toward center
 ARENA_PULSE_SHAKE = 6  # Screen shake intensity for pulse
-ESCALATION_SHRINK_SPEED = 0.3  # Pixels per frame during inactivity shrink
 
 # Game Settings
 GAME_SETTINGS = {
