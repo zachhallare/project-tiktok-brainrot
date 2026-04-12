@@ -137,7 +137,7 @@ class Game:
         
         # Game State
         self.game_state = 'TITLE'
-        self.sync_marker_timer = 0
+        self.obs_startup_timer = 0
         
         # Seamless Loop Wipe System
         # Phases: 0=none, 1=flash_in (opacity rising), 2=solid (reset behind),
@@ -636,16 +636,17 @@ class Game:
         self.death_sound_phase = 0
         self.opening_chaos_delay = 0
         
-        # Flash green sync marker between rounds
-        self.sync_marker_timer = 60
+        # Delay for OBS startup between rounds
+        self.obs_startup_timer = 60
 
     def update(self):
         """Main update loop."""
         if self.paused:
             return
         
-        # Wait for sync marker (green screen/OBS startup) to finish before starting countdown
-        if getattr(self, 'sync_marker_timer', 0) > 0:
+        # Wait for OBS startup to finish before starting countdown
+        if getattr(self, 'obs_startup_timer', 0) > 0:
+            self.obs_startup_timer -= 1
             return
         
         if self.countdown_active:
@@ -1085,23 +1086,65 @@ class Game:
             
             self.screen.blit(text_surface, text_rect)
         
+        # Tekken-style HUD on top of everything
+        self._draw_hud(self.screen)
+        
         # Draw game surface to high-res canvas
         self.canvas.fill((15, 15, 15))  # Dark background for dead space
         y_offset = (CANVAS_HEIGHT - SCREEN_HEIGHT) // 2
         self.canvas.blit(self.screen, (0, y_offset))
-        
-        # --- SYNC MARKER (Green Screen Flash) ---
-        if hasattr(self, 'sync_marker_timer') and self.sync_marker_timer > 0:
-            self.sync_marker_timer -= 1
-            self.canvas.fill((0, 255, 0))  # BRIGHT GREEN for video editing sync
-        
-
         
         # Scale down and present to the laptop display window
         scaled_preview = pygame.transform.smoothscale(self.canvas, (DISPLAY_WIDTH, DISPLAY_HEIGHT))
         self.window.blit(scaled_preview, (0, 0))
         
         pygame.display.flip()
+    
+    def _draw_hud(self, surface):
+        """Draw Tekken-style static health bars flush above the arena."""
+        # Part 1: Dynamic arena positioning
+        ax, ay, aw, ah = self.arena_bounds
+        bar_width = (aw // 2) - 20
+        bar_height = 20
+        bar_y = ay - bar_height - 10  # 10px padding above arena top line
+        
+        bg_color = (30, 30, 30)
+        dark_border_color = (60, 60, 60)  # Cel-shaded dark outline
+        
+        # --- Blue (Left) Bar: depletes right-to-left, anchored to left arena wall ---
+        bar_x = ax
+        blue_hp_ratio = max(0.0, self.blue.health / self.blue.max_health)
+        blue_fill_w = int(bar_width * blue_hp_ratio)
+        
+        # Background (missing health)
+        pygame.draw.rect(surface, bg_color, (bar_x, bar_y, bar_width, bar_height))
+        # Health fill (anchored to left edge, depletes from right)
+        if blue_fill_w > 0:
+            pygame.draw.rect(surface, self.blue.render_color,
+                            (bar_x, bar_y, blue_fill_w, bar_height))
+        # Dark border outline
+        pygame.draw.rect(surface, dark_border_color, (bar_x, bar_y, bar_width, bar_height), 2)
+        
+        # --- Red (Right) Bar: depletes left-to-right, anchored to right arena wall ---
+        bar_x = ax + aw - bar_width
+        red_hp_ratio = max(0.0, self.red.health / self.red.max_health)
+        red_fill_w = int(bar_width * red_hp_ratio)
+        
+        # Background (missing health)
+        pygame.draw.rect(surface, bg_color, (bar_x, bar_y, bar_width, bar_height))
+        # Health fill (anchored to right edge, depletes from left)
+        if red_fill_w > 0:
+            fill_x = bar_x + (bar_width - red_fill_w)
+            pygame.draw.rect(surface, self.red.render_color,
+                            (fill_x, bar_y, red_fill_w, bar_height))
+        # Dark border outline
+        pygame.draw.rect(surface, dark_border_color, (bar_x, bar_y, bar_width, bar_height), 2)
+        
+        # --- VS Text (centered between the two bars) ---
+        vs_font = self.font_small
+        vs_surface = vs_font.render("VS", True, WHITE)
+        vs_rect = vs_surface.get_rect(center=(ax + (aw // 2), bar_y + (bar_height // 2)))
+        surface.blit(vs_surface, vs_rect)
     
     def _draw_grid(self, offset):
         """Draw faint grid for cyberpunk aesthetic."""
@@ -1178,7 +1221,7 @@ class Game:
         if "--auto-start" in sys.argv:
             self.game_state = 'PLAYING'
             self._start_obs_recording()
-            self.sync_marker_timer = 60
+            self.obs_startup_timer = 60
         elif "--test-mode" in sys.argv:
             self.game_state = 'PLAYING'
 
@@ -1194,19 +1237,19 @@ class Game:
                         if self.game_state == 'TITLE':
                             self.game_state = 'PLAYING'
                             self._start_obs_recording()  # Start OBS
-                            self.sync_marker_timer = 60  # Flash green marker on start
+                            self.obs_startup_timer = 60  # Delay on start
                         else:
                             self.paused = not self.paused
                     elif event.key == pygame.K_m:
-                        # Manual sync marker
-                        self.sync_marker_timer = 60
+                        # Manual delay
+                        self.obs_startup_timer = 60
                     elif event.key == pygame.K_r:
                         self._reset_round()
                 elif event.type == pygame.MOUSEBUTTONDOWN:
                     if self.game_state == 'TITLE':
                         self.game_state = 'PLAYING'
                         self._start_obs_recording()  # Start OBS
-                        self.sync_marker_timer = 60  # Flash green marker on start
+                        self.obs_startup_timer = 60  # Delay on start
             
             if self.game_state == 'TITLE':
                 self._draw_title_screen()

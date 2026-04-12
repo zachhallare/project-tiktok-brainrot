@@ -247,9 +247,6 @@ class Fighter:
         
         # Sword
         self._draw_sword(surface, offset, dark_border_color)
-        
-        # Health bar (can be hidden during blackout via main.py)
-        self._draw_health_bar(surface, offset)
     
     def _draw_glow(self, surface, offset):
         """Draw a glow/bloom effect behind the fighter."""
@@ -416,29 +413,7 @@ class Fighter:
                         (int(base_x + ox), int(base_y + oy)),
                         (int(tip_x + ox), int(tip_y + oy)), sword_w)
     
-    def _draw_health_bar(self, surface, offset):
-        """Draw health bar above fighter."""
-        ox, oy = offset
-        bar_width = 40
-        bar_height = 6
-        bar_x = self.x - bar_width // 2
-        bar_y = self.y - self.current_radius - 15  # Use current_radius for proper positioning
-        
-        # Background
-        pygame.draw.rect(surface, (50, 50, 50),
-                        (int(bar_x + ox), int(bar_y + oy), bar_width, bar_height))
-        
-        # Health fill - use health_bar_color (BLACK during Blackout, otherwise normal)
-        health_pct = max(0, self.health / self.max_health)
-        fill_width = int(bar_width * health_pct)
-        if fill_width > 0:
-            pygame.draw.rect(surface, self.health_bar_color,
-                            (int(bar_x + ox), int(bar_y + oy), fill_width, bar_height))
-        
-        # Border - also use health bar color for consistency during Blackout
-        border_color = self.health_bar_color if self.health_bar_color == BLACK else WHITE
-        pygame.draw.rect(surface, border_color,
-                        (int(bar_x + ox), int(bar_y + oy), bar_width, bar_height), 1)
+
     
     def take_damage(self, amount, knockback_angle, knockback_force, particles):
         """Take damage and knockback."""
