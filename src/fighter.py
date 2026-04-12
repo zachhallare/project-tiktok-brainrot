@@ -60,30 +60,8 @@ class Fighter:
         # Legacy hit tracking
         self.last_hit_frame = -100     # Frame of last successful hit
         
-        # Motion trail (list of previous positions)
         self.trail = []
-        
-        # Dynamic sizing (modified by chaos events)
-        # Separate body and sword size for Tiny Terror
-        self.body_size_multiplier = 1.0   # Body/collision size
-        self.sword_size_multiplier = 1.0  # Sword length/reach
-        self.current_radius = self.radius  # Actual collision radius (body only)
-        
-        # Attack speed multiplier (lower = slower attacks)
-        self.attack_speed_multiplier = 1.0
-        
-        # Physics movement speed multiplier
-        self.speed_multiplier = 1.0
-        
-        # Render color (can be overridden by chaos events)
-        self.render_color = color
-        self.render_color_bright = color_bright
-        
-        # Health bar render color (for Blackout)
-        self.health_bar_color = color
-    
 
-    
     def update_rotation(self, opponent=None, frame_count=0):
         """Update sword angle - constant Beyblade spin with parry reversal."""
         self.sword_angle += self.spin_speed * self.spin_direction
@@ -103,9 +81,6 @@ class Fighter:
         if self.locked:
             return
         
-        # Update current radius based on BODY size multiplier (not sword)
-        self.current_radius = self.radius * self.body_size_multiplier
-        
         # Update trail (store previous positions for motion trail effect)
         self.trail.insert(0, (self.x, self.y))
         if len(self.trail) > TRAIL_LENGTH:
@@ -122,8 +97,7 @@ class Fighter:
         if self.flash_timer > 0:
             self.flash_timer -= 1
         if self.attack_cooldown > 0:
-            # Apply attack speed multiplier (slower attacks = slower cooldown decay)
-            self.attack_cooldown -= self.attack_speed_multiplier
+            self.attack_cooldown -= 1
         if self.invincible > 0:
             self.invincible -= 1
 
@@ -134,13 +108,13 @@ class Fighter:
         
         # Clamp velocity (scaling limits with speed_multiplier)
         speed = math.hypot(self.vx, self.vy)
-        max_vel = MAX_VELOCITY * self.speed_multiplier
+        max_vel = MAX_VELOCITY
         if speed > max_vel:
             self.vx = (self.vx / speed) * max_vel
             self.vy = (self.vy / speed) * max_vel
         
         # Ensure minimum velocity (DVD logo always moving)
-        min_vel = MIN_VELOCITY * self.speed_multiplier
+        min_vel = MIN_VELOCITY
         if speed < min_vel and speed > 0:
             self.vx = (self.vx / speed) * min_vel
             self.vy = (self.vy / speed) * min_vel
@@ -155,9 +129,8 @@ class Fighter:
         self.y += self.vy
         
         # Wall collision with perfect bounce (DVD logo style)
-        # Use current_radius for proper collision with size changes
         ax, ay, aw, ah = arena_bounds
-        r = self.current_radius
+        r = self.radius
         
         # Left wall
         if self.x - r < ax:
@@ -199,10 +172,8 @@ class Fighter:
     
     def get_sword_hitbox(self):
         """Get sword collision points for rotation attacks."""
-        # Use current_radius (body) for sword base position
-        r = self.current_radius
-        # Scale sword length with SWORD size multiplier (separate from body)
-        scaled_sword_length = self.sword_length * self.sword_size_multiplier
+        r = self.radius
+        scaled_sword_length = self.sword_length
         
         base_x = self.x + math.cos(self.sword_angle) * (r + 3)
         base_y = self.y + math.sin(self.sword_angle) * (r + 3)
@@ -219,7 +190,7 @@ class Fighter:
     def draw(self, surface, offset=(0, 0)):
         """Draw fighter with glow, trail, and neon effects."""
         ox, oy = offset
-        r = self.current_radius
+        r = self.radius
         
         # Draw motion trail first (behind fighter)
         self._draw_trail(surface, offset)
@@ -228,19 +199,19 @@ class Fighter:
         self._draw_glow(surface, offset)
         
         # Calculate dark border color for cel-shaded outline
-        dark_border_color = (int(self.render_color[0] * 0.4), int(self.render_color[1] * 0.4), int(self.render_color[2] * 0.4))
+        dark_border_color = (int(self.color[0] * 0.4), int(self.color[1] * 0.4), int(self.color[2] * 0.4))
         
         # Dark border circle (drawn slightly larger behind the body)
         pygame.draw.circle(surface, dark_border_color,
                           (int(self.x + ox), int(self.y + oy)), int(r + 3))
         
-        # Main body circle - use render_color for chaos events
-        body_color = WHITE if self.flash_timer > 0 else self.render_color
+        # Main body circle
+        body_color = WHITE if self.flash_timer > 0 else self.color
         pygame.draw.circle(surface, body_color, 
                           (int(self.x + ox), int(self.y + oy)), int(r))
         
         # Inner highlight
-        pygame.draw.circle(surface, self.render_color_bright,
+        pygame.draw.circle(surface, self.color_bright,
                           (int(self.x - r * 0.2 + ox), 
                            int(self.y - r * 0.2 + oy)), 
                           int(r * 0.3))
@@ -251,7 +222,7 @@ class Fighter:
     def _draw_glow(self, surface, offset):
         """Draw a glow/bloom effect behind the fighter."""
         ox, oy = offset
-        glow_radius = int(self.current_radius * GLOW_RADIUS_MULT)
+        glow_radius = int(self.radius * GLOW_RADIUS_MULT)
         
         # Create a surface for the glow with alpha
         glow_size = glow_radius * 2 + 4
@@ -262,7 +233,7 @@ class Fighter:
             r = glow_radius - i * 4
             if r > 0:
                 alpha = GLOW_ALPHA - i * 15
-                color = (*self.render_color[:3], max(0, alpha))
+                color = (*self.color[:3], max(0, alpha))
                 pygame.draw.circle(glow_surf, color, (glow_size // 2, glow_size // 2), r)
         
         # Blit the glow
@@ -286,13 +257,13 @@ class Fighter:
                 continue
             
             # Trail circle gets smaller further back
-            trail_r = int(self.current_radius * fade * 0.7)
+            trail_r = int(self.radius * fade * 0.7)
             if trail_r < 2:
                 continue
             
             # Create faded color
             alpha = int(100 * fade)
-            trail_color = (*self.render_color[:3], alpha)
+            trail_color = (*self.color[:3], alpha)
             
             # Draw on a temp surface for alpha
             trail_surf = pygame.Surface((trail_r * 2, trail_r * 2), pygame.SRCALPHA)
@@ -302,10 +273,9 @@ class Fighter:
     def _draw_sword(self, surface, offset, dark_border_color):
         """Draw sword with cel-shaded blade, dark directional smear, and clean tip trail."""
         ox, oy = offset
-        r = self.current_radius
+        r = self.radius
         
-        # Scale sword length with sword size multiplier
-        visual_sword_length = self.sword_length * self.sword_size_multiplier
+        visual_sword_length = self.sword_length
         
         # --- Main sword geometry ---
         base_x = self.x + math.cos(self.sword_angle) * (r + 3)
@@ -323,7 +293,7 @@ class Fighter:
             for i in range(1, len(self.sword_trail)):
                 # Fade: older segments are more transparent
                 alpha = int(255 * (i / len(self.sword_trail)) * 0.5)
-                trail_color = (*self.render_color[:3], alpha)
+                trail_color = (*self.color[:3], alpha)
                 # Draw on a temp surface for alpha support
                 x1, y1 = self.sword_trail[i - 1]
                 x2, y2 = self.sword_trail[i]
@@ -351,9 +321,9 @@ class Fighter:
         tty = tby + math.sin(tail_angle) * visual_sword_length
         
         # Deeply darkened smear color from the fighter's base color
-        smear_r = int(self.render_color[0] * 0.2)
-        smear_g = int(self.render_color[1] * 0.2)
-        smear_b = int(self.render_color[2] * 0.2)
+        smear_r = int(self.color[0] * 0.2)
+        smear_g = int(self.color[1] * 0.2)
+        smear_b = int(self.color[2] * 0.2)
         
         # Build a surface large enough for the smear + sword area
         # Use a generous bounding box around the fighter center
@@ -403,13 +373,13 @@ class Fighter:
         surface.blit(smear_surf, (int(self.x + ox) - smear_cx, int(self.y + oy) - smear_cy))
         
         # --- Thinner, Sharper Sword (drawn on top of smear) ---
-        sword_w = max(4, int(SWORD_WIDTH * self.sword_size_multiplier * 1.5))
+        sword_w = max(4, int(SWORD_WIDTH * 1.5))
         # Dark border outline (refined to fit thinner blade)
         pygame.draw.line(surface, dark_border_color,
                         (int(base_x + ox), int(base_y + oy)),
                         (int(tip_x + ox), int(tip_y + oy)), sword_w + 3)
         # Core blade matches body neon color
-        pygame.draw.line(surface, self.render_color,
+        pygame.draw.line(surface, self.color,
                         (int(base_x + ox), int(base_y + oy)),
                         (int(tip_x + ox), int(tip_y + oy)), sword_w)
     
@@ -456,13 +426,4 @@ class Fighter:
         
         self.last_hit_frame = -100
         
-        # Reset chaos event properties
         self.trail.clear()
-        self.body_size_multiplier = 1.0
-        self.sword_size_multiplier = 1.0
-        self.attack_speed_multiplier = 1.0
-        self.speed_multiplier = 1.0
-        self.current_radius = self.radius
-        self.render_color = self.color
-        self.render_color_bright = self.color_bright
-        self.health_bar_color = self.color

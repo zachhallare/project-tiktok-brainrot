@@ -29,7 +29,6 @@ from config import (
 )
 from effects import ParticleSystem, ShockwaveSystem, ArenaPulseSystem, DamageNumberSystem
 from fighter import Fighter
-from chaos_manager import ChaosManager, ChaosTextRenderer
 
 
 # Main game class - DVD logo style combat with rotating swords.
@@ -85,9 +84,7 @@ class Game:
         self.arena_pulses = ArenaPulseSystem()
         self.damage_numbers = DamageNumberSystem()
         
-        # Chaos Manager for TikTok Brainrot events
-        self.chaos = ChaosManager(self.f1_color, self.f2_color)
-        self.chaos_text = ChaosTextRenderer()
+
         
         # Screen effects.
         self.screen_shake = 0
@@ -120,17 +117,7 @@ class Game:
         self.countdown_duration = 15   # 0.25s per tick (was 45 = 0.75s)
         self.fight_duration = 15       # 0.25s for FIGHT text (was 30 = 0.5s)
         
-        # Opening chaos event pool (high-impact visual openers)
-        self.OPENING_CHAOS_POOL = [
-            "HYPER SPEED",
-            "BLACKOUT",
-            "ULTRA KNOCKBACK",
-            "DISCO FEVER",
-            "THE CRUSHER"
-        ]
-        
-        # Delay before first chaos event (1 second = 60 frames at 60 FPS)
-        self.opening_chaos_delay = 0  # 0 = not pending
+
         
         # Arena Escalation System
         self.inactivity_timer = 0
@@ -232,13 +219,7 @@ class Game:
         self.red.vx = random.uniform(-6, 6)
         self.red.vy = random.uniform(-6, 6)
     
-    def _trigger_opening_chaos(self):
-        """Immediately trigger a random high-impact chaos event at match start."""
-        # TEMPORARILY DISABLED for slash testing
-        # opener = random.choice(self.OPENING_CHAOS_POOL)
-        # self.chaos.trigger_specific_event(opener)
-        # self._play_chaos_event_sound(opener)
-        pass
+
     
     def _reset_inactivity(self):
         """Reset inactivity timer."""
@@ -298,20 +279,7 @@ class Game:
             self.countdown_beep_sound = load_sound("countdown", "countdown_beep.mp3", 0.6)
             self.sword_fight_sound = load_sound("countdown", "sword-fight.mp3", 0.5)
             
-            # === CHAOS EVENT SOUNDS (one-shots on event start) ===
-            self.chaos_sounds = {
-                "HYPER SPEED": load_sound("chaos_event", "hyper_speed.mp3", 0.5),
-                "TINY TERROR": load_sound("chaos_event", "chaos_trigger.mp3", 0.5),  # Use generic trigger
-                "DISCO FEVER": load_sound("chaos_event", "disco_fever.mp3", 0.5),
-                "THE CRUSHER": load_sound("chaos_event", "the_crusher.mp3", 0.5),
-                "BLACKOUT": load_sound("chaos_event", "blackout_start.mp3", 0.5),
-                "TRON MODE": load_sound("chaos_event", "tron_mode.mp3", 0.5),
-                "GLITCH TRAP": load_sound("chaos_event", "glitch_trap.mp3", 0.5),
-                "BREATHING ROOM": load_sound("chaos_event", "breathing_room.mp3", 0.5),
-                "MOVING WALLS": load_sound("chaos_event", "moving_walls.mp3", 0.5),
-                "ULTRA KNOCKBACK": load_sound("chaos_event", "ultra_knockback.mp3", 0.5),
-            }
-            self.chaos_trigger_sound = load_sound("chaos_event", "chaos_trigger.mp3", 0.6)
+
             
             # === CONTINUOUS/LOOP SOUNDS ===
             self.arena_shrink_warning_sound = load_sound("continuous", "arena_shrink_warning.mp3", 0.4)
@@ -325,9 +293,7 @@ class Game:
             self.wall_boost_sound = load_sound("feedback", "wall_boost.mp3", 0.3)
             self.wall_bounce_sound = load_sound("feedback", "wall_bounce.mp3", 0.25)
             
-            # Track currently playing looping sounds for chaos events
-            self.active_loop_channel = None  # Channel for looping chaos sounds
-            self.active_chaos_event_sound = None  # Currently playing event name
+        
             self.escalation_loop_channel = None  # Channel for arena shrink warning
             
             # Track countdown sound state
@@ -352,36 +318,7 @@ class Game:
             self.hit_sounds[self.hit_sound_index].play()
             self.hit_sound_index = (self.hit_sound_index + 1) % 2
     
-    def _play_chaos_event_sound(self, event_name):
-        """Play chaos event sound and start loops if needed."""
-        if not self.sounds_enabled:
-            return
-        
-        # Stop any currently playing chaos loops
-        self._stop_chaos_loops()
-        
-        # Play the trigger sound
-        if self.chaos_trigger_sound:
-            self.chaos_trigger_sound.play()
-        
-        # Play event-specific sound
-        if event_name in self.chaos_sounds and self.chaos_sounds[event_name]:
-            self.chaos_sounds[event_name].play()
-        
-        # Start continuous loops for specific events
-        if event_name == "DISCO FEVER" and self.disco_beat_sound:
-            self.active_loop_channel = self.disco_beat_sound.play(loops=-1)
-            self.active_chaos_event_sound = event_name
-        elif event_name == "TRON MODE" and self.tron_trail_hum_sound:
-            self.active_loop_channel = self.tron_trail_hum_sound.play(loops=-1)
-            self.active_chaos_event_sound = event_name
-    
-    def _stop_chaos_loops(self):
-        """Stop any chaos-related looping sounds."""
-        if self.active_loop_channel:
-            self.active_loop_channel.stop()
-            self.active_loop_channel = None
-        self.active_chaos_event_sound = None
+
     
     def _start_escalation_sound(self):
         """Start the escalation shrink warning loop."""
@@ -403,8 +340,8 @@ class Game:
         
         # Early-out: skip if defender is too far for any sword point to reach
         fighter_dist = math.hypot(attacker.x - defender.x, attacker.y - defender.y)
-        scaled_sword_length = attacker.sword_length * attacker.sword_size_multiplier
-        max_reach = attacker.current_radius + 3 + scaled_sword_length + defender.current_radius + 3
+        scaled_sword_length = attacker.sword_length
+        max_reach = attacker.radius + 3 + scaled_sword_length + defender.radius + 3
         if fighter_dist > max_reach:
             return None
         
@@ -415,8 +352,7 @@ class Game:
             check_x = base_x + (tip_x - base_x) * t
             check_y = base_y + (tip_y - base_y) * t
             dist = math.hypot(check_x - defender.x, check_y - defender.y)
-            # Tighter tolerance: current_radius + 3 (was +8)
-            if dist < defender.current_radius + 3:
+            if dist < defender.radius + 3:
                 return (check_x, check_y)
         return None
 
@@ -494,27 +430,19 @@ class Game:
                 is_crit = random.random() < CRIT_CHANCE
                 crit_mult = CRIT_MULTIPLIER if is_crit else 1.0
                 
-                # Apply combo damage multiplier + chaos damage multiplier + crit
+                # Apply damage multiplier + crit
                 damage_mult = attacker.get_attack_damage_multiplier()
-                chaos_damage_mult = self.chaos.get_damage_mult()
-                knockback_mult = self.chaos.get_knockback_mult() * crit_mult
-                total_damage_mult = damage_mult * chaos_damage_mult * crit_mult
+                total_damage_mult = damage_mult * crit_mult
                 
                 angle = math.atan2(defender.y - attacker.y, defender.x - attacker.x)
-                knockback = BASE_KNOCKBACK * knockback_mult * (1.0 + (total_damage_mult - 1.0) * 0.5) * 1.5
+                knockback = BASE_KNOCKBACK * crit_mult * (1.0 + (total_damage_mult - 1.0) * 0.5) * 1.5
                 damage = DAMAGE_PER_HIT * total_damage_mult
-                
-                # ULTRA KNOCKBACK: Massive screen shake + knockback whoosh
-                if self.chaos.is_ultra_knockback():
-                    self.screen_shake = max(self.screen_shake, SCREEN_SHAKE_INTENSITY * 3)
-                    if self.sounds_enabled and self.knockback_whoosh_sound:
-                        self.knockback_whoosh_sound.play()
                 
                 # Fixed hit-stop frames (no combo system)
                 hit_stop_frames = HIT_STOP_FRAMES
                 
                 if defender.take_damage(damage, angle, knockback, self.particles):
-                    self._trigger_hit(hit_pos[0], hit_pos[1], attacker.render_color, hit_stop_frames, damage, is_crit)
+                    self._trigger_hit(hit_pos[0], hit_pos[1], attacker.color, hit_stop_frames, damage, is_crit)
                     self.hit_slowmo_frames = HIT_SLOWMO_FRAMES
                     self._reset_inactivity()
                     
@@ -525,16 +453,7 @@ class Game:
                         self.crit_flash_phase = 1  # Start flash sequence
                         self.screen_shake = max(self.screen_shake, SCREEN_SHAKE_INTENSITY * 2)
                     
-                    # DISCO FEVER: 100% Life Steal (vampirism)
-                    life_steal = self.chaos.get_life_steal()
-                    if life_steal > 0:
-                        heal_amount = damage * life_steal
-                        attacker.health = min(attacker.max_health, attacker.health + heal_amount)
-                        # Visual feedback for healing
-                        self.particles.emit(attacker.x, attacker.y, (100, 255, 100), count=6, size=3)
-                        # Play life steal sound
-                        if self.sounds_enabled and self.healing_life_steal_sound:
-                            self.healing_life_steal_sound.play()
+
 
     def _trigger_hit(self, x, y, color, hit_stop_frames=None, damage=0, is_crit=False):
         """Apply hit effects including damage numbers."""
@@ -562,23 +481,8 @@ class Game:
             self.winner_text = "WINS"
         
         # Color state reversion and death animation rules
-        if self.chaos.is_blackout():
-            # Blackout Exception: Allow animation to run under blackout visual rules
-            # Do NOT reset chaos, use either flashing white or current blackout color for chunks
-            death_color = WHITE if loser.flash_timer > 0 else loser.render_color
-        else:
-            # Forcefully revert color state from critical hit white back to base default
-            loser.flash_timer = 0
-            death_color = loser.color
-            
-            # Reset chaos back to normal lighting/colors for physics death sequence
-            self.chaos.reset_chaos()
-            
-            # Ensure render colors revert from any modified values back to defaults
-            winner.render_color = winner.color
-            winner.render_color_bright = winner.color_bright
-            loser.render_color = loser.color
-            loser.render_color_bright = loser.color_bright
+        loser.flash_timer = 0
+        death_color = loser.color
             
         self.particles.emit_explosion(loser.x, loser.y, death_color, count=40)
         self.shockwaves.add(loser.x, loser.y, death_color, 100)
@@ -592,8 +496,6 @@ class Game:
         if self.sounds_enabled and self.death_final_hit_sound:
             self.death_final_hit_sound.play()
         
-        # Stop any chaos sounds
-        self._stop_chaos_loops()
         self._stop_escalation_sound()
 
     def _reset_round(self):
@@ -610,9 +512,6 @@ class Game:
         self.arena_pulses.clear()
         self.damage_numbers.clear()
         
-        # Reset chaos system and stop all chaos sounds
-        self.chaos.reset_chaos()
-        self._stop_chaos_loops()
         self._stop_escalation_sound()
         
         self.hit_slowmo_frames = 0
@@ -634,7 +533,7 @@ class Game:
         self.countdown_beep_played = [False, False, False]
         self.fight_sound_played = False
         self.death_sound_phase = 0
-        self.opening_chaos_delay = 0
+
         
         # Delay for OBS startup between rounds
         self.obs_startup_timer = 60
@@ -673,7 +572,7 @@ class Game:
                 if self.countdown_stage > 3:
                     self.countdown_active = False
                     self._unlock_fighters()
-                    self.opening_chaos_delay = FPS  # 1-second delay before first chaos event
+
             return
         
         if self.slow_motion and not self.round_ending:
@@ -736,11 +635,7 @@ class Game:
         
         self.round_timer += 1
         
-        # Opening chaos event delay timer
-        if self.opening_chaos_delay > 0:
-            self.opening_chaos_delay -= 1
-            if self.opening_chaos_delay <= 0:
-                self._trigger_opening_chaos()
+
         
         # Arena Escalation (Repeating Pulse)
         self.inactivity_timer += 1
@@ -748,55 +643,7 @@ class Game:
             self._trigger_arena_pulse()
             self.inactivity_timer = 0  # Reset so it pulses again in 2 seconds if still inactive
         
-        # ===== CHAOS SYSTEM UPDATE (TEMPORARILY DISABLED for slash testing) =====
-        dt = 1.0 / FPS
-        # prev_event = self.chaos.active_event  # Track for sound trigger
-        # self.chaos.update(dt, self.particles, [self.blue, self.red])
-        
-        # # Trigger chaos event sound when new event starts
-        # current_event = self.chaos.active_event
-        # if current_event and current_event != prev_event:
-        #     self._play_chaos_event_sound(current_event)
-        # elif prev_event and not current_event:
-        #     # Event ended, stop any loops
-        #     self._stop_chaos_loops()
-        
-        # Ensure fighters use default colors and sizes (no chaos modifiers)
-        for fighter in [self.blue, self.red]:
-            fighter.body_size_multiplier = 1.0
-            fighter.sword_size_multiplier = 1.0
-            fighter.attack_speed_multiplier = 1.0
-            fighter.speed_multiplier = 1.0
-            fighter.render_color = fighter.color
-            fighter.render_color_bright = fighter.color_bright
-            fighter.health_bar_color = fighter.color
-        
-        # Calculate arena bounds with Crusher/Breathing Room modifier
-        arena_mult = self.chaos.get_arena_mult()
-        if arena_mult != 1.0:
-            # Apply arena scaling (shrink for Crusher, pulse for Breathing Room)
-            if arena_mult < 1.0:
-                shrink = (1.0 - arena_mult) * min(self.arena_bounds[2], self.arena_bounds[3]) / 2
-            else:
-                # Expand for Breathing Room
-                shrink = -(arena_mult - 1.0) * min(self.arena_bounds[2], self.arena_bounds[3]) / 2
-            
-            effective_arena = (
-                max(10, self.arena_bounds[0] + shrink),
-                max(10, self.arena_bounds[1] + shrink),
-                max(200, min(SCREEN_WIDTH - 20, self.arena_bounds[2] - shrink * 2)),
-                max(200, min(SCREEN_HEIGHT - 20, self.arena_bounds[3] - shrink * 2))
-            )
-            
-            # Safety push - push fighters inside if outside bounds
-            if self.chaos.needs_crusher_safety_push():
-                for fighter in [self.blue, self.red]:
-                    ax, ay, aw, ah = effective_arena
-                    margin = fighter.current_radius + 5
-                    fighter.x = max(ax + margin, min(ax + aw - margin, fighter.x))
-                    fighter.y = max(ay + margin, min(ay + ah - margin, fighter.y))
-        else:
-            effective_arena = tuple(self.arena_bounds)
+        effective_arena = tuple(self.arena_bounds)
         
         # Update fighters with effective arena
         self.blue.update(self.red, effective_arena, self.particles, self.shockwaves)
@@ -806,7 +653,7 @@ class Game:
         dx = self.red.x - self.blue.x
         dy = self.red.y - self.blue.y
         body_dist = math.hypot(dx, dy)
-        min_sep = self.blue.current_radius + self.red.current_radius
+        min_sep = self.blue.radius + self.red.radius
         if body_dist < min_sep and body_dist > 0:
             overlap = (min_sep - body_dist) / 2.0
             nx = dx / body_dist
@@ -816,19 +663,7 @@ class Game:
             self.red.x += nx * overlap
             self.red.y += ny * overlap
         
-        # ===== CHAOS EVENT HANDLERS =====
-        
-        # TRON MODE: Check trail collisions
-        if self.chaos.is_tron_mode():
-            self._handle_tron_mode(effective_arena)
-        
-        # GLITCH TRAP: Random teleports
-        if self.chaos.is_glitch_trap():
-            self._handle_glitch_trap(effective_arena)
-        
-        # MOVING WALLS: Push fighters
-        if self.chaos.is_moving_walls():
-            self._handle_moving_walls(effective_arena)
+
         
         self._handle_combat()
         
@@ -841,47 +676,7 @@ class Game:
             self._end_round(winner=self.red, loser=self.blue)
         elif self.red.health <= 0:
             self._end_round(winner=self.blue, loser=self.red)
-    def _handle_tron_mode(self, arena_bounds):
-        """Handle TRON MODE: Opponent's trail deals damage (1 per second)."""
-        dt = 1.0 / FPS
-        for fighter, other in [(self.blue, self.red), (self.red, self.blue)]:
-            damage = self.chaos.check_tron_collision(fighter, other, dt)
-            if damage > 0 and fighter.invincible <= 0:
-                angle = math.atan2(fighter.y - other.y, fighter.x - other.x)
-                if fighter.take_damage(damage, angle, BASE_KNOCKBACK * 2, self.particles):
-                    self._trigger_hit(fighter.x, fighter.y, other.render_color, 3, damage)
-                    # Play damage tick sound for TRON trail damage
-                    if self.sounds_enabled and self.damage_tick_sound:
-                        self.damage_tick_sound.play()
-    
-    def _handle_glitch_trap(self, arena_bounds):
-        """Handle GLITCH TRAP: Random teleports with safe bounds."""
-        if self.chaos.should_glitch_teleport():
-            ax, ay, aw, ah = arena_bounds
-            
-            for fighter in [self.blue, self.red]:
-                dx, dy = self.chaos.get_glitch_teleport_offset()
-                new_x = fighter.x + dx
-                new_y = fighter.y + dy
-                
-                # Safe teleport: clamp to arena bounds
-                margin = fighter.current_radius + 5
-                new_x = max(ax + margin, min(ax + aw - margin, new_x))
-                new_y = max(ay + margin, min(ay + ah - margin, new_y))
-                
-                fighter.x = new_x
-                fighter.y = new_y
-                
-                # Visual glitch effect
-                self.particles.emit(fighter.x, fighter.y, (255, 0, 255), count=8, size=4)
-    
-    def _handle_moving_walls(self, arena_bounds):
-        """Handle MOVING WALLS: Push fighters in wall's movement direction."""
-        for fighter in [self.blue, self.red]:
-            was_pushed = self.chaos.handle_moving_wall_collision(fighter, arena_bounds)
-            # Play moving walls sound only when fighter is pushed
-            if was_pushed and self.sounds_enabled and self.wall_bounce_sound:
-                self.wall_bounce_sound.play()
+
 
     def _draw_title_screen(self):
         """Draw title screen."""
@@ -928,46 +723,22 @@ class Game:
         pygame.display.flip()
 
     def draw(self):
-        """Draw game with neon visuals and chaos effects."""
+        """Draw game with neon visuals."""
         offset = (0, 0)
         if self.screen_shake > 0:
             offset = (random.uniform(-self.screen_shake, self.screen_shake),
                      random.uniform(-self.screen_shake, self.screen_shake))
         
-        # Use chaos background color (NEON_BG normally, WHITE for Blackout)
-        bg_color = self.chaos.get_bg_color()
-        self.screen.fill(bg_color)
+        self.screen.fill(NEON_BG)
         
-        # Draw grid (unless Blackout)
-        if not self.chaos.is_blackout():
-            self._draw_grid(offset)
+        self._draw_grid(offset)
         
-        # Calculate effective arena for Crusher/Breathing Room
-        arena_mult = self.chaos.get_arena_mult()
-        if arena_mult != 1.0:
-            if arena_mult < 1.0:
-                shrink = (1.0 - arena_mult) * min(self.arena_bounds[2], self.arena_bounds[3]) / 2
-            else:
-                shrink = -(arena_mult - 1.0) * min(self.arena_bounds[2], self.arena_bounds[3]) / 2
-            draw_arena = (
-                max(10, self.arena_bounds[0] + shrink),
-                max(10, self.arena_bounds[1] + shrink),
-                max(200, min(SCREEN_WIDTH - 20, self.arena_bounds[2] - shrink * 2)),
-                max(200, min(SCREEN_HEIGHT - 20, self.arena_bounds[3] - shrink * 2))
-            )
-        else:
-            draw_arena = self.arena_bounds
+        draw_arena = self.arena_bounds
         
         ax, ay, aw, ah = draw_arena
         arena_rect = pygame.Rect(int(ax + offset[0]), int(ay + offset[1]), int(aw), int(ah))
         
-        # Arena fill color (dark, Blackout inverted, Tron very dark)
-        if self.chaos.is_blackout():
-            arena_fill = WHITE
-        elif self.chaos.is_tron_mode():
-            arena_fill = (5, 5, 10)
-        else:
-            arena_fill = BLACK
+        arena_fill = BLACK
         pygame.draw.rect(self.screen, arena_fill, arena_rect)
         
         # Draw background logo watermark
@@ -980,28 +751,9 @@ class Game:
         base_border_color = self.f1_color if (self.round_timer // 180) % 2 == 0 else self.f2_color
         
         # Arena border
-        if self.chaos.active_event in ["THE CRUSHER", "BREATHING ROOM"]:
-            border_color = self.f2_color if not self.chaos.is_blackout() else BLACK
-            border_width = 6
-        elif self.chaos.is_tron_mode():
-            border_color = base_border_color
-            border_width = 6
-        else:
-            border_color = base_border_color if not self.chaos.is_blackout() else GRAY
-            border_width = 4
+        border_color = base_border_color
+        border_width = 4
         pygame.draw.rect(self.screen, border_color, arena_rect, border_width)
-        
-        # Draw TRON trails (solid neon walls)
-        if self.chaos.is_tron_mode():
-            self._draw_tron_trails(offset)
-        
-        # Draw GLITCH rectangles
-        if self.chaos.is_glitch_trap():
-            self._draw_glitch_rects()
-        
-        # Draw MOVING WALL
-        if self.chaos.is_moving_walls():
-            self._draw_moving_wall(offset, draw_arena)
         
         self.arena_pulses.draw(self.screen, offset)
         self.shockwaves.draw(self.screen, offset)
@@ -1024,9 +776,7 @@ class Game:
             self.screen.fill(WHITE)
         # Phase 3+: Normal render (no flash)
         
-        # Draw chaos event banner (always visible, black text during Blackout)
-        if self.chaos.active_event:
-            self.chaos_text.draw_chaos_banner(self.screen, self.chaos)
+
         
         # Countdown overlay
         if self.countdown_active:
@@ -1120,7 +870,7 @@ class Game:
         pygame.draw.rect(surface, bg_color, (bar_x, bar_y, bar_width, bar_height))
         # Health fill (anchored to left edge, depletes from right)
         if blue_fill_w > 0:
-            pygame.draw.rect(surface, self.blue.render_color,
+            pygame.draw.rect(surface, self.blue.color,
                             (bar_x, bar_y, blue_fill_w, bar_height))
         # Dark border outline
         pygame.draw.rect(surface, dark_border_color, (bar_x, bar_y, bar_width, bar_height), 2)
@@ -1135,7 +885,7 @@ class Game:
         # Health fill (anchored to right edge, depletes from left)
         if red_fill_w > 0:
             fill_x = bar_x + (bar_width - red_fill_w)
-            pygame.draw.rect(surface, self.red.render_color,
+            pygame.draw.rect(surface, self.red.color,
                             (fill_x, bar_y, red_fill_w, bar_height))
         # Dark border outline
         pygame.draw.rect(surface, dark_border_color, (bar_x, bar_y, bar_width, bar_height), 2)
@@ -1159,61 +909,7 @@ class Game:
             pygame.draw.line(self.screen, NEON_GRID,
                            (0, int(y + oy)), (SCREEN_WIDTH, int(y + oy)), 1)
     
-    def _draw_tron_trails(self, offset):
-        """Draw TRON MODE solid neon trail walls."""
-        ox, oy = offset
-        trails = self.chaos.get_tron_trails()
-        
-        # Draw blue fighter's trail in neon blue
-        blue_trail = trails.get('blue', [])
-        if len(blue_trail) >= 2:
-            for i in range(1, len(blue_trail)):
-                x1, y1 = blue_trail[i-1]
-                x2, y2 = blue_trail[i]
-                pygame.draw.line(self.screen, self.f1_color,
-                               (int(x1 + ox), int(y1 + oy)),
-                               (int(x2 + ox), int(y2 + oy)), 4)
-        
-        # Draw red fighter's trail in neon red
-        red_trail = trails.get('red', [])
-        if len(red_trail) >= 2:
-            for i in range(1, len(red_trail)):
-                x1, y1 = red_trail[i-1]
-                x2, y2 = red_trail[i]
-                pygame.draw.line(self.screen, self.f2_color,
-                               (int(x1 + ox), int(y1 + oy)),
-                               (int(x2 + ox), int(y2 + oy)), 4)
-    
-    def _draw_glitch_rects(self):
-        """Draw GLITCH TRAP visual glitch rectangles."""
-        for x, y, w, h, color in self.chaos.get_glitch_rects():
-            surf = pygame.Surface((w, h), pygame.SRCALPHA)
-            surf.fill((*color, 100))  # Semi-transparent
-            self.screen.blit(surf, (x, y))
-    
-    def _draw_moving_wall(self, offset, arena_bounds):
-        """Draw MOVING WALLS vertical bar."""
-        ox, oy = offset
-        ax, ay, aw, ah = arena_bounds
-        
-        wall_x, wall_width, wall_dir = self.chaos.get_moving_wall()
-        
-        # Draw glowing wall
-        wall_rect = pygame.Rect(
-            int(wall_x - wall_width // 2 + ox),
-            int(ay + oy),
-            wall_width,
-            int(ah)
-        )
-        
-        # Glow effect
-        glow_rect = wall_rect.inflate(8, 0)
-        glow_surf = pygame.Surface((glow_rect.width, glow_rect.height), pygame.SRCALPHA)
-        pygame.draw.rect(glow_surf, (*self.f1_color, 60), glow_surf.get_rect())
-        self.screen.blit(glow_surf, glow_rect)
-        
-        # Main wall
-        pygame.draw.rect(self.screen, self.f1_color, wall_rect)
+
 
     def run(self):
         """Main loop."""

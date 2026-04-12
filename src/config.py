@@ -63,10 +63,7 @@ NEON_PALETTE = {
 GLOW_ALPHA = 50
 GLOW_RADIUS_MULT = 1.8
 
-# Chaos System Constants (tuned for ~15s matches)
-CHAOS_MIN_INTERVAL = 1.5  # seconds before event triggers (high frequency)
-CHAOS_MAX_INTERVAL = 3.0  # seconds max wait
-CHAOS_DURATION = 3.5      # seconds each event lasts
+
 
 # Motion Trail Settings
 TRAIL_LENGTH = 8          # Number of trail positions to store
