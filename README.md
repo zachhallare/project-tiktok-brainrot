@@ -123,8 +123,7 @@ project_root/
 │   ├── effects.py        # Particle, shockwave, and slash effects
 │   ├── sound_manager.py  # Sound generation utilities
 │   └── utils.py          # Helper functions
-├── record_batch.py   # Batch OBS recording script
-└── test.py           # Simulation testing mode (No OBS context)
+└── record.py         # Consolidated recording and testing script
 ```
 
 ---
@@ -145,12 +144,10 @@ python src/main.py
 # CLI Bypass: Pass colors directly (1=Red, 2=Orange, 3=Yellow, 4=Green, 5=Blue, 6=Violet)
 python src/main.py --auto-start --f1 5 --f2 1
 
-# OR: Run the batch recorder for multiple automated rounds
+# OR: Run the batch recorder for multiple automated rounds or test loops
 # Fighter colors are fully randomized for each video before launching OBS sequences!
-python record_batch.py
-
-# To run test loops WITHOUT triggering OBS recording, use test mode:
-python test.py
+# You will be prompted to run in "Test Mode" (no OBS) or "Batch Recording" (OBS)
+python record.py
 ```
 
 ---
@@ -177,7 +174,7 @@ This project is built to automate the creation of YouTube shorts content. It inc
 2. Add a **Window Capture** source and select the Python game window (`Color Battle`).
 3. In OBS, go to **Tools > WebSocket Server Settings**, enable it, and set a password.
 4. Add your password and port to your `.env` file (see Quick Start).
-5. Simply leave OBS open in the background, run `python src/main.py`, and hit space! Or run `python record_batch.py` for fully automated batch recording.
+5. Simply leave OBS open in the background, run `python src/main.py`, and hit space! Or run `python record.py` for fully automated batch recording.
 
 ---
 

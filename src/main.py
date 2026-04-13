@@ -122,6 +122,9 @@ class Game:
         # Arena Escalation System
         self.inactivity_timer = 0
         
+        # Parry Escalation System
+        self.total_parries = 0
+        
         # Game State
         self.game_state = 'TITLE'
         self.obs_startup_timer = 0
@@ -336,25 +339,28 @@ class Game:
     # Skills disabled - _spawn_skill_orb removed
 
     def _check_sword_hit(self, attacker, defender):
-        """Check if sword tip hits defender body (always active in Beyblade mode)."""
+        """Check if sword hits defender body, returning point and impact ratio."""
         
         # Early-out: skip if defender is too far for any sword point to reach
         fighter_dist = math.hypot(attacker.x - defender.x, attacker.y - defender.y)
         scaled_sword_length = attacker.sword_length
         max_reach = attacker.radius + 3 + scaled_sword_length + defender.radius + 3
         if fighter_dist > max_reach:
-            return None
+            return None, 0.0
         
         (base_x, base_y), (tip_x, tip_y) = attacker.get_sword_hitbox()
         
-        # Check outer portion of blade only (skip midpoint to avoid body-overlap phantom hits)
-        for t in [0.75, 1.0]:
+        # Check multiple points along the blade to determine impact ratio
+        steps = 10
+        # Start from base to tip to find the first point of contact
+        for i in range(1, steps + 1):
+            t = i / steps
             check_x = base_x + (tip_x - base_x) * t
             check_y = base_y + (tip_y - base_y) * t
             dist = math.hypot(check_x - defender.x, check_y - defender.y)
             if dist < defender.radius + 3:
-                return (check_x, check_y)
-        return None
+                return (check_x, check_y), t
+        return None, 0.0
 
     @staticmethod
     def _cross(o, a, b):
@@ -408,14 +414,41 @@ class Game:
                 self.blue.parry_cooldown = 15
                 self.red.parry_cooldown = 15
                 
-                # Hit-stop and screen shake
-                self.hit_stop = 8
-                self.screen_shake = 12
+                # --- Parry Escalation ---
+                self.total_parries += 1
                 
-                # Sparks at intersection point
+                # Determine escalation level & stats
+                if self.total_parries >= 15:
+                    # Level 3: Sudden Death
+                    shake_intensity = 30
+                    spark_color = (255, 255, 255)
+                    spark_count = 50
+                    speed_multiplier = 1.7
+                elif self.total_parries >= 7:
+                    # Level 2: Heated
+                    shake_intensity = 18
+                    spark_color = (255, 150, 50)
+                    spark_count = 30
+                    speed_multiplier = 1.3
+                else:
+                    # Level 1: Normal
+                    shake_intensity = 12
+                    spark_color = (255, 255, 100)
+                    spark_count = 20
+                    speed_multiplier = 1.0
+                
+                # Hit-stop and escalated screen shake
+                self.hit_stop = 8
+                self.screen_shake = shake_intensity
+                
+                # Sparks at intersection point with escalated FX
                 ix_point = self._get_intersection_point(blue_base, blue_tip, red_base, red_tip)
                 if ix_point:
-                    self.particles.emit(ix_point[0], ix_point[1], (255, 255, 200), count=20, size=4)
+                    self.particles.emit(ix_point[0], ix_point[1], spark_color, count=spark_count, size=4)
+                
+                # Apply speed buff to both fighters
+                self.blue.spin_speed = 0.25 * speed_multiplier
+                self.red.spin_speed = 0.25 * speed_multiplier
                 
                 # Play sword clash sound
                 if self.sounds_enabled and self.sword_clash_sound:
@@ -423,7 +456,7 @@ class Game:
         
         # === BODY HIT CHECK: Sword vs body (always active - Beyblade mode) ===
         for attacker, defender in [(self.blue, self.red), (self.red, self.blue)]:
-            hit_pos = self._check_sword_hit(attacker, defender)
+            hit_pos, impact_ratio = self._check_sword_hit(attacker, defender)
             if hit_pos:
                 
                 # Roll for critical hit (20% chance)
@@ -436,13 +469,51 @@ class Game:
                 
                 angle = math.atan2(defender.y - attacker.y, defender.x - attacker.x)
                 knockback = BASE_KNOCKBACK * crit_mult * (1.0 + (total_damage_mult - 1.0) * 0.5) * 1.5
-                damage = DAMAGE_PER_HIT * total_damage_mult
+                
+                # Dynamic Sweet Spot Damage System
+                if impact_ratio < 0.7:
+                    # The Grinding Hit
+                    base_damage = 10
+                    shake_intensity = 4
+                    spark_count = 10
+                    spark_color = (255, 255, 0) # Yellow
+                    spark_size = 4
+                    is_sweet_spot = False
+                else:
+                    # The Sweet Spot / Tip Hit
+                    base_damage = 35
+                    shake_intensity = 15
+                    spark_count = 30
+                    spark_color = (255, 100, 0) if random.random() < 0.5 else (255, 0, 0) # ORANGE or RED
+                    spark_size = 6
+                    is_sweet_spot = True
+                
+                damage = base_damage * total_damage_mult
+                
+                # Sudden Death: override damage to instant kill
+                if self.total_parries >= 15:
+                    damage = 9999
                 
                 # Fixed hit-stop frames (no combo system)
                 hit_stop_frames = HIT_STOP_FRAMES
                 
                 if defender.take_damage(damage, angle, knockback, self.particles):
-                    self._trigger_hit(hit_pos[0], hit_pos[1], attacker.color, hit_stop_frames, damage, is_crit)
+                    # Trigger custom hit effects instead of generic _trigger_hit
+                    self.particles.emit(hit_pos[0], hit_pos[1], spark_color, count=spark_count, size=spark_size)
+                    self.hit_stop = hit_stop_frames if hit_stop_frames else HIT_STOP_FRAMES
+                    self.screen_shake = shake_intensity if self.total_parries < 15 else shake_intensity * 2
+                    
+                    if damage > 0:
+                        self.damage_numbers.spawn(hit_pos[0], hit_pos[1] - 20, damage, attacker.color, is_crit or is_sweet_spot)
+                    
+                    # Play appropriate hit sound based on sweet spot
+                    if self.sounds_enabled:
+                        if is_sweet_spot and self.critical_hit_sound:
+                            self.critical_hit_sound.play()
+                        elif self.hit_sounds[0] and self.hit_sounds[1]:
+                            self.hit_sounds[self.hit_sound_index].play()
+                            self.hit_sound_index = (self.hit_sound_index + 1) % 2
+                    
                     self.hit_slowmo_frames = HIT_SLOWMO_FRAMES
                     self._reset_inactivity()
                     
@@ -523,6 +594,7 @@ class Game:
         self.crit_flash_phase = 0
         
         self.inactivity_timer = 0
+        self.total_parries = 0
         
         self._lock_fighters_for_countdown()
         self.countdown_stage = 0
@@ -750,9 +822,13 @@ class Game:
         # Base swap logic for border color (180 frames = 3 seconds at 60fps)
         base_border_color = self.f1_color if (self.round_timer // 180) % 2 == 0 else self.f2_color
         
-        # Arena border
-        border_color = base_border_color
-        border_width = 4
+        # Arena border — flash RED/WHITE during Sudden Death
+        if self.total_parries >= 15:
+            border_color = (255, 0, 0) if (self.round_timer // 4) % 2 == 0 else WHITE
+            border_width = 6
+        else:
+            border_color = base_border_color
+            border_width = 4
         pygame.draw.rect(self.screen, border_color, arena_rect, border_width)
         
         self.arena_pulses.draw(self.screen, offset)
@@ -766,6 +842,18 @@ class Game:
         
         self.particles.draw(self.screen, offset)
         self.damage_numbers.draw(self.screen, offset)
+        
+        # Sudden Death UI Warning
+        if self.total_parries >= 15:
+            sd_font = self.font_medium
+            sd_text = sd_font.render("SUDDEN DEATH", True, (255, 0, 0))
+            # Position just below health bars
+            sd_ax, sd_ay, sd_aw, sd_ah = self.arena_bounds
+            sd_y = sd_ay - 55  # Above arena, below HUD
+            sd_rect = sd_text.get_rect(center=(sd_ax + sd_aw // 2, sd_y))
+            # Pulsing alpha via blinking (every 8 frames)
+            if (self.round_timer // 8) % 2 == 0:
+                self.screen.blit(sd_text, sd_rect)
         
         # Critical Hit Impact Flash (drawn AFTER fighters, BEFORE UI)
         if self.crit_flash_phase == 1:
@@ -967,6 +1055,13 @@ if __name__ == "__main__":
     # Randomize two distinct fighter colors
     f1_key = random.choice(list(NEON_PALETTE.keys()))
     available = [k for k in NEON_PALETTE.keys() if k != f1_key]
+    
+    # Prevent pairing PINK ('1') and MAGENTA ('5')
+    if f1_key == '1' and '5' in available:
+        available.remove('5')
+    elif f1_key == '5' and '1' in available:
+        available.remove('1')
+        
     f2_key = random.choice(available)
     
     print(f"[MATCH STARTING]")
