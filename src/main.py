@@ -33,7 +33,9 @@ from fighter import Fighter
 
 # Main game class - DVD logo style combat with rotating swords.
 class Game:    
-    def __init__(self, f1_color, f2_color):
+    def __init__(self, f1_color, f2_color, f1_name="Blue", f2_name="Red"):
+        self.f1_name = f1_name
+        self.f2_name = f2_name
         self.f1_color = f1_color
         self.f1_bright = tuple(min(255, c + 100) for c in f1_color)
         self.f2_color = f2_color
@@ -187,11 +189,50 @@ class Game:
                 
     def _stop_obs_recording(self):
         """Stop OBS recording if connected."""
+        import os
+        import time
+        import glob
         if self.obs_client and self.is_recording:
             try:
+                # Retrieve Recording Path
+                record_dir_resp = self.obs_client.get_record_directory()
+                record_dir = record_dir_resp.record_directory
+                
+                # Execute Stop
                 self.obs_client.stop_record()
                 self.is_recording = False
-                print("[OBS] ⏹️ CUT! Recording Saved.")
+                
+                # The Renaming Sequence
+                files = glob.glob(os.path.join(record_dir, "*.mp4"))
+                if files:
+                    latest_file = max(files, key=os.path.getctime)
+                    name1 = self.f1_name.capitalize()
+                    name2 = self.f2_name.capitalize()
+                    new_filename = f"Who Wins {name1} vs {name2}.mp4"
+                    new_path = os.path.join(record_dir, new_filename)
+                    
+                    # Handle Conflicts
+                    if os.path.exists(new_path):
+                        new_filename = f"Who Wins {name1} vs {name2}_{int(time.time())}.mp4"
+                        new_path = os.path.join(record_dir, new_filename)
+                        
+                    # Retry loop to wait for OBS to release the file lock
+                    max_retries = 20
+                    retry_delay = 0.5
+                    success = False
+                    for i in range(max_retries):
+                        try:
+                            os.rename(latest_file, new_path)
+                            print(f"[OBS] File renamed to: {new_filename}")
+                            success = True
+                            break
+                        except OSError:
+                            time.sleep(retry_delay)
+                            
+                    if not success:
+                        print(f"[OBS] Failed to rename. File might still be locked: {latest_file}")
+                else:
+                    print("[OBS] ⏹️ CUT! Recording Saved.")
             except Exception as e:
                 print(f"[OBS] Stop recording failed: {e}")
     
@@ -1052,5 +1093,5 @@ if __name__ == "__main__":
     print(f"Fighter 1: {name_1}")
     print(f"Fighter 2: {name_2}")
     
-    game = Game(BASE_COLORS[name_1], BASE_COLORS[name_2])
+    game = Game(BASE_COLORS[name_1], BASE_COLORS[name_2], name_1, name_2)
     game.run()
