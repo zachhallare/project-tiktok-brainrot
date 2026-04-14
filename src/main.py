@@ -24,7 +24,7 @@ from config import (
     HIT_SLOWMO_FRAMES, HIT_SLOWMO_TIMESCALE,
     INACTIVITY_PULSE_TIME, ARENA_PULSE_VELOCITY_BOOST,
     ARENA_PULSE_SHAKE,
-    NEON_RED, NEON_BLUE, NEON_BG, NEON_GRID,
+    NEON_BG, NEON_GRID,
     CRIT_CHANCE, CRIT_MULTIPLIER, CRIT_IMPACT_FRAMES, CRIT_IMPACT_TIMESCALE
 )
 from effects import ParticleSystem, ShockwaveSystem, ArenaPulseSystem, DamageNumberSystem
@@ -33,18 +33,11 @@ from fighter import Fighter
 
 # Main game class - DVD logo style combat with rotating swords.
 class Game:    
-    def __init__(self, f1_key='5', f2_key='1'):
-        from config import NEON_PALETTE
-        
-        f1_name, f1_col, f1_bright = NEON_PALETTE.get(f1_key, NEON_PALETTE['5'])
-        f2_name, f2_col, f2_bright = NEON_PALETTE.get(f2_key, NEON_PALETTE['1'])
-        
-        self.f1_color = f1_col
-        self.f1_bright = f1_bright
-        self.f1_name = f1_name
-        self.f2_color = f2_col
-        self.f2_bright = f2_bright
-        self.f2_name = f2_name
+    def __init__(self, f1_color, f2_color):
+        self.f1_color = f1_color
+        self.f1_bright = tuple(min(255, c + 100) for c in f1_color)
+        self.f2_color = f2_color
+        self.f2_bright = tuple(min(255, c + 100) for c in f2_color)
         
         # Initialize pygame modules
         pygame.init()
@@ -1050,23 +1043,14 @@ class Game:
 if __name__ == "__main__":
     import sys
     import random
-    from config import NEON_PALETTE
+    from config import BASE_COLORS
     
-    # Randomize two distinct fighter colors
-    f1_key = random.choice(list(NEON_PALETTE.keys()))
-    available = [k for k in NEON_PALETTE.keys() if k != f1_key]
+    # Randomly pick two distinct color names from the 12-slice wheel
+    name_1, name_2 = random.sample(list(BASE_COLORS.keys()), 2)
     
-    # Prevent pairing PINK ('1') and MAGENTA ('5')
-    if f1_key == '1' and '5' in available:
-        available.remove('5')
-    elif f1_key == '5' and '1' in available:
-        available.remove('1')
-        
-    f2_key = random.choice(available)
+    print("[MATCH STARTING]")
+    print(f"Fighter 1: {name_1}")
+    print(f"Fighter 2: {name_2}")
     
-    print(f"[MATCH STARTING]")
-    print(f"Fighter 1: {NEON_PALETTE[f1_key][0]}")
-    print(f"Fighter 2: {NEON_PALETTE[f2_key][0]}")
-    
-    game = Game(f1_key, f2_key)
+    game = Game(BASE_COLORS[name_1], BASE_COLORS[name_2])
     game.run()

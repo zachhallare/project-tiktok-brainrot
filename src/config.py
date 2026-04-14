@@ -25,39 +25,42 @@ BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
 DARK_GRAY = (30, 30, 30)
 GRAY = (60, 60, 60)
-BLUE = (50, 150, 255)
-BLUE_BRIGHT = (120, 200, 255)
-RED = (255, 80, 80)
-RED_BRIGHT = (255, 150, 150)
 YELLOW = (255, 220, 100)
-GREEN = (100, 255, 150)
 PURPLE = (200, 100, 255)
-CYAN = (100, 255, 255)
-ORANGE = (255, 180, 80)
 
-# Cyberpunk/Neon Color Palette (YT Shorts Brainrot Style)
-NEON_PINK = (255, 110, 255)
-NEON_BLUE = (0, 255, 255)
-NEON_YELLOW = (255, 255, 0)
-NEON_ORANGE = (255, 94, 0)
-NEON_MAGENTA = (255, 0, 204)
-NEON_GREEN = (204, 255, 0)
-NEON_RED = (255, 53, 94)
-NEON_PURPLE = (191, 0, 255)
+# 12-Slice Color Wheel Palette
+RED = (255, 0, 0)
+ORANGE = (255, 128, 0)
+# YELLOW already defined above as UI color; wheel yellow below is pure (255,255,0)
+LIME = (128, 255, 0)
+GREEN = (0, 255, 0)
+SPRING = (0, 255, 128)
+CYAN = (0, 255, 255)
+AZURE = (0, 128, 255)
+BLUE = (0, 0, 255)
+PURPLE_WHEEL = (128, 0, 255)
+MAGENTA = (255, 0, 255)
+ROSE = (255, 0, 128)
+YELLOW_WHEEL = (255, 255, 0)
 
+BASE_COLORS = {
+    "RED": RED,
+    "ORANGE": ORANGE,
+    "YELLOW": YELLOW_WHEEL,
+    "LIME": LIME,
+    "GREEN": GREEN,
+    "SPRING": SPRING,
+    "CYAN": CYAN,
+    "AZURE": AZURE,
+    "BLUE": BLUE,
+    "PURPLE": PURPLE_WHEEL,
+    "MAGENTA": MAGENTA,
+    "ROSE": ROSE
+}
+
+# Background / Grid (kept for arena drawing)
 NEON_BG = (20, 20, 25)
 NEON_GRID = (35, 35, 45)
-
-NEON_PALETTE = {
-    '1': ('PINK', NEON_PINK, (255, 180, 255)),
-    '2': ('BLUE', NEON_BLUE, (150, 255, 255)),
-    '3': ('YELLOW', NEON_YELLOW, (255, 255, 150)),
-    '4': ('ORANGE', NEON_ORANGE, (255, 170, 120)),
-    '5': ('MAGENTA', NEON_MAGENTA, (255, 120, 230)),
-    '6': ('GREEN', NEON_GREEN, (230, 255, 150)),
-    '7': ('RED', NEON_RED, (255, 140, 160)),
-    '8': ('PURPLE', NEON_PURPLE, (220, 130, 255))
-}
 
 # Glow/Bloom settings
 GLOW_ALPHA = 50
@@ -122,10 +125,6 @@ ARENA_PULSE_SHAKE = 6  # Screen shake intensity for pulse
 GAME_SETTINGS = {
     'num_rounds': 3,
     'best_of': 3,
-    'blue_color': BLUE,
-    'blue_bright': BLUE_BRIGHT,
-    'red_color': RED,
-    'red_bright': RED_BRIGHT,
     'arena_size': 500,
     'slow_motion_death': True,
 }
