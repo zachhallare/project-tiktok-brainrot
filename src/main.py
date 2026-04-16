@@ -261,13 +261,32 @@ class Game:
         self.red.sword_angle = math.pi
     
     def _unlock_fighters(self):
-        """Unlock fighters with random velocity."""
+        """Unlock fighters and trigger a magnetic pulse toward the center."""
         self.blue.locked = False
         self.red.locked = False
-        self.blue.vx = random.uniform(-6, 6)
-        self.blue.vy = random.uniform(-6, 6)
-        self.red.vx = random.uniform(-6, 6)
-        self.red.vy = random.uniform(-6, 6)
+        
+        # Trigger the visual and audio pulse effect
+        self._trigger_arena_pulse()
+        
+        # Launch them directly at the center for a massive opening clash
+        from config import SCREEN_WIDTH, SCREEN_HEIGHT
+        import math
+        
+        center_x = SCREEN_WIDTH // 2
+        center_y = SCREEN_HEIGHT // 2
+        
+        # Calculate launch vectors
+        dx_b = center_x - self.blue.x
+        dy_b = center_y - self.blue.y
+        dist_b = max(1, math.hypot(dx_b, dy_b))
+        self.blue.vx = (dx_b / dist_b) * 18  # High-speed initial launch
+        self.blue.vy = (dy_b / dist_b) * 18
+        
+        dx_r = center_x - self.red.x
+        dy_r = center_y - self.red.y
+        dist_r = max(1, math.hypot(dx_r, dy_r))
+        self.red.vx = (dx_r / dist_r) * 18
+        self.red.vy = (dy_r / dist_r) * 18
     
 
     
@@ -453,49 +472,74 @@ class Game:
         
         if self._segments_intersect(blue_base, blue_tip, red_base, red_tip):
             if self.blue.parry_cooldown <= 0 and self.red.parry_cooldown <= 0:
-                # Reverse both spin directions
-                self.blue.spin_direction *= -1
-                self.red.spin_direction *= -1
                 
-                # Set parry cooldown
-                self.blue.parry_cooldown = 15
-                self.red.parry_cooldown = 15
-                
-                # --- Parry Escalation ---
-                self.total_parries += 1
-                
-                # Determine escalation level & stats
-                if self.total_parries >= 15:
-                    # Level 3: Sudden Death
-                    shake_intensity = 30
-                    spark_color = (255, 255, 255)
-                    spark_count = 50
-                    speed_multiplier = 1.7
-                elif self.total_parries >= 7:
-                    # Level 2: Heated
-                    shake_intensity = 18
-                    spark_color = (255, 150, 50)
-                    spark_count = 30
-                    speed_multiplier = 1.3
-                else:
-                    # Level 1: Normal
-                    shake_intensity = 12
-                    spark_color = (255, 255, 100)
-                    spark_count = 20
-                    speed_multiplier = 1.0
-                
-                # Hit-stop and escalated screen shake
-                self.hit_stop = 8
-                self.screen_shake = shake_intensity
-                
-                # Sparks at intersection point with escalated FX
                 ix_point = self._get_intersection_point(blue_base, blue_tip, red_base, red_tip)
-                if ix_point:
-                    self.particles.emit(ix_point[0], ix_point[1], spark_color, count=spark_count, size=4)
+                if not ix_point:
+                    ix_point = ((blue_base[0] + red_base[0]) / 2, (blue_base[1] + red_base[1]) / 2)
                 
-                # Apply speed buff to both fighters
-                self.blue.spin_speed = 0.25 * speed_multiplier
-                self.red.spin_speed = 0.25 * speed_multiplier
+                both_parried = True
+                for fighter in (self.blue, self.red):
+                    if fighter.parry_energy >= fighter.parry_cost:
+                        # SUCCESSFUL PARRY
+                        fighter.parry_energy -= fighter.parry_cost
+                        fighter.spin_direction *= -1
+                        fighter.parry_cooldown = 15
+                    else:
+                        both_parried = False
+                        # GUARD BREAK! (Energy depleted)
+                        # Spawn massive red/white 'Guard Break' sparks
+                        self.particles.emit(ix_point[0], ix_point[1], (255, 0, 0), count=40, size=6)
+                        self.particles.emit(ix_point[0], ix_point[1], (255, 255, 255), count=20, size=4)
+
+                        # Dynamic Penalty Damage: Highly variable, between 35 and 60 damage
+                        guard_break_dmg = random.randint(35, 60)
+                        fighter.health -= guard_break_dmg 
+                        fighter.parry_energy = 0 # Reset energy to zero
+
+                        # Apply aggressive hit-stun knockback to the defender
+                        fighter.vx = -fighter.vx * 1.5
+                        fighter.vy = -fighter.vy * 1.5
+                        fighter.parry_cooldown = 30 # Longer penalty
+
+                        if guard_break_dmg > 0:
+                            self.damage_numbers.spawn(ix_point[0], ix_point[1] - 30, guard_break_dmg, fighter.color, True)
+
+                if both_parried:
+                    # --- Parry Escalation ---
+                    self.total_parries += 1
+                    
+                    # Determine escalation level & stats
+                    if self.total_parries >= 15:
+                        # Level 3: Sudden Death
+                        shake_intensity = 30
+                        spark_color = (255, 255, 255)
+                        spark_count = 50
+                        speed_multiplier = 1.7
+                    elif self.total_parries >= 7:
+                        # Level 2: Heated
+                        shake_intensity = 18
+                        spark_color = (255, 150, 50)
+                        spark_count = 30
+                        speed_multiplier = 1.3
+                    else:
+                        # Level 1: Normal
+                        shake_intensity = 12
+                        spark_color = (255, 255, 100)
+                        spark_count = 20
+                        speed_multiplier = 1.0
+                    
+                    # Hit-stop and escalated screen shake
+                    self.hit_stop = 8
+                    self.screen_shake = shake_intensity
+                    
+                    self.particles.emit(ix_point[0], ix_point[1], spark_color, count=spark_count, size=4)
+                    
+                    # Apply speed buff to both fighters
+                    self.blue.spin_speed = 0.25 * speed_multiplier
+                    self.red.spin_speed = 0.25 * speed_multiplier
+                else:
+                    self.hit_stop = 12
+                    self.screen_shake = 20
                 
                 # Play sword clash sound
                 if self.sounds_enabled and self.sword_clash_sound:
@@ -536,10 +580,6 @@ class Game:
                     is_sweet_spot = True
                 
                 damage = base_damage * total_damage_mult
-                
-                # Sudden Death: override damage to instant kill
-                if self.total_parries >= 15:
-                    damage = 9999
                 
                 # Fixed hit-stop frames (no combo system)
                 hit_stop_frames = HIT_STOP_FRAMES
@@ -1095,34 +1135,62 @@ class Game:
         bg_color = (30, 30, 30)
         dark_border_color = (60, 60, 60)  # Cel-shaded dark outline
         
+        # Calculate Danger Zone Offsets (10% HP threshold)
+        blue_hp_pct = max(0.0, self.blue.health / self.blue.max_health)
+        blue_shake_x = random.randint(-4, 4) if blue_hp_pct <= 0.10 else 0
+        blue_shake_y = random.randint(-4, 4) if blue_hp_pct <= 0.10 else 0
+        
+        red_hp_pct = max(0.0, self.red.health / self.red.max_health)
+        red_shake_x = random.randint(-4, 4) if red_hp_pct <= 0.10 else 0
+        red_shake_y = random.randint(-4, 4) if red_hp_pct <= 0.10 else 0
+        
         # --- Blue (Left) Bar: depletes right-to-left, anchored to left arena wall ---
         bar_x = ax
-        blue_hp_ratio = max(0.0, self.blue.health / self.blue.max_health)
-        blue_fill_w = int(bar_width * blue_hp_ratio)
+        blue_fill_w = int(bar_width * blue_hp_pct)
         
         # Background (missing health)
-        pygame.draw.rect(surface, bg_color, (bar_x, bar_y, bar_width, bar_height))
+        pygame.draw.rect(surface, bg_color, (bar_x + blue_shake_x, bar_y + blue_shake_y, bar_width, bar_height))
         # Health fill (anchored to left edge, depletes from right)
         if blue_fill_w > 0:
             pygame.draw.rect(surface, self.blue.color,
-                            (bar_x, bar_y, blue_fill_w, bar_height))
+                            (bar_x + blue_shake_x, bar_y + blue_shake_y, blue_fill_w, bar_height))
         # Dark border outline
-        pygame.draw.rect(surface, dark_border_color, (bar_x, bar_y, bar_width, bar_height), 2)
+        pygame.draw.rect(surface, dark_border_color, (bar_x + blue_shake_x, bar_y + blue_shake_y, bar_width, bar_height), 2)
+        
+        # Blue Energy Bar
+        energy_pct_blue = max(0.0, self.blue.parry_energy / self.blue.max_parry_energy)
+        energy_bar_width = bar_width
+        energy_bar_y = bar_y + bar_height + 4
+        # Draw background (dark gray)
+        pygame.draw.rect(surface, (40, 40, 40), (bar_x + blue_shake_x, energy_bar_y + blue_shake_y, energy_bar_width, 3))
+        # Draw current energy (cyan)
+        if energy_pct_blue > 0:
+            pygame.draw.rect(surface, (0, 255, 255), (bar_x + blue_shake_x, energy_bar_y + blue_shake_y, int(energy_bar_width * energy_pct_blue), 3))
         
         # --- Red (Right) Bar: depletes left-to-right, anchored to right arena wall ---
         bar_x = ax + aw - bar_width
-        red_hp_ratio = max(0.0, self.red.health / self.red.max_health)
-        red_fill_w = int(bar_width * red_hp_ratio)
+        red_fill_w = int(bar_width * red_hp_pct)
         
         # Background (missing health)
-        pygame.draw.rect(surface, bg_color, (bar_x, bar_y, bar_width, bar_height))
+        pygame.draw.rect(surface, bg_color, (bar_x + red_shake_x, bar_y + red_shake_y, bar_width, bar_height))
         # Health fill (anchored to right edge, depletes from left)
         if red_fill_w > 0:
             fill_x = bar_x + (bar_width - red_fill_w)
             pygame.draw.rect(surface, self.red.color,
-                            (fill_x, bar_y, red_fill_w, bar_height))
+                            (fill_x + red_shake_x, bar_y + red_shake_y, red_fill_w, bar_height))
         # Dark border outline
-        pygame.draw.rect(surface, dark_border_color, (bar_x, bar_y, bar_width, bar_height), 2)
+        pygame.draw.rect(surface, dark_border_color, (bar_x + red_shake_x, bar_y + red_shake_y, bar_width, bar_height), 2)
+        
+        # Red Energy Bar
+        energy_pct_red = max(0.0, self.red.parry_energy / self.red.max_parry_energy)
+        red_energy_x = bar_x + (bar_width - energy_bar_width)
+        # Draw background (dark gray)
+        pygame.draw.rect(surface, (40, 40, 40), (red_energy_x + red_shake_x, energy_bar_y + red_shake_y, energy_bar_width, 3))
+        # Draw current energy (cyan)
+        if energy_pct_red > 0:
+            red_energy_fill_w = int(energy_bar_width * energy_pct_red)
+            red_energy_fill_x = red_energy_x + (energy_bar_width - red_energy_fill_w)
+            pygame.draw.rect(surface, (0, 255, 255), (red_energy_fill_x + red_shake_x, energy_bar_y + red_shake_y, red_energy_fill_w, 3))
         
         # --- VS Text (centered between the two bars) ---
         vs_font = self.font_small

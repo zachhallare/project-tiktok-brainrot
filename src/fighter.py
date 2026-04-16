@@ -44,6 +44,10 @@ class Fighter:
         self.spin_direction = 1 if self.is_blue else -1
         self.spin_speed = 0.25
         self.parry_cooldown = 0
+        self.max_parry_energy = 100.0
+        self.parry_energy = self.max_parry_energy
+        self.energy_regen_rate = 0.5  # Recharges slowly over time
+        self.parry_cost = 35.0  # ~3 rapid parries before a Guard Break
         self.sword_trail = []  # Tip positions for clean visual trail
         
         # Visual
@@ -80,6 +84,8 @@ class Fighter:
         # Skip update if locked (during countdown)
         if self.locked:
             return
+        
+        self.parry_energy = min(self.max_parry_energy, self.parry_energy + self.energy_regen_rate)
         
         # Update trail (store previous positions for motion trail effect)
         self.trail.insert(0, (self.x, self.y))
@@ -416,6 +422,7 @@ class Fighter:
         self.spin_direction = 1 if self.is_blue else -1
         self.spin_speed = 0.25
         self.parry_cooldown = 0
+        self.parry_energy = self.max_parry_energy
         self.sword_trail = []
         
         self.flash_timer = 0
