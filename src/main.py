@@ -621,44 +621,44 @@ class Game:
         winner_color_name = self.f1_name if winner == self.blue else self.f2_name
         loser_color_name = self.f2_name if winner == self.blue else self.f1_name
 
-        # Expanded 15-Title Pools
-        if hp_percent <= 15:
+        # Expanded 15-Title Pools (SPOILER-FREE)
+        if hp_percent <= 10:
             category = "clutch"
             titles = [
-                f"THE GREATEST {winner_color_name} COMEBACK?!",
-                f"1 HP CLUTCH! {winner_color_name} Survived The Impossible!",
-                f"Never count {winner_color_name} out... INSANE Ending!",
-                f"They thought {winner_color_name} was done... (Wait for it)!",
-                f"The Ultimate Underdog: {winner_color_name} Steals The Win!",
-                f"{winner_color_name} was at 1 HP... What Happened Next Will Shock You!",
-                f"Greatest Plot Twist: {winner_color_name} Refuses to Die!",
-                f"99% of people thought {loser_color_name} had this... Then {winner_color_name} woke up!",
-                f"A literal miracle for {winner_color_name} in the final seconds!",
-                f"{loser_color_name} choked a massive lead against {winner_color_name}!",
-                f"How did {winner_color_name} survive that?! (1 HP Comeback)",
-                f"The exact moment {winner_color_name} turned the tables!",
-                f"{winner_color_name} secures the craziest buzzer-beater win!",
-                f"From the brink of defeat: {winner_color_name}’s legendary clutch!",
-                f"Do not swipe away... {winner_color_name}'s comeback is pure cinema!"
+                f"The greatest 1 HP comeback in AlgoRot history?!",
+                f"Someone actually survived on 1 HP! ({self.f1_name} vs {self.f2_name})",
+                f"Never count them out... INSANE Ending!",
+                f"They thought it was over... (Wait for it)",
+                f"The Ultimate Underdog Story: {self.f1_name} vs {self.f2_name}!",
+                f"A literal miracle in the final seconds!",
+                f"Greatest Plot Twist: Someone refuses to die!",
+                f"99% of people thought this was over... Then they woke up!",
+                f"How did they survive that?! (1 HP Comeback)",
+                f"A massive lead just got CHOKED in {self.f1_name} vs {self.f2_name}!",
+                f"The exact moment the tables turned!",
+                f"The craziest buzzer-beater win yet!",
+                f"From the brink of defeat: A legendary clutch!",
+                f"Do not swipe away... this comeback is pure cinema!",
+                f"{self.f1_name} vs {self.f2_name} goes down to the wire!"
             ]
-        elif hp_percent >= 50:
+        elif hp_percent >= 75:
             category = "blowout"
             titles = [
-                f"{winner_color_name} ABSOLUTELY DOMINATES!",
-                f"Is {winner_color_name} the most broken color in AlgoRot?!",
-                f"FLAWLESS VICTORY! {winner_color_name} destroys {loser_color_name}!",
-                f"Nobody can stop {winner_color_name}... Just watch.",
-                f"{loser_color_name} didn't stand a chance against {winner_color_name}!",
-                f"The most one-sided battle in AlgoRot history ({winner_color_name} wins)!",
-                f"Pure Destruction: {winner_color_name} dismantles {loser_color_name}!",
-                f"{winner_color_name} just proved they are the final boss!",
-                f"A masterclass in physics by {winner_color_name}!",
-                f"{loser_color_name} got absolutely vaporized by {winner_color_name}...",
-                f"Speedrun? {winner_color_name} finishes {loser_color_name} with no mercy!",
-                f"Is {winner_color_name} cheating?! (Flawless Win)",
-                f"{winner_color_name} casually wiping the floor with {loser_color_name}.",
-                f"Total annihilation: {winner_color_name} takes zero damage!",
-                f"{loser_color_name} needs to be deleted after what {winner_color_name} did to them."
+                f"ABSOLUTE DOMINATION! ({self.f1_name} vs {self.f2_name})",
+                f"Is one of these colors broken in AlgoRot?!",
+                f"FLAWLESS VICTORY! Someone gets destroyed!",
+                f"Nobody can stop them... Just watch.",
+                f"They didn't stand a chance...",
+                f"The most one-sided battle in AlgoRot history!",
+                f"Pure Destruction: {self.f1_name} vs {self.f2_name}!",
+                f"Someone just proved they are the final boss!",
+                f"A masterclass in physics!",
+                f"Someone got absolutely vaporized...",
+                f"Speedrun? Finished with NO MERCY!",
+                f"Are they cheating?! (Flawless Win)",
+                f"Casually wiping the floor with their opponent.",
+                f"Total annihilation: Zero damage taken!",
+                f"They need to be deleted after what just happened."
             ]
         else:
             category = "standard"
@@ -672,7 +672,7 @@ class Game:
                 f"You won't believe how {self.f1_name} vs {self.f2_name} ends!",
                 f"Are we dreaming?! {self.f1_name} vs {self.f2_name} goes off the rails!",
                 f"This collision between {self.f1_name} and {self.f2_name} broke the engine!",
-                f"The most intense {self.f1_name} vs {self.f2_name} rivalry yet!",
+                f"The most intense rivalry yet! ({self.f1_name} vs {self.f2_name})",
                 f"Pure satisfying chaos: {self.f1_name} vs {self.f2_name} Sudden Death!",
                 f"My brain melted watching {self.f1_name} vs {self.f2_name}...",
                 f"Who are you rooting for? ({self.f1_name} vs {self.f2_name} Epic Ending)",
