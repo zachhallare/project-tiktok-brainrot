@@ -2,6 +2,7 @@ import pygame
 import math
 import random
 import os
+import json
 
 try:
     from dotenv import load_dotenv
@@ -208,13 +209,25 @@ class Game:
                     latest_file = max(files, key=os.path.getctime)
                     name1 = self.f1_name.capitalize()
                     name2 = self.f2_name.capitalize()
-                    new_filename = f"Who Wins {name1} vs {name2}.mp4"
-                    new_path = os.path.join(record_dir, new_filename)
                     
-                    # Handle Conflicts
-                    if os.path.exists(new_path):
-                        new_filename = f"Who Wins {name1} vs {name2}_{int(time.time())}.mp4"
+                    if hasattr(self, 'viral_title_idea') and self.viral_title_idea:
+                        # Sanitize string for valid Windows filename format
+                        safe_title = "".join(c for c in self.viral_title_idea if c not in r'\/:*?"<>|').strip()
+                        new_filename = f"{safe_title}.mp4"
+                        
+                        # Handle Conflicts
                         new_path = os.path.join(record_dir, new_filename)
+                        if os.path.exists(new_path):
+                            new_filename = f"{safe_title}_{int(time.time())}.mp4"
+                            new_path = os.path.join(record_dir, new_filename)
+                    else:
+                        new_filename = f"Who Wins {name1} vs {name2}.mp4"
+                        new_path = os.path.join(record_dir, new_filename)
+                        
+                        # Handle Conflicts
+                        if os.path.exists(new_path):
+                            new_filename = f"Who Wins {name1} vs {name2}_{int(time.time())}.mp4"
+                            new_path = os.path.join(record_dir, new_filename)
                         
                     # Retry loop to wait for OBS to release the file lock
                     max_retries = 20
@@ -602,6 +615,105 @@ class Game:
             self.death_final_hit_sound.play()
         
         self._stop_escalation_sound()
+        
+        # Calculate winner's remaining health percentage
+        hp_percent = (winner.health / winner.max_health) * 100
+        winner_color_name = self.f1_name if winner == self.blue else self.f2_name
+        loser_color_name = self.f2_name if winner == self.blue else self.f1_name
+
+        # Expanded 15-Title Pools
+        if hp_percent <= 15:
+            category = "clutch"
+            titles = [
+                f"THE GREATEST {winner_color_name} COMEBACK?!",
+                f"1 HP CLUTCH! {winner_color_name} Survived The Impossible!",
+                f"Never count {winner_color_name} out... INSANE Ending!",
+                f"They thought {winner_color_name} was done... (Wait for it)!",
+                f"The Ultimate Underdog: {winner_color_name} Steals The Win!",
+                f"{winner_color_name} was at 1 HP... What Happened Next Will Shock You!",
+                f"Greatest Plot Twist: {winner_color_name} Refuses to Die!",
+                f"99% of people thought {loser_color_name} had this... Then {winner_color_name} woke up!",
+                f"A literal miracle for {winner_color_name} in the final seconds!",
+                f"{loser_color_name} choked a massive lead against {winner_color_name}!",
+                f"How did {winner_color_name} survive that?! (1 HP Comeback)",
+                f"The exact moment {winner_color_name} turned the tables!",
+                f"{winner_color_name} secures the craziest buzzer-beater win!",
+                f"From the brink of defeat: {winner_color_name}’s legendary clutch!",
+                f"Do not swipe away... {winner_color_name}'s comeback is pure cinema!"
+            ]
+        elif hp_percent >= 50:
+            category = "blowout"
+            titles = [
+                f"{winner_color_name} ABSOLUTELY DOMINATES!",
+                f"Is {winner_color_name} the most broken color in AlgoRot?!",
+                f"FLAWLESS VICTORY! {winner_color_name} destroys {loser_color_name}!",
+                f"Nobody can stop {winner_color_name}... Just watch.",
+                f"{loser_color_name} didn't stand a chance against {winner_color_name}!",
+                f"The most one-sided battle in AlgoRot history ({winner_color_name} wins)!",
+                f"Pure Destruction: {winner_color_name} dismantles {loser_color_name}!",
+                f"{winner_color_name} just proved they are the final boss!",
+                f"A masterclass in physics by {winner_color_name}!",
+                f"{loser_color_name} got absolutely vaporized by {winner_color_name}...",
+                f"Speedrun? {winner_color_name} finishes {loser_color_name} with no mercy!",
+                f"Is {winner_color_name} cheating?! (Flawless Win)",
+                f"{winner_color_name} casually wiping the floor with {loser_color_name}.",
+                f"Total annihilation: {winner_color_name} takes zero damage!",
+                f"{loser_color_name} needs to be deleted after what {winner_color_name} did to them."
+            ]
+        else:
+            category = "standard"
+            titles = [
+                f"{self.f1_name} vs {self.f2_name} ends in SHOCKING Sudden Death!",
+                f"The physics in this {self.f1_name} vs {self.f2_name} match went CRAZY!",
+                f"10 Parries Later... {self.f1_name} vs {self.f2_name} goes Nuclear!",
+                f"This {self.f1_name} vs {self.f2_name} Sudden Death will give you chills!",
+                f"NO WAY! The {self.f1_name} vs {self.f2_name} Match Was Too Close!",
+                f"Wait until the end of this {self.f1_name} vs {self.f2_name} fight!",
+                f"You won't believe how {self.f1_name} vs {self.f2_name} ends!",
+                f"Are we dreaming?! {self.f1_name} vs {self.f2_name} goes off the rails!",
+                f"This collision between {self.f1_name} and {self.f2_name} broke the engine!",
+                f"The most intense {self.f1_name} vs {self.f2_name} rivalry yet!",
+                f"Pure satisfying chaos: {self.f1_name} vs {self.f2_name} Sudden Death!",
+                f"My brain melted watching {self.f1_name} vs {self.f2_name}...",
+                f"Who are you rooting for? ({self.f1_name} vs {self.f2_name} Epic Ending)",
+                f"Gravity stopped working in this {self.f1_name} vs {self.f2_name} clash!",
+                f"The exact moment {self.f1_name} vs {self.f2_name} turned into a movie!"
+            ]
+
+        # Persistent JSON Tracker Logic (INDEX-BASED)
+        tracker_file = "used_titles.json"
+        
+        # Load existing tracker data
+        if os.path.exists(tracker_file):
+            with open(tracker_file, 'r') as f:
+                tracker_data = json.load(f)
+        else:
+            tracker_data = {"clutch": [], "blowout": [], "standard": []}
+            
+        # Ensure category exists
+        if category not in tracker_data:
+            tracker_data[category] = []
+            
+        # Find available indices (0 to len(titles)-1)
+        available_indices = [i for i in range(len(titles)) if i not in tracker_data[category]]
+        
+        # If all indices in this category have been used, reset the pool
+        if not available_indices:
+            print(f"[INFO] All '{category}' titles used. Resetting pool.")
+            tracker_data[category] = []
+            available_indices = list(range(len(titles)))
+            
+        # Pick a random index from the available ones
+        chosen_index = random.choice(available_indices)
+        title_idea = titles[chosen_index]
+        self.viral_title_idea = title_idea
+        
+        # Save the picked index to the tracker (not the string)
+        tracker_data[category].append(chosen_index)
+        with open(tracker_file, 'w') as f:
+            json.dump(tracker_data, f, indent=4)
+            
+
 
     def _reset_round(self):
         """Reset round."""
