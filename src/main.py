@@ -30,6 +30,9 @@ from config import (
 )
 from effects import ParticleSystem, ShockwaveSystem, ArenaPulseSystem, DamageNumberSystem
 from fighter import Fighter
+from obs_manager import OBSManager
+from combat_manager import CombatManager
+from ui_renderer import UIRenderer
 
 
 # Main game class - DVD logo style combat with rotating swords.
@@ -150,105 +153,15 @@ class Game:
             print(f"Failed to load background logo: {e}")
             self.bg_logo = None
         
-        # OBS Integration
-        self.obs_client = None
-        self.is_recording = False
-        self._init_obs_client()
+        # Main Component Managers
+        self.obs_manager = OBSManager(self.f1_name, self.f2_name)
+        self.obs_manager.connect()
+        self.combat_manager = CombatManager()
+        self.ui_renderer = UIRenderer(self.screen, self.font_medium, self.font_small)
         
         # Load sounds.
         self._setup_sounds()
         
-    def _init_obs_client(self):
-        """Initialize connection to OBS WebSocket server."""
-        if obs is None:
-            print("[OBS] obsws-python library not found. Auto-recording disabled.")
-            return
-            
-        try:
-            port = int(os.getenv("OBS_PORT", "4455"))
-            password = os.getenv("OBS_PASSWORD", "")
-            
-            if not password:
-                print("[OBS] No OBS_PASSWORD found in .env. Auto-recording disabled.")
-                return
-                
-            self.obs_client = obs.ReqClient(host='localhost', port=port, password=password)
-            print("[OBS] Successfully hooked into OBS Studio!")
-        except Exception as e:
-            print(f"[OBS] Failed to connect: {e} (Is OBS open?)")
-            self.obs_client = None
-            
-    def _start_obs_recording(self):
-        """Start OBS recording if connected."""
-        if self.obs_client and not self.is_recording:
-            try:
-                self.obs_client.start_record()
-                self.is_recording = True
-                print("[OBS] 🎥 Camera Rolling! Recording Started.")
-            except Exception as e:
-                print(f"[OBS] Start recording failed: {e}")
-                
-    def _stop_obs_recording(self):
-        """Stop OBS recording if connected."""
-        import os
-        import time
-        import glob
-        if self.obs_client and self.is_recording:
-            try:
-                # Retrieve Recording Path
-                record_dir_resp = self.obs_client.get_record_directory()
-                record_dir = record_dir_resp.record_directory
-                
-                # Execute Stop
-                self.obs_client.stop_record()
-                self.is_recording = False
-                
-                # The Renaming Sequence
-                files = glob.glob(os.path.join(record_dir, "*.mp4"))
-                if files:
-                    latest_file = max(files, key=os.path.getctime)
-                    name1 = self.f1_name.capitalize()
-                    name2 = self.f2_name.capitalize()
-                    
-                    if hasattr(self, 'viral_title_idea') and self.viral_title_idea:
-                        # Sanitize string for valid Windows filename format
-                        safe_title = "".join(c for c in self.viral_title_idea if c not in r'\/:*?"<>|').strip()
-                        new_filename = f"{safe_title}.mp4"
-                        
-                        # Handle Conflicts
-                        new_path = os.path.join(record_dir, new_filename)
-                        if os.path.exists(new_path):
-                            new_filename = f"{safe_title}_{int(time.time())}.mp4"
-                            new_path = os.path.join(record_dir, new_filename)
-                    else:
-                        new_filename = f"Who Wins {name1} vs {name2}.mp4"
-                        new_path = os.path.join(record_dir, new_filename)
-                        
-                        # Handle Conflicts
-                        if os.path.exists(new_path):
-                            new_filename = f"Who Wins {name1} vs {name2}_{int(time.time())}.mp4"
-                            new_path = os.path.join(record_dir, new_filename)
-                        
-                    # Retry loop to wait for OBS to release the file lock
-                    max_retries = 20
-                    retry_delay = 0.5
-                    success = False
-                    for i in range(max_retries):
-                        try:
-                            os.rename(latest_file, new_path)
-                            print(f"[OBS] File renamed to: {new_filename}")
-                            success = True
-                            break
-                        except OSError:
-                            time.sleep(retry_delay)
-                            
-                    if not success:
-                        print(f"[OBS] Failed to rename. File might still be locked: {latest_file}")
-                else:
-                    print("[OBS] ⏹️ CUT! Recording Saved.")
-            except Exception as e:
-                print(f"[OBS] Stop recording failed: {e}")
-    
     def _lock_fighters_for_countdown(self):
         """Lock fighters in place for countdown."""
         self.blue.locked = True
@@ -403,215 +316,6 @@ class Game:
             self.escalation_loop_channel = None
 
     # Skills disabled - _spawn_skill_orb removed
-
-    def _check_sword_hit(self, attacker, defender):
-        """Check if sword hits defender body, returning point and impact ratio."""
-        
-        # Early-out: skip if defender is too far for any sword point to reach
-        fighter_dist = math.hypot(attacker.x - defender.x, attacker.y - defender.y)
-        scaled_sword_length = attacker.sword_length
-        max_reach = attacker.radius + 3 + scaled_sword_length + defender.radius + 3
-        if fighter_dist > max_reach:
-            return None, 0.0
-        
-        (base_x, base_y), (tip_x, tip_y) = attacker.get_sword_hitbox()
-        
-        # Check multiple points along the blade to determine impact ratio
-        steps = 10
-        # Start from base to tip to find the first point of contact
-        for i in range(1, steps + 1):
-            t = i / steps
-            check_x = base_x + (tip_x - base_x) * t
-            check_y = base_y + (tip_y - base_y) * t
-            dist = math.hypot(check_x - defender.x, check_y - defender.y)
-            if dist < defender.radius + 3:
-                return (check_x, check_y), t
-        return None, 0.0
-
-    @staticmethod
-    def _cross(o, a, b):
-        """2D cross product of vectors OA and OB."""
-        return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
-    
-    def _segments_intersect(self, p1, p2, p3, p4):
-        """Check if line segment p1-p2 intersects p3-p4 using cross products."""
-        d1 = self._cross(p3, p4, p1)
-        d2 = self._cross(p3, p4, p2)
-        d3 = self._cross(p1, p2, p3)
-        d4 = self._cross(p1, p2, p4)
-        
-        if ((d1 > 0 and d2 < 0) or (d1 < 0 and d2 > 0)) and \
-           ((d3 > 0 and d4 < 0) or (d3 < 0 and d4 > 0)):
-            return True
-        
-        return False
-    
-    def _get_intersection_point(self, p1, p2, p3, p4):
-        """Get the intersection point of segments p1-p2 and p3-p4."""
-        x1, y1 = p1
-        x2, y2 = p2
-        x3, y3 = p3
-        x4, y4 = p4
-        
-        denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4)
-        if abs(denom) < 1e-10:
-            return None
-        
-        t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denom
-        
-        ix = x1 + t * (x2 - x1)
-        iy = y1 + t * (y2 - y1)
-        return (ix, iy)
-
-    def _handle_combat(self):
-        """Detect and resolve combat interactions with sword-to-sword parry."""
-        
-        # === PARRY CHECK: Sword-to-Sword intersection ===
-        blue_base, blue_tip = self.blue.get_sword_hitbox()
-        red_base, red_tip = self.red.get_sword_hitbox()
-        
-        if self._segments_intersect(blue_base, blue_tip, red_base, red_tip):
-            if self.blue.parry_cooldown <= 0 and self.red.parry_cooldown <= 0:
-                
-                ix_point = self._get_intersection_point(blue_base, blue_tip, red_base, red_tip)
-                if not ix_point:
-                    ix_point = ((blue_base[0] + red_base[0]) / 2, (blue_base[1] + red_base[1]) / 2)
-                
-                both_parried = True
-                for fighter in (self.blue, self.red):
-                    if fighter.parry_energy >= fighter.parry_cost:
-                        # SUCCESSFUL PARRY
-                        fighter.parry_energy -= fighter.parry_cost
-                        fighter.spin_direction *= -1
-                        fighter.parry_cooldown = 15
-                    else:
-                        both_parried = False
-                        # GUARD BREAK! (Energy depleted)
-                        # Spawn massive red/white 'Guard Break' sparks
-                        self.particles.emit(ix_point[0], ix_point[1], (255, 0, 0), count=40, size=6)
-                        self.particles.emit(ix_point[0], ix_point[1], (255, 255, 255), count=20, size=4)
-
-                        # Dynamic Penalty Damage: Highly variable, between 35 and 60 damage
-                        guard_break_dmg = random.randint(35, 60)
-                        fighter.health -= guard_break_dmg 
-                        fighter.parry_energy = 0 # Reset energy to zero
-
-                        # Apply aggressive hit-stun knockback to the defender
-                        fighter.vx = -fighter.vx * 1.5
-                        fighter.vy = -fighter.vy * 1.5
-                        fighter.parry_cooldown = 30 # Longer penalty
-
-                        if guard_break_dmg > 0:
-                            self.damage_numbers.spawn(ix_point[0], ix_point[1] - 30, guard_break_dmg, fighter.color, True)
-
-                if both_parried:
-                    # --- Parry Escalation ---
-                    self.total_parries += 1
-                    
-                    # Determine escalation level & stats
-                    if self.total_parries >= 15:
-                        # Level 3: Sudden Death
-                        shake_intensity = 30
-                        spark_color = (255, 255, 255)
-                        spark_count = 50
-                        speed_multiplier = 1.7
-                    elif self.total_parries >= 7:
-                        # Level 2: Heated
-                        shake_intensity = 18
-                        spark_color = (255, 150, 50)
-                        spark_count = 30
-                        speed_multiplier = 1.3
-                    else:
-                        # Level 1: Normal
-                        shake_intensity = 12
-                        spark_color = (255, 255, 100)
-                        spark_count = 20
-                        speed_multiplier = 1.0
-                    
-                    # Hit-stop and escalated screen shake
-                    self.hit_stop = 8
-                    self.screen_shake = shake_intensity
-                    
-                    self.particles.emit(ix_point[0], ix_point[1], spark_color, count=spark_count, size=4)
-                    
-                    # Apply speed buff to both fighters
-                    self.blue.spin_speed = 0.25 * speed_multiplier
-                    self.red.spin_speed = 0.25 * speed_multiplier
-                else:
-                    self.hit_stop = 12
-                    self.screen_shake = 20
-                
-                # Play sword clash sound
-                if self.sounds_enabled and self.sword_clash_sound:
-                    self.sword_clash_sound.play()
-        
-        # === BODY HIT CHECK: Sword vs body (always active - Beyblade mode) ===
-        for attacker, defender in [(self.blue, self.red), (self.red, self.blue)]:
-            hit_pos, impact_ratio = self._check_sword_hit(attacker, defender)
-            if hit_pos:
-                
-                # Roll for critical hit (20% chance)
-                is_crit = random.random() < CRIT_CHANCE
-                crit_mult = CRIT_MULTIPLIER if is_crit else 1.0
-                
-                # Apply damage multiplier + crit
-                damage_mult = attacker.get_attack_damage_multiplier()
-                total_damage_mult = damage_mult * crit_mult
-                
-                angle = math.atan2(defender.y - attacker.y, defender.x - attacker.x)
-                knockback = BASE_KNOCKBACK * crit_mult * (1.0 + (total_damage_mult - 1.0) * 0.5) * 1.5
-                
-                # Dynamic Sweet Spot Damage System
-                if impact_ratio < 0.7:
-                    # The Grinding Hit
-                    base_damage = 10
-                    shake_intensity = 4
-                    spark_count = 10
-                    spark_color = (255, 255, 0) # Yellow
-                    spark_size = 4
-                    is_sweet_spot = False
-                else:
-                    # The Sweet Spot / Tip Hit
-                    base_damage = 35
-                    shake_intensity = 15
-                    spark_count = 30
-                    spark_color = (255, 100, 0) if random.random() < 0.5 else (255, 0, 0) # ORANGE or RED
-                    spark_size = 6
-                    is_sweet_spot = True
-                
-                damage = base_damage * total_damage_mult
-                
-                # Fixed hit-stop frames (no combo system)
-                hit_stop_frames = HIT_STOP_FRAMES
-                
-                if defender.take_damage(damage, angle, knockback, self.particles):
-                    # Trigger custom hit effects instead of generic _trigger_hit
-                    self.particles.emit(hit_pos[0], hit_pos[1], spark_color, count=spark_count, size=spark_size)
-                    self.hit_stop = hit_stop_frames if hit_stop_frames else HIT_STOP_FRAMES
-                    self.screen_shake = shake_intensity if self.total_parries < 15 else shake_intensity * 2
-                    
-                    if damage > 0:
-                        self.damage_numbers.spawn(hit_pos[0], hit_pos[1] - 20, damage, attacker.color, is_crit or is_sweet_spot)
-                    
-                    # Play appropriate hit sound based on sweet spot
-                    if self.sounds_enabled:
-                        if is_sweet_spot and self.critical_hit_sound:
-                            self.critical_hit_sound.play()
-                        elif self.hit_sounds[0] and self.hit_sounds[1]:
-                            self.hit_sounds[self.hit_sound_index].play()
-                            self.hit_sound_index = (self.hit_sound_index + 1) % 2
-                    
-                    self.hit_slowmo_frames = HIT_SLOWMO_FRAMES
-                    self._reset_inactivity()
-                    
-                    # Critical Hit: Trigger anime impact sequence
-                    if is_crit:
-                        self.crit_impact_frames = CRIT_IMPACT_FRAMES
-                        self.crit_impact_accumulator = 0.0
-                        self.crit_flash_phase = 1  # Start flash sequence
-                        self.screen_shake = max(self.screen_shake, SCREEN_SHAKE_INTENSITY * 2)
-                    
-
 
     def _trigger_hit(self, x, y, color, hit_stop_frames=None, damage=0, is_crit=False):
         """Apply hit effects including damage numbers."""
@@ -923,7 +627,7 @@ class Game:
         
 
         
-        self._handle_combat()
+        self.combat_manager.handle_collisions(self.blue, self.red, self)
         
         self.particles.update()
         self.shockwaves.update()
@@ -1029,18 +733,6 @@ class Game:
         self.particles.draw(self.screen, offset)
         self.damage_numbers.draw(self.screen, offset)
         
-        # Sudden Death UI Warning
-        if self.total_parries >= 15:
-            sd_font = self.font_medium
-            sd_text = sd_font.render("SUDDEN DEATH", True, (255, 0, 0))
-            # Position just below health bars
-            sd_ax, sd_ay, sd_aw, sd_ah = self.arena_bounds
-            sd_y = sd_ay - 55  # Above arena, below HUD
-            sd_rect = sd_text.get_rect(center=(sd_ax + sd_aw // 2, sd_y))
-            # Pulsing alpha via blinking (every 8 frames)
-            if (self.round_timer // 8) % 2 == 0:
-                self.screen.blit(sd_text, sd_rect)
-        
         # Critical Hit Impact Flash (drawn AFTER fighters, BEFORE UI)
         if self.crit_flash_phase == 1:
             # Phase 1: Full screen BLACK flash
@@ -1110,8 +802,8 @@ class Game:
             
             self.screen.blit(text_surface, text_rect)
         
-        # Tekken-style HUD on top of everything
-        self._draw_hud(self.screen)
+        # UI Overlays
+        self.ui_renderer.draw(self)
         
         # Draw game surface to high-res canvas
         self.canvas.fill((15, 15, 15))  # Dark background for dead space
@@ -1123,80 +815,6 @@ class Game:
         self.window.blit(scaled_preview, (0, 0))
         
         pygame.display.flip()
-    
-    def _draw_hud(self, surface):
-        """Draw Tekken-style static health bars flush above the arena."""
-        # Part 1: Dynamic arena positioning
-        ax, ay, aw, ah = self.arena_bounds
-        bar_width = (aw // 2) - 20
-        bar_height = 20
-        bar_y = ay - bar_height - 10  # 10px padding above arena top line
-        
-        bg_color = (30, 30, 30)
-        dark_border_color = (60, 60, 60)  # Cel-shaded dark outline
-        
-        # Calculate Danger Zone Offsets (10% HP threshold)
-        blue_hp_pct = max(0.0, self.blue.health / self.blue.max_health)
-        blue_shake_x = random.randint(-4, 4) if blue_hp_pct <= 0.10 else 0
-        blue_shake_y = random.randint(-4, 4) if blue_hp_pct <= 0.10 else 0
-        
-        red_hp_pct = max(0.0, self.red.health / self.red.max_health)
-        red_shake_x = random.randint(-4, 4) if red_hp_pct <= 0.10 else 0
-        red_shake_y = random.randint(-4, 4) if red_hp_pct <= 0.10 else 0
-        
-        # --- Blue (Left) Bar: depletes right-to-left, anchored to left arena wall ---
-        bar_x = ax
-        blue_fill_w = int(bar_width * blue_hp_pct)
-        
-        # Background (missing health)
-        pygame.draw.rect(surface, bg_color, (bar_x + blue_shake_x, bar_y + blue_shake_y, bar_width, bar_height))
-        # Health fill (anchored to left edge, depletes from right)
-        if blue_fill_w > 0:
-            pygame.draw.rect(surface, self.blue.color,
-                            (bar_x + blue_shake_x, bar_y + blue_shake_y, blue_fill_w, bar_height))
-        # Dark border outline
-        pygame.draw.rect(surface, dark_border_color, (bar_x + blue_shake_x, bar_y + blue_shake_y, bar_width, bar_height), 2)
-        
-        # Blue Energy Bar
-        energy_pct_blue = max(0.0, self.blue.parry_energy / self.blue.max_parry_energy)
-        energy_bar_width = bar_width
-        energy_bar_y = bar_y + bar_height + 4
-        # Draw background (dark gray)
-        pygame.draw.rect(surface, (40, 40, 40), (bar_x + blue_shake_x, energy_bar_y + blue_shake_y, energy_bar_width, 3))
-        # Draw current energy (cyan)
-        if energy_pct_blue > 0:
-            pygame.draw.rect(surface, (0, 255, 255), (bar_x + blue_shake_x, energy_bar_y + blue_shake_y, int(energy_bar_width * energy_pct_blue), 3))
-        
-        # --- Red (Right) Bar: depletes left-to-right, anchored to right arena wall ---
-        bar_x = ax + aw - bar_width
-        red_fill_w = int(bar_width * red_hp_pct)
-        
-        # Background (missing health)
-        pygame.draw.rect(surface, bg_color, (bar_x + red_shake_x, bar_y + red_shake_y, bar_width, bar_height))
-        # Health fill (anchored to right edge, depletes from left)
-        if red_fill_w > 0:
-            fill_x = bar_x + (bar_width - red_fill_w)
-            pygame.draw.rect(surface, self.red.color,
-                            (fill_x + red_shake_x, bar_y + red_shake_y, red_fill_w, bar_height))
-        # Dark border outline
-        pygame.draw.rect(surface, dark_border_color, (bar_x + red_shake_x, bar_y + red_shake_y, bar_width, bar_height), 2)
-        
-        # Red Energy Bar
-        energy_pct_red = max(0.0, self.red.parry_energy / self.red.max_parry_energy)
-        red_energy_x = bar_x + (bar_width - energy_bar_width)
-        # Draw background (dark gray)
-        pygame.draw.rect(surface, (40, 40, 40), (red_energy_x + red_shake_x, energy_bar_y + red_shake_y, energy_bar_width, 3))
-        # Draw current energy (cyan)
-        if energy_pct_red > 0:
-            red_energy_fill_w = int(energy_bar_width * energy_pct_red)
-            red_energy_fill_x = red_energy_x + (energy_bar_width - red_energy_fill_w)
-            pygame.draw.rect(surface, (0, 255, 255), (red_energy_fill_x + red_shake_x, energy_bar_y + red_shake_y, red_energy_fill_w, 3))
-        
-        # --- VS Text (centered between the two bars) ---
-        vs_font = self.font_small
-        vs_surface = vs_font.render("VS", True, WHITE)
-        vs_rect = vs_surface.get_rect(center=(ax + (aw // 2), bar_y + (bar_height // 2)))
-        surface.blit(vs_surface, vs_rect)
     
     def _draw_grid(self, offset):
         """Draw faint grid for cyberpunk aesthetic."""
@@ -1218,7 +836,7 @@ class Game:
         import sys
         if "--auto-start" in sys.argv:
             self.game_state = 'PLAYING'
-            self._start_obs_recording()
+            self.obs_manager.start_recording()
             self.obs_startup_timer = 60
         elif "--test-mode" in sys.argv:
             self.game_state = 'PLAYING'
@@ -1234,7 +852,7 @@ class Game:
                     elif event.key == pygame.K_SPACE:
                         if self.game_state == 'TITLE':
                             self.game_state = 'PLAYING'
-                            self._start_obs_recording()  # Start OBS
+                            self.obs_manager.start_recording()  # Start OBS
                             self.obs_startup_timer = 60  # Delay on start
                         else:
                             self.paused = not self.paused
@@ -1246,7 +864,7 @@ class Game:
                 elif event.type == pygame.MOUSEBUTTONDOWN:
                     if self.game_state == 'TITLE':
                         self.game_state = 'PLAYING'
-                        self._start_obs_recording()  # Start OBS
+                        self.obs_manager.start_recording()  # Start OBS
                         self.obs_startup_timer = 60  # Delay on start
             
             if self.game_state == 'TITLE':
@@ -1257,7 +875,7 @@ class Game:
             self.clock.tick(FPS)
         
         # Stop OBS before shutting down entirely
-        self._stop_obs_recording()
+        self.obs_manager.stop_recording(getattr(self, 'viral_title_idea', None))
         pygame.quit()
 
 

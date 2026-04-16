@@ -1,0 +1,222 @@
+import math
+import random
+
+from config import (
+    BASE_KNOCKBACK, HIT_STOP_FRAMES, SCREEN_SHAKE_INTENSITY,
+    HIT_SLOWMO_FRAMES, CRIT_CHANCE, CRIT_MULTIPLIER, CRIT_IMPACT_FRAMES
+)
+
+class CombatManager:
+    """Handles combat interactions, collision detection, and damage calculations."""
+    
+    def __init__(self):
+        pass
+
+    def _check_sword_hit(self, attacker, defender):
+        """Check if sword hits defender body, returning point and impact ratio."""
+        
+        # Early-out: skip if defender is too far for any sword point to reach
+        fighter_dist = math.hypot(attacker.x - defender.x, attacker.y - defender.y)
+        scaled_sword_length = attacker.sword_length
+        max_reach = attacker.radius + 3 + scaled_sword_length + defender.radius + 3
+        if fighter_dist > max_reach:
+            return None, 0.0
+        
+        (base_x, base_y), (tip_x, tip_y) = attacker.get_sword_hitbox()
+        
+        # Check multiple points along the blade to determine impact ratio
+        steps = 10
+        # Start from base to tip to find the first point of contact
+        for i in range(1, steps + 1):
+            t = i / steps
+            check_x = base_x + (tip_x - base_x) * t
+            check_y = base_y + (tip_y - base_y) * t
+            dist = math.hypot(check_x - defender.x, check_y - defender.y)
+            if dist < defender.radius + 3:
+                return (check_x, check_y), t
+        return None, 0.0
+
+    @staticmethod
+    def _cross(o, a, b):
+        """2D cross product of vectors OA and OB."""
+        return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
+    
+    def _segments_intersect(self, p1, p2, p3, p4):
+        """Check if line segment p1-p2 intersects p3-p4 using cross products."""
+        d1 = self._cross(p3, p4, p1)
+        d2 = self._cross(p3, p4, p2)
+        d3 = self._cross(p1, p2, p3)
+        d4 = self._cross(p1, p2, p4)
+        
+        if ((d1 > 0 and d2 < 0) or (d1 < 0 and d2 > 0)) and \
+           ((d3 > 0 and d4 < 0) or (d3 < 0 and d4 > 0)):
+            return True
+        
+        return False
+    
+    def _get_intersection_point(self, p1, p2, p3, p4):
+        """Get the intersection point of segments p1-p2 and p3-p4."""
+        x1, y1 = p1
+        x2, y2 = p2
+        x3, y3 = p3
+        x4, y4 = p4
+        
+        denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4)
+        if abs(denom) < 1e-10:
+            return None
+        
+        t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denom
+        
+        ix = x1 + t * (x2 - x1)
+        iy = y1 + t * (y2 - y1)
+        return (ix, iy)
+
+    def handle_collisions(self, blue, red, game):
+        """Detect and resolve combat interactions with sword-to-sword parry.
+        Modifies game state objects directly (particles, screen shake, hit stop, etc).
+        """
+        
+        # === PARRY CHECK: Sword-to-Sword intersection ===
+        blue_base, blue_tip = blue.get_sword_hitbox()
+        red_base, red_tip = red.get_sword_hitbox()
+        
+        if self._segments_intersect(blue_base, blue_tip, red_base, red_tip):
+            if blue.parry_cooldown <= 0 and red.parry_cooldown <= 0:
+                
+                ix_point = self._get_intersection_point(blue_base, blue_tip, red_base, red_tip)
+                if not ix_point:
+                    ix_point = ((blue_base[0] + red_base[0]) / 2, (blue_base[1] + red_base[1]) / 2)
+                
+                both_parried = True
+                for fighter in (blue, red):
+                    if fighter.parry_energy >= fighter.parry_cost:
+                        # SUCCESSFUL PARRY
+                        fighter.parry_energy -= fighter.parry_cost
+                        fighter.spin_direction *= -1
+                        fighter.parry_cooldown = 15
+                    else:
+                        both_parried = False
+                        # GUARD BREAK! (Energy depleted)
+                        # Spawn massive red/white 'Guard Break' sparks
+                        game.particles.emit(ix_point[0], ix_point[1], (255, 0, 0), count=40, size=6)
+                        game.particles.emit(ix_point[0], ix_point[1], (255, 255, 255), count=20, size=4)
+
+                        # Dynamic Penalty Damage: Highly variable, between 35 and 60 damage
+                        guard_break_dmg = random.randint(35, 60)
+                        fighter.health -= guard_break_dmg 
+                        fighter.parry_energy = 0 # Reset energy to zero
+
+                        # Apply aggressive hit-stun knockback to the defender
+                        fighter.vx = -fighter.vx * 1.5
+                        fighter.vy = -fighter.vy * 1.5
+                        fighter.parry_cooldown = 30 # Longer penalty
+
+                        if guard_break_dmg > 0:
+                            game.damage_numbers.spawn(ix_point[0], ix_point[1] - 30, guard_break_dmg, fighter.color, True)
+
+                if both_parried:
+                    # --- Parry Escalation ---
+                    game.total_parries += 1
+                    
+                    # Determine escalation level & stats
+                    if game.total_parries >= 15:
+                        # Level 3: Sudden Death
+                        shake_intensity = 30
+                        spark_color = (255, 255, 255)
+                        spark_count = 50
+                        speed_multiplier = 1.7
+                    elif game.total_parries >= 7:
+                        # Level 2: Heated
+                        shake_intensity = 18
+                        spark_color = (255, 150, 50)
+                        spark_count = 30
+                        speed_multiplier = 1.3
+                    else:
+                        # Level 1: Normal
+                        shake_intensity = 12
+                        spark_color = (255, 255, 100)
+                        spark_count = 20
+                        speed_multiplier = 1.0
+                    
+                    # Hit-stop and escalated screen shake
+                    game.hit_stop = 8
+                    game.screen_shake = shake_intensity
+                    
+                    game.particles.emit(ix_point[0], ix_point[1], spark_color, count=spark_count, size=4)
+                    
+                    # Apply speed buff to both fighters
+                    blue.spin_speed = 0.25 * speed_multiplier
+                    red.spin_speed = 0.25 * speed_multiplier
+                else:
+                    game.hit_stop = 12
+                    game.screen_shake = 20
+                
+                # Play sword clash sound
+                if game.sounds_enabled and game.sword_clash_sound:
+                    game.sword_clash_sound.play()
+        
+        # === BODY HIT CHECK: Sword vs body (always active - Beyblade mode) ===
+        for attacker, defender in [(blue, red), (red, blue)]:
+            hit_pos, impact_ratio = self._check_sword_hit(attacker, defender)
+            if hit_pos:
+                
+                # Roll for critical hit (20% chance)
+                is_crit = random.random() < CRIT_CHANCE
+                crit_mult = CRIT_MULTIPLIER if is_crit else 1.0
+                
+                # Apply damage multiplier + crit
+                damage_mult = attacker.get_attack_damage_multiplier()
+                total_damage_mult = damage_mult * crit_mult
+                
+                angle = math.atan2(defender.y - attacker.y, defender.x - attacker.x)
+                knockback = BASE_KNOCKBACK * crit_mult * (1.0 + (total_damage_mult - 1.0) * 0.5) * 1.5
+                
+                # Dynamic Sweet Spot Damage System
+                if impact_ratio < 0.7:
+                    # The Grinding Hit
+                    base_damage = 10
+                    shake_intensity = 4
+                    spark_count = 10
+                    spark_color = (255, 255, 0) # Yellow
+                    spark_size = 4
+                    is_sweet_spot = False
+                else:
+                    # The Sweet Spot / Tip Hit
+                    base_damage = 35
+                    shake_intensity = 15
+                    spark_count = 30
+                    spark_color = (255, 100, 0) if random.random() < 0.5 else (255, 0, 0) # ORANGE or RED
+                    spark_size = 6
+                    is_sweet_spot = True
+                
+                damage = base_damage * total_damage_mult
+                
+                # Fixed hit-stop frames (no combo system)
+                hit_stop_frames = HIT_STOP_FRAMES
+                
+                if defender.take_damage(damage, angle, knockback, game.particles):
+                    # Trigger custom hit effects instead of generic _trigger_hit
+                    game.particles.emit(hit_pos[0], hit_pos[1], spark_color, count=spark_count, size=spark_size)
+                    game.hit_stop = hit_stop_frames if hit_stop_frames else HIT_STOP_FRAMES
+                    game.screen_shake = shake_intensity if game.total_parries < 15 else shake_intensity * 2
+                    
+                    if damage > 0:
+                        game.damage_numbers.spawn(hit_pos[0], hit_pos[1] - 20, damage, attacker.color, is_crit or is_sweet_spot)
+                    
+                    # Play appropriate hit sound based on sweet spot
+                    if game.sounds_enabled:
+                        if is_sweet_spot and game.critical_hit_sound:
+                            game.critical_hit_sound.play()
+                        elif game.hit_sounds[0] and game.hit_sounds[1]:
+                            game.hit_sounds[game.hit_sound_index].play()
+                            game.hit_sound_index = (game.hit_sound_index + 1) % 2
+                    
+                    game.hit_slowmo_frames = HIT_SLOWMO_FRAMES
+                    game._reset_inactivity()
+                    
+                    # Critical Hit: Trigger anime impact sequence
+                    if is_crit:
+                        game.crit_impact_frames = CRIT_IMPACT_FRAMES
+                        game.crit_impact_accumulator = 0.0
+                        game.crit_flash_phase = 1  # Start flash sequence
+                        game.screen_shake = max(game.screen_shake, SCREEN_SHAKE_INTENSITY * 2)
