@@ -54,9 +54,10 @@ The combat is a **"Beyblade" style auto-battler**. There are no directional slas
 Each successful hit triggers:
 - **Hit-Stop:** Momentarily freezes the action to add weight to the impact.
 - **Hit Slow-Mo:** 5 frames at 60% speed.
+- **Decomposition Effect:** Critical tip-hits trigger a special sequence: a heavy hit-stop freeze (4 frames), followed by a dramatic 0.5s slow-mo phase (10% timescale) with decoupled high-velocity cyan/magenta particle bursts.
 - **Screen Shake:** Massive screen shake, decaying at 85% per frame.
-- **Particle Burst:** White particles erupting from the impact point.
-- **Sound Effect:** Procedurally generated hit sound.
+- **Particle Burst:** Sparks erupting from the impact point, varying dynamically based on sweet-spot or grinding hits.
+- **Sound Effect:** Centralized audio manager playing clash, hit, or critical hit sounds.
 
 ---
 
@@ -117,13 +118,20 @@ If no combat occurs for **2 seconds**, an **Arena Pulse** triggers.
 project_root/
 ├── assets/           # Media assets (audio, images) extracted to root
 ├── src/
-│   ├── main.py           # Game loop, combat handling, rendering
-│   ├── fighter.py        # Fighter class with movement and attacks
-│   ├── config.py         # All tuning constants and physics values
-│   ├── effects.py        # Particle, shockwave, and slash effects
-│   ├── sound_manager.py  # Sound generation utilities
-│   └── utils.py          # Helper functions
-└── record.py         # Consolidated recording and testing script
+│   ├── config.py           # Constants, physics values, and configuration
+│   ├── effects.py          # Particle, shockwave, and slash effects
+│   ├── main.py             # Main game loop and window management
+│   ├── utils.py            # Helpful utilities
+│   ├── entities/
+│   │   └── fighter.py      # Core fighter logical state and movement
+│   ├── managers/
+│   │   ├── combat_manager.py # Handles collision, hitting, and parry logic
+│   │   ├── obs_manager.py    # OBS WebSocket integration for automated recording
+│   │   └── sound_manager.py  # Centralized sound generation and effect playback
+│   └── renderers/
+│       ├── fighter_renderer.py # Draws the fighter visuals
+│       └── ui_renderer.py      # HUD and UI element drawing
+└── record.py         # Consolidated batch recording script
 ```
 
 ---
@@ -170,11 +178,15 @@ This project is built to automate the creation of YouTube shorts content. It inc
 2. Two seconds after the Winner text appears, the application will automatically close, and command OBS to **Stop Recording** and save your clip. 
 
 ### OBS Setup Instructions:
-1. Open OBS Studio.
-2. Add a **Window Capture** source and select the Python game window (`Color Battle`).
-3. In OBS, go to **Tools > WebSocket Server Settings**, enable it, and set a password.
-4. Add your password and port to your `.env` file (see Quick Start).
-5. Simply leave OBS open in the background, run `python src/main.py`, and hit space! Or run `python record.py` for fully automated batch recording.
+1. Add a **Window Capture** source and select the Python game window (`Color Battle`).
+2. Setup the OBS WebSocket for automated recording:
+   - Click on **Tools** in the very top menu bar.
+   - Select **WebSocket Server Settings** from the dropdown menu.
+   - In the window that pops up, make sure **Enable WebSocket server** is checked. You will find your details right there:
+     - **OBS_PORT**: Look for the Server Port field (it almost always defaults to `4455`).
+     - **OBS_PASSWORD**: Make sure Enable authentication is checked. You can either type a new password directly into the Server Password box, or click the Show Connect Info button to reveal and copy the currently active password.
+3. Add your `OBS_PASSWORD` and `OBS_PORT` to your `.env` file in the root directory.
+4. Simply leave OBS open in the background! Run `python src/main.py` and hit space for a single round, or run `python record.py` for fully automated batch recording.
 
 ---
 
