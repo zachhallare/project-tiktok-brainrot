@@ -1,5 +1,7 @@
 {
-    "clutch": [],
+    "clutch": [
+        12
+    ],
     "blowout": [],
     "standard": []
 }

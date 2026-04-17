@@ -47,7 +47,6 @@ class Game:
         
         # Initialize pygame modules
         pygame.init()
-        pygame.mixer.init()
         pygame.font.init()
         
         # Create the game window.
@@ -90,6 +89,10 @@ class Game:
         self.hit_stop = 0
         self.hit_slowmo_frames = 0
         self.hit_slowmo_accumulator = 0.0
+        
+        # Decomposition Effect
+        self.decomp_slowmo_frames = 0
+        self.decomp_slowmo_accumulator = 0.0
         
         # Critical Hit Impact Sequence
         self.crit_impact_frames = 0
@@ -159,8 +162,9 @@ class Game:
         self.combat_manager = CombatManager()
         self.ui_renderer = UIRenderer(self.screen, self.font_medium, self.font_small)
         
-        # Load sounds.
-        self._setup_sounds()
+        # Initialize centralized SoundManager
+        from sound_manager import SoundManager
+        self.sound_manager = SoundManager()
         
     def _lock_fighters_for_countdown(self):
         """Lock fighters in place for countdown."""
@@ -213,8 +217,8 @@ class Game:
         self.screen_shake = ARENA_PULSE_SHAKE
         
         # Play arena pulse sound
-        if self.sounds_enabled and self.arena_pulse_sound:
-            self.arena_pulse_sound.play()
+        if hasattr(self, 'sound_manager'):
+            self.sound_manager.play_arena_pulse()
         
         center_x = SCREEN_WIDTH // 2
         center_y = SCREEN_HEIGHT // 2
@@ -230,90 +234,11 @@ class Game:
                 fighter.vx *= 1.2
                 fighter.vy *= 1.2
 
-    def _setup_sounds(self):
-        """Load all sound effects from audio files."""
-        import os
-        try:
-            base_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "audio")
-            
-            # Helper function to load a sound file
-            def load_sound(subfolder, filename, volume=0.5):
-                path = os.path.join(base_path, subfolder, filename)
-                if os.path.exists(path):
-                    sound = pygame.mixer.Sound(path)
-                    sound.set_volume(volume)
-                    return sound
-                return None
-            
-            # === COMBAT SOUNDS ===
-            self.hit_sounds = [
-                load_sound("combat", "hit_1.mp3", 0.5),
-                load_sound("combat", "hit_2.mp3", 0.5)
-            ]
-            self.hit_sound_index = 0  # Alternate between hit sounds
-            self.critical_hit_sound = load_sound("combat", "critical_hit.mp3", 0.6)
-            self.knockback_whoosh_sound = load_sound("combat", "knockback_whoosh.mp3", 0.5)
-            self.sword_clash_sound = load_sound("combat", "sword_clash.mp3", 0.5)
-            self.death_final_hit_sound = load_sound("combat", "death_final_hit.mp3", 0.7)
-            self.sword_to_ground_sound = load_sound("combat", "sword_to_the_ground.mp3", 0.6)
-            
-            # === COUNTDOWN SOUNDS ===
-            self.countdown_beep_sound = load_sound("countdown", "countdown_beep.mp3", 0.6)
-            self.sword_fight_sound = load_sound("countdown", "sword-fight.mp3", 0.5)
-            
-
-            
-            # === CONTINUOUS/LOOP SOUNDS ===
-            self.arena_shrink_warning_sound = load_sound("continuous", "arena_shrink_warning.mp3", 0.4)
-            self.disco_beat_sound = load_sound("continuous", "disco_beat.mp3", 0.4)
-            self.tron_trail_hum_sound = load_sound("continuous", "tron_trail_hum.mp3", 0.3)
-            
-            # === FEEDBACK SOUNDS ===
-            self.arena_pulse_sound = load_sound("feedback", "arena_pulse.mp3", 0.5)
-            self.damage_tick_sound = load_sound("feedback", "damage_tick.mp3", 0.4)
-            self.healing_life_steal_sound = load_sound("feedback", "healing_life_steal.mp3", 0.4)
-            self.wall_boost_sound = load_sound("feedback", "wall_boost.mp3", 0.3)
-            self.wall_bounce_sound = load_sound("feedback", "wall_bounce.mp3", 0.25)
-            
-        
-            self.escalation_loop_channel = None  # Channel for arena shrink warning
-            
-            # Track countdown sound state
-            self.countdown_beep_played = [False, False, False]  # For 3, 2, 1
-            self.fight_sound_played = False
-            
-            # Track death sequence sound state
-            self.death_sound_phase = 0  # 0=none, 1=final_hit_played, 2=sword_to_ground_played
-            
-            self.sounds_enabled = True
-        except Exception as e:
-            print(f"Sound loading error: {e}")
-            self.sounds_enabled = False
-    
-    def _play_hit_sound(self, is_crit=False):
-        """Play appropriate hit sound."""
-        if not self.sounds_enabled:
-            return
-        if is_crit and self.critical_hit_sound:
-            self.critical_hit_sound.play()
-        elif self.hit_sounds[0] and self.hit_sounds[1]:
-            self.hit_sounds[self.hit_sound_index].play()
-            self.hit_sound_index = (self.hit_sound_index + 1) % 2
-    
-
-    
     def _start_escalation_sound(self):
-        """Start the escalation shrink warning loop."""
-        if not self.sounds_enabled or not self.arena_shrink_warning_sound:
-            return
-        if self.escalation_loop_channel is None:
-            self.escalation_loop_channel = self.arena_shrink_warning_sound.play(loops=-1)
-    
+        pass
+
     def _stop_escalation_sound(self):
-        """Stop the escalation shrink warning loop."""
-        if self.escalation_loop_channel:
-            self.escalation_loop_channel.stop()
-            self.escalation_loop_channel = None
+        pass
 
     # Skills disabled - _spawn_skill_orb removed
 
@@ -327,8 +252,11 @@ class Game:
         if damage > 0:
             self.damage_numbers.spawn(x, y - 20, damage, color, is_crit)
         
-        # Play hit sound (alternating hit_1/hit_2, or critical_hit for crits)
-        self._play_hit_sound(is_crit)
+        # Play hit sound via central manager
+        if is_crit:
+            self.sound_manager.play_crit()
+        else:
+            self.sound_manager.play_hit()
 
     def _end_round(self, winner, loser):
         """Handle round end."""
@@ -355,8 +283,8 @@ class Game:
         
         # Death sound sequence: death_final_hit first, sword_to_ground after freeze
         self.death_sound_phase = 1
-        if self.sounds_enabled and self.death_final_hit_sound:
-            self.death_final_hit_sound.play()
+        if hasattr(self, 'sound_manager'):
+            self.sound_manager.play_death_final_hit()
         
         self._stop_escalation_sound()
         
@@ -385,7 +313,7 @@ class Game:
                 f"Do not swipe away... this comeback is pure cinema!",
                 f"{self.f1_name} vs {self.f2_name} goes down to the wire!"
             ]
-        elif hp_percent >= 75:
+        elif hp_percent >= 50:
             category = "blowout"
             titles = [
                 f"ABSOLUTE DOMINATION! ({self.f1_name} vs {self.f2_name})",
@@ -478,6 +406,9 @@ class Game:
         self.hit_slowmo_frames = 0
         self.hit_slowmo_accumulator = 0.0
         
+        self.decomp_slowmo_frames = 0
+        self.decomp_slowmo_accumulator = 0.0
+        
         # Reset critical hit impact state
         self.crit_impact_frames = 0
         self.crit_impact_accumulator = 0.0
@@ -516,17 +447,21 @@ class Game:
             
             # Play countdown beep sounds for stages 0, 1, 2 ("3", "2", "1")
             if self.countdown_stage < 3 and self.countdown_timer == 1:
+                if not hasattr(self, 'countdown_beep_played'):
+                    self.countdown_beep_played = [False, False, False]
                 if not self.countdown_beep_played[self.countdown_stage]:
                     self.countdown_beep_played[self.countdown_stage] = True
-                    if self.sounds_enabled and self.countdown_beep_sound:
-                        self.countdown_beep_sound.play()
+                    if hasattr(self, 'sound_manager'):
+                        self.sound_manager.play_countdown_beep()
             
             # Play sword-fight sound when "FIGHT" appears
             if self.countdown_stage == 3 and self.countdown_timer == 1:
+                if not hasattr(self, 'fight_sound_played'):
+                    self.fight_sound_played = False
                 if not self.fight_sound_played:
                     self.fight_sound_played = True
-                    if self.sounds_enabled and self.sword_fight_sound:
-                        self.sword_fight_sound.play()
+                    if hasattr(self, 'sound_manager'):
+                        self.sound_manager.play_sword_fight()
             
             if self.countdown_timer >= duration:
                 self.countdown_timer = 0
@@ -549,6 +484,16 @@ class Game:
         if self.hit_stop > 0:
             self.hit_stop -= 1
             return
+            
+        # Decomposition Slow-Mo Phase 2 (10% timescale)
+        if self.decomp_slowmo_frames > 0:
+            self.decomp_slowmo_accumulator += 0.10
+            self.decomp_slowmo_frames -= 1
+            if self.decomp_slowmo_accumulator < 1.0:
+                self.particles.update()
+                self.damage_numbers.update()
+                return
+            self.decomp_slowmo_accumulator -= 1.0
         
         if self.hit_slowmo_frames > 0:
             self.hit_slowmo_accumulator += HIT_SLOWMO_TIMESCALE
@@ -580,11 +525,11 @@ class Game:
         if self.round_ending:
             self.reset_timer -= 1
             
-            # Play sword_to_ground sound partway through the freeze (40 frames in)
-            if self.death_sound_phase == 1 and self.reset_timer < 50:
+            # Play sword_to_ground sound partway through the freeze
+            if getattr(self, 'death_sound_phase', 0) == 1 and self.reset_timer < 50:
                 self.death_sound_phase = 2
-                if self.sounds_enabled and self.sword_to_ground_sound:
-                    self.sword_to_ground_sound.play()
+                if hasattr(self, 'sound_manager'):
+                    self.sound_manager.play_sword_to_ground()
             
             if self.reset_timer <= 0:
                 # Game over — quit after the winner message

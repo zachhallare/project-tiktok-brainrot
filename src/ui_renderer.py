@@ -1,6 +1,5 @@
 import pygame
 import random
-import math
 
 class UIRenderer:
     """Handles rendering of the HUD, health bars, warnings, and CTA text."""
@@ -17,27 +16,6 @@ class UIRenderer:
         """Main draw method for all UI overlays."""
         # 1. Tekken-style HUD
         self._draw_hud(game)
-        
-        # 2. Sudden Death Warning
-        if getattr(game, 'total_parries', 0) >= 15:
-            sd_text = self.font_medium.render("SUDDEN DEATH", True, (255, 0, 0))
-            sd_ax, sd_ay, sd_aw, sd_ah = game.arena_bounds
-            sd_y = sd_ay - 55
-            sd_rect = sd_text.get_rect(center=(sd_ax + sd_aw // 2, sd_y))
-            if (game.round_timer // 8) % 2 == 0:
-                self.screen.blit(sd_text, sd_rect)
-                
-        # 3. WHO ARE YOU ROOTING FOR? CTA
-        cta_text = self.font_small.render("WHO ARE YOU ROOTING FOR?", True, self.white)
-        ax, ay, aw, ah = game.arena_bounds
-        cta_y = ay + ah + 30
-        cta_rect = cta_text.get_rect(center=(ax + aw // 2, cta_y))
-        
-        # Adding a subtle pulse
-        pulse_alpha = int(155 + 100 * math.sin(game.round_timer * 0.05))
-        pulse_surf = cta_text.copy()
-        pulse_surf.set_alpha(pulse_alpha)
-        self.screen.blit(pulse_surf, cta_rect)
 
     def _draw_hud(self, game):
         """Draw Tekken-style static health bars flush above the arena."""

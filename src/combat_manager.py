@@ -101,8 +101,8 @@ class CombatManager:
                         game.particles.emit(ix_point[0], ix_point[1], (255, 0, 0), count=40, size=6)
                         game.particles.emit(ix_point[0], ix_point[1], (255, 255, 255), count=20, size=4)
 
-                        # Dynamic Penalty Damage: Highly variable, between 35 and 60 damage
-                        guard_break_dmg = random.randint(35, 60)
+                        # Dynamic Penalty Damage: Softer penalty, between 15 and 25 damage
+                        guard_break_dmg = random.randint(15, 25)
                         fighter.health -= guard_break_dmg 
                         fighter.parry_energy = 0 # Reset energy to zero
 
@@ -115,45 +115,20 @@ class CombatManager:
                             game.damage_numbers.spawn(ix_point[0], ix_point[1] - 30, guard_break_dmg, fighter.color, True)
 
                 if both_parried:
-                    # --- Parry Escalation ---
                     game.total_parries += 1
                     
-                    # Determine escalation level & stats
-                    if game.total_parries >= 15:
-                        # Level 3: Sudden Death
-                        shake_intensity = 30
-                        spark_color = (255, 255, 255)
-                        spark_count = 50
-                        speed_multiplier = 1.7
-                    elif game.total_parries >= 7:
-                        # Level 2: Heated
-                        shake_intensity = 18
-                        spark_color = (255, 150, 50)
-                        spark_count = 30
-                        speed_multiplier = 1.3
-                    else:
-                        # Level 1: Normal
-                        shake_intensity = 12
-                        spark_color = (255, 255, 100)
-                        spark_count = 20
-                        speed_multiplier = 1.0
-                    
-                    # Hit-stop and escalated screen shake
+                    # Standard hit-stop and screen shake
                     game.hit_stop = 8
-                    game.screen_shake = shake_intensity
+                    game.screen_shake = 12
                     
-                    game.particles.emit(ix_point[0], ix_point[1], spark_color, count=spark_count, size=4)
-                    
-                    # Apply speed buff to both fighters
-                    blue.spin_speed = 0.25 * speed_multiplier
-                    red.spin_speed = 0.25 * speed_multiplier
+                    game.particles.emit(ix_point[0], ix_point[1], (255, 255, 100), count=20, size=4)
                 else:
                     game.hit_stop = 12
                     game.screen_shake = 20
                 
                 # Play sword clash sound
-                if game.sounds_enabled and game.sword_clash_sound:
-                    game.sword_clash_sound.play()
+                if hasattr(game, 'sound_manager'):
+                    game.sound_manager.play_clash()
         
         # === BODY HIT CHECK: Sword vs body (always active - Beyblade mode) ===
         for attacker, defender in [(blue, red), (red, blue)]:
@@ -182,7 +157,9 @@ class CombatManager:
                     is_sweet_spot = False
                 else:
                     # The Sweet Spot / Tip Hit
-                    base_damage = 35
+                    base_damage = 15
+                    if is_crit:
+                        base_damage = 4 # Keep actual health damage low for decomposition hit
                     shake_intensity = 15
                     spark_count = 30
                     spark_color = (255, 100, 0) if random.random() < 0.5 else (255, 0, 0) # ORANGE or RED
@@ -198,24 +175,33 @@ class CombatManager:
                     # Trigger custom hit effects instead of generic _trigger_hit
                     game.particles.emit(hit_pos[0], hit_pos[1], spark_color, count=spark_count, size=spark_size)
                     game.hit_stop = hit_stop_frames if hit_stop_frames else HIT_STOP_FRAMES
-                    game.screen_shake = shake_intensity if game.total_parries < 15 else shake_intensity * 2
+                    game.screen_shake = shake_intensity
                     
                     if damage > 0:
                         game.damage_numbers.spawn(hit_pos[0], hit_pos[1] - 20, damage, attacker.color, is_crit or is_sweet_spot)
                     
                     # Play appropriate hit sound based on sweet spot
-                    if game.sounds_enabled:
-                        if is_sweet_spot and game.critical_hit_sound:
-                            game.critical_hit_sound.play()
-                        elif game.hit_sounds[0] and game.hit_sounds[1]:
-                            game.hit_sounds[game.hit_sound_index].play()
-                            game.hit_sound_index = (game.hit_sound_index + 1) % 2
+                    if hasattr(game, 'sound_manager'):
+                        if is_sweet_spot:
+                            game.sound_manager.play_crit()
+                        else:
+                            game.sound_manager.play_hit()
                     
                     game.hit_slowmo_frames = HIT_SLOWMO_FRAMES
                     game._reset_inactivity()
                     
-                    # Critical Hit: Trigger anime impact sequence
-                    if is_crit:
+                    # Critical Hit: Trigger anime impact sequence (Decomposition for tip hits)
+                    if is_crit and is_sweet_spot:
+                        game.decomp_slowmo_frames = 30  # Phase 2: 0.5 seconds at 10% timescale
+                        game.decomp_slowmo_accumulator = 0.0
+                        game.hit_slowmo_frames = 0
+                        game.hit_stop = 4  # Phase 1: 4 frames freeze
+                        game.screen_shake = max(game.screen_shake, 35)  # Heavy screen shake
+                        # Decoupled high-velocity, high-contrast sparks
+                        game.particles.emit_explosion(hit_pos[0], hit_pos[1], (0, 255, 255), count=25) # Cyan
+                        game.particles.emit_explosion(hit_pos[0], hit_pos[1], (255, 0, 255), count=25) # Magenta
+                        game.particles.emit_explosion(hit_pos[0], hit_pos[1], (255, 255, 255), count=15) # White
+                    elif is_crit:
                         game.crit_impact_frames = CRIT_IMPACT_FRAMES
                         game.crit_impact_accumulator = 0.0
                         game.crit_flash_phase = 1  # Start flash sequence
