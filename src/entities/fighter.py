@@ -15,7 +15,7 @@ from config import (
     GLOW_ALPHA, GLOW_RADIUS_MULT
 )
 
-from fighter_renderer import FighterRenderer
+from renderers.fighter_renderer import FighterRenderer
 
 class Fighter:
     """Simplified fighter with wall-bounce movement and Beyblade spin combat."""

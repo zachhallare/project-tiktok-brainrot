@@ -115,8 +115,6 @@ class CombatManager:
                             game.damage_numbers.spawn(ix_point[0], ix_point[1] - 30, guard_break_dmg, fighter.color, True)
 
                 if both_parried:
-                    game.total_parries += 1
-                    
                     # Standard hit-stop and screen shake
                     game.hit_stop = 8
                     game.screen_shake = 12

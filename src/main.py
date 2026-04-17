@@ -29,10 +29,10 @@ from config import (
     CRIT_CHANCE, CRIT_MULTIPLIER, CRIT_IMPACT_FRAMES, CRIT_IMPACT_TIMESCALE
 )
 from effects import ParticleSystem, ShockwaveSystem, ArenaPulseSystem, DamageNumberSystem
-from fighter import Fighter
-from obs_manager import OBSManager
-from combat_manager import CombatManager
-from ui_renderer import UIRenderer
+from entities.fighter import Fighter
+from managers.obs_manager import OBSManager
+from managers.combat_manager import CombatManager
+from renderers.ui_renderer import UIRenderer
 
 
 # Main game class - DVD logo style combat with rotating swords.
@@ -124,9 +124,6 @@ class Game:
         # Arena Escalation System
         self.inactivity_timer = 0
         
-        # Parry Escalation System
-        self.total_parries = 0
-        
         # Game State
         self.game_state = 'TITLE'
         self.obs_startup_timer = 0
@@ -163,7 +160,7 @@ class Game:
         self.ui_renderer = UIRenderer(self.screen, self.font_medium, self.font_small)
         
         # Initialize centralized SoundManager
-        from sound_manager import SoundManager
+        from managers.sound_manager import SoundManager
         self.sound_manager = SoundManager()
         
     def _lock_fighters_for_countdown(self):
@@ -313,7 +310,7 @@ class Game:
                 f"Do not swipe away... this comeback is pure cinema!",
                 f"{self.f1_name} vs {self.f2_name} goes down to the wire!"
             ]
-        elif hp_percent >= 50:
+        elif hp_percent >= 40:
             category = "blowout"
             titles = [
                 f"ABSOLUTE DOMINATION! ({self.f1_name} vs {self.f2_name})",
@@ -415,7 +412,6 @@ class Game:
         self.crit_flash_phase = 0
         
         self.inactivity_timer = 0
-        self.total_parries = 0
         
         self._lock_fighters_for_countdown()
         self.countdown_stage = 0
@@ -655,15 +651,9 @@ class Game:
             self.screen.blit(self.bg_logo, logo_rect)
         
         # Base swap logic for border color (180 frames = 3 seconds at 60fps)
-        base_border_color = self.f1_color if (self.round_timer // 180) % 2 == 0 else self.f2_color
+        border_color = self.f1_color if (self.round_timer // 180) % 2 == 0 else self.f2_color
+        border_width = 4
         
-        # Arena border — flash RED/WHITE during Sudden Death
-        if self.total_parries >= 15:
-            border_color = (255, 0, 0) if (self.round_timer // 4) % 2 == 0 else WHITE
-            border_width = 6
-        else:
-            border_color = base_border_color
-            border_width = 4
         pygame.draw.rect(self.screen, border_color, arena_rect, border_width)
         
         self.arena_pulses.draw(self.screen, offset)

@@ -34,11 +34,7 @@ class FighterRenderer:
         pygame.draw.circle(surface, body_color, 
                           (int(fighter.x + ox), int(fighter.y + oy)), int(r))
         
-        # Inner highlight
-        pygame.draw.circle(surface, fighter.color_bright,
-                          (int(fighter.x - r * 0.2 + ox), 
-                           int(fighter.y - r * 0.2 + oy)), 
-                          int(r * 0.3))
+
         
         # Sword
         self._draw_sword(fighter, surface, offset, dark_border_color)

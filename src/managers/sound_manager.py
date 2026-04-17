@@ -10,7 +10,7 @@ class SoundManager:
         self.muted = False
         self.master_volume = 1.0
         
-        base_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "audio")
+        base_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "assets", "audio")
         
         def load_sound(subfolder, filename, volume=0.5):
             path = os.path.join(base_path, subfolder, filename)
