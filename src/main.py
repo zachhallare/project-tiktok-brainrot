@@ -310,7 +310,7 @@ class Game:
                 f"Do not swipe away... this comeback is pure cinema!",
                 f"{self.f1_name} vs {self.f2_name} goes down to the wire!"
             ]
-        elif hp_percent >= 40:
+        elif hp_percent >= 35:
             category = "blowout"
             titles = [
                 f"ABSOLUTE DOMINATION! ({self.f1_name} vs {self.f2_name})",
