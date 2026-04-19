@@ -3,6 +3,7 @@ import math
 import random
 import os
 import json
+from titles import get_title_pools
 
 try:
     from dotenv import load_dotenv
@@ -290,64 +291,17 @@ class Game:
         winner_color_name = self.f1_name if winner == self.blue else self.f2_name
         loser_color_name = self.f2_name if winner == self.blue else self.f1_name
 
-        # Expanded 15-Title Pools (SPOILER-FREE)
         if hp_percent <= 10:
             category = "clutch"
-            titles = [
-                f"The greatest 1 HP comeback in AlgoRot history?!",
-                f"Someone actually survived on 1 HP! ({self.f1_name} vs {self.f2_name})",
-                f"Never count them out... INSANE Ending!",
-                f"They thought it was over... (Wait for it)",
-                f"The Ultimate Underdog Story: {self.f1_name} vs {self.f2_name}!",
-                f"A literal miracle in the final seconds!",
-                f"Greatest Plot Twist: Someone refuses to die!",
-                f"99% of people thought this was over... Then they woke up!",
-                f"How did they survive that?! (1 HP Comeback)",
-                f"A massive lead just got CHOKED in {self.f1_name} vs {self.f2_name}!",
-                f"The exact moment the tables turned!",
-                f"The craziest buzzer-beater win yet!",
-                f"From the brink of defeat: A legendary clutch!",
-                f"Do not swipe away... this comeback is pure cinema!",
-                f"{self.f1_name} vs {self.f2_name} goes down to the wire!"
-            ]
-        elif hp_percent >= 35:
+        elif hp_percent >= 25:
             category = "blowout"
-            titles = [
-                f"ABSOLUTE DOMINATION! ({self.f1_name} vs {self.f2_name})",
-                f"Is one of these colors broken in AlgoRot?!",
-                f"FLAWLESS VICTORY! Someone gets destroyed!",
-                f"Nobody can stop them... Just watch.",
-                f"They didn't stand a chance...",
-                f"The most one-sided battle in AlgoRot history!",
-                f"Pure Destruction: {self.f1_name} vs {self.f2_name}!",
-                f"Someone just proved they are the final boss!",
-                f"A masterclass in physics!",
-                f"Someone got absolutely vaporized...",
-                f"Speedrun? Finished with NO MERCY!",
-                f"Are they cheating?! (Flawless Win)",
-                f"Casually wiping the floor with their opponent.",
-                f"Total annihilation: Zero damage taken!",
-                f"They need to be deleted after what just happened."
-            ]
         else:
             category = "standard"
-            titles = [
-                f"{self.f1_name} vs {self.f2_name} ends in SHOCKING Sudden Death!",
-                f"The physics in this {self.f1_name} vs {self.f2_name} match went CRAZY!",
-                f"10 Parries Later... {self.f1_name} vs {self.f2_name} goes Nuclear!",
-                f"This {self.f1_name} vs {self.f2_name} Sudden Death will give you chills!",
-                f"NO WAY! The {self.f1_name} vs {self.f2_name} Match Was Too Close!",
-                f"Wait until the end of this {self.f1_name} vs {self.f2_name} fight!",
-                f"You won't believe how {self.f1_name} vs {self.f2_name} ends!",
-                f"Are we dreaming?! {self.f1_name} vs {self.f2_name} goes off the rails!",
-                f"This collision between {self.f1_name} and {self.f2_name} broke the engine!",
-                f"The most intense rivalry yet! ({self.f1_name} vs {self.f2_name})",
-                f"Pure satisfying chaos: {self.f1_name} vs {self.f2_name} Sudden Death!",
-                f"My brain melted watching {self.f1_name} vs {self.f2_name}...",
-                f"Who are you rooting for? ({self.f1_name} vs {self.f2_name} Epic Ending)",
-                f"Gravity stopped working in this {self.f1_name} vs {self.f2_name} clash!",
-                f"The exact moment {self.f1_name} vs {self.f2_name} turned into a movie!"
-            ]
+            
+        # Title Pools (loaded from titles.py)
+        title_pools = get_title_pools(self.f1_name, self.f2_name)
+        titles = title_pools[category]
+
 
         # Persistent JSON Tracker Logic (INDEX-BASED)
         tracker_file = "used_titles.json"
