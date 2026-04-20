@@ -33,6 +33,7 @@ class Fighter:
         self.is_blue = is_blue
         self.health = BASE_HEALTH
         self.max_health = BASE_HEALTH
+        self.speed_multiplier = 1.0
         
         # Sword
         self.sword_angle = 0
@@ -54,6 +55,9 @@ class Fighter:
         # Visual
         self.flash_timer = 0
         self.victory_bounce = 0
+        self.render_color = self.color
+        self.render_color_bright = self.color_bright
+        self.health_bar_color = self.color
         
         # Cooldowns
         self.attack_cooldown = 0
@@ -117,13 +121,13 @@ class Fighter:
         
         # Clamp velocity (scaling limits with speed_multiplier)
         speed = math.hypot(self.vx, self.vy)
-        max_vel = MAX_VELOCITY
+        max_vel = MAX_VELOCITY * self.speed_multiplier
         if speed > max_vel:
             self.vx = (self.vx / speed) * max_vel
             self.vy = (self.vy / speed) * max_vel
         
         # Ensure minimum velocity (DVD logo always moving)
-        min_vel = MIN_VELOCITY
+        min_vel = MIN_VELOCITY * self.speed_multiplier
         if speed < min_vel and speed > 0:
             self.vx = (self.vx / speed) * min_vel
             self.vy = (self.vy / speed) * min_vel
@@ -240,6 +244,10 @@ class Fighter:
         self.attack_cooldown = 0
         self.invincible = 0
         self.locked = False
+
+        self.render_color = self.color
+        self.render_color_bright = self.color_bright
+        self.health_bar_color
         
         self.last_hit_frame = -100
         

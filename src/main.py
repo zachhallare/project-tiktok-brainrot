@@ -500,7 +500,7 @@ class Game:
             self._trigger_arena_pulse()
             self.inactivity_timer = 0  # Reset so it pulses again in 2 seconds if still inactive
         
-        effective_arena = tuple(self.arena_bounds)
+        effective_arena = self.chaos.get_effective_bounds(tuple(self.arena_bounds))
         
         # Update fighters with effective arena
         self.blue.update(self.red, effective_arena, self.particles, self.shockwaves)

@@ -144,6 +144,11 @@ class CombatManager:
                 angle = math.atan2(defender.y - attacker.y, defender.x - attacker.x)
                 knockback = BASE_KNOCKBACK * crit_mult * (1.0 + (total_damage_mult - 1.0) * 0.5) * 1.5
                 
+                if hasattr(game, 'chaos'):
+                    knockback *= game.chaos.get_knockback_mult()
+                    if game.chaos.is_ultra_knockback():
+                        game.screen_shake = max(game.screen_shake, SCREEN_SHAKE_INTENSITY * 3)
+
                 # Dynamic Sweet Spot Damage System
                 if impact_ratio < 0.7:
                     # The Grinding Hit
