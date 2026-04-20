@@ -1,6 +1,6 @@
 import pygame
 import random
-from chaos_manager import CHAOS_DURATION, CHAOS_INTERVAL
+
 
 class UIRenderer:
     """Handles rendering of the HUD, health bars, warnings, and CTA text."""
@@ -13,7 +13,7 @@ class UIRenderer:
         self.bg_color = (30, 30, 30)
         self.dark_border_color = (60, 60, 60)
         self.event_label_anim_timer = 0
-        self.last_chaos_event = None
+
 
     def draw(self, game):
         """Main draw method for all UI overlays."""
@@ -89,33 +89,4 @@ class UIRenderer:
         vs_rect = vs_surface.get_rect(center=(ax + (aw // 2), bar_y + (bar_height // 2)))
         self.screen.blit(vs_surface, vs_rect)
 
-        # Chaos event label
-        current_event = game.chaos.get_active_label()
-        if current_event and current_event != self.last_chaos_event:
-            self.event_label_anim_timer = 8
 
-        self.last_chaos_event = current_event
-
-        if current_event:
-            font = pygame.font.SysFont(None, 64, bold=True)
-            text = font.render(current_event, True, (255, 255, 255))
-            if self.event_label_anim_timer > 0:
-                scale = 2.0 - (8 - self.event_label_anim_timer) * 0.125
-                self.event_label_anim_timer -= 1
-            else:
-                scale = 1.0
-
-            scaled = pygame.transform.scale(text, (int(text.get_width() * scale), int(text.get_height() * scale)))
-
-            self.screen.blit(scaled, scaled.get_rect(centerx=ax + aw // 2, top=8))
-
-        # Chaos countdown bar
-        remaining = game.chaos.get_interval_remaining()
-        total = CHAOS_DURATION if game.chaos.active_event else CHAOS_INTERVAL
-        pct = max(0.0, min(1.0, remaining / total))
-        bar_w, bar_h = 160, 4
-        bar_x = ax + aw // 2 - bar_w // 2
-        bar_y_chaos = ay - 6
-        pygame.draw.rect(self.screen, (60, 60, 60), (bar_x, bar_y_chaos, bar_w, bar_h))
-        fill_color = (255, 80, 80) if game.chaos.active_event else (180, 180, 180)
-        pygame.draw.rect(self.screen, fill_color, (bar_x, bar_y_chaos, int(bar_w * pct), bar_h))

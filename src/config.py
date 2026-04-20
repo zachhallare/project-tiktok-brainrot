@@ -22,6 +22,7 @@ ARENA_HEIGHT = SCREEN_HEIGHT - ARENA_MARGIN * 2
 
 # Colors
 BLACK = (0, 0, 0)
+ARENA_BG = (26, 26, 26)  # Dark grey arena fill (~#1a1a1a) for better trail/particle visibility
 WHITE = (255, 255, 255)
 DARK_GRAY = (30, 30, 30)
 GRAY = (60, 60, 60)

@@ -19,7 +19,7 @@ except ImportError:
 # Import constants and classes from other modules.
 from config import (
     SCREEN_WIDTH, SCREEN_HEIGHT, CANVAS_WIDTH, CANVAS_HEIGHT, DISPLAY_WIDTH, DISPLAY_HEIGHT, FPS,
-    WHITE, PURPLE, BLACK, DARK_GRAY, GRAY, YELLOW,
+    WHITE, PURPLE, BLACK, ARENA_BG, DARK_GRAY, GRAY, YELLOW,
     ARENA_MARGIN, ARENA_WIDTH, ARENA_HEIGHT,
     ROUND_MAX_TIME, BASE_KNOCKBACK, DAMAGE_PER_HIT, SLOW_MOTION_SPEED,
     HIT_STOP_FRAMES, SCREEN_SHAKE_INTENSITY, SCREEN_SHAKE_DECAY,
@@ -500,8 +500,8 @@ class Game:
             self._trigger_arena_pulse()
             self.inactivity_timer = 0  # Reset so it pulses again in 2 seconds if still inactive
         
-        effective_arena = self.chaos.get_effective_bounds(tuple(self.arena_bounds))
-        
+        effective_arena = tuple(self.arena_bounds)
+
         # Update fighters with effective arena
         self.blue.update(self.red, effective_arena, self.particles, self.shockwaves)
         self.red.update(self.blue, effective_arena, self.particles, self.shockwaves)
@@ -595,7 +595,7 @@ class Game:
         ax, ay, aw, ah = draw_arena
         arena_rect = pygame.Rect(int(ax + offset[0]), int(ay + offset[1]), int(aw), int(ah))
         
-        arena_fill = BLACK
+        arena_fill = ARENA_BG
         pygame.draw.rect(self.screen, arena_fill, arena_rect)
         
         # Draw background logo watermark
