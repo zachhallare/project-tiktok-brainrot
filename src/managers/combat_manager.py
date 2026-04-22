@@ -24,16 +24,38 @@ class CombatManager:
         
         (base_x, base_y), (tip_x, tip_y) = attacker.get_sword_hitbox()
         
-        # Check multiple points along the blade to determine impact ratio
+        # Perpendicular direction across the blade thickness.
+        angle = attacker.sword_angle
+        perp_x = -math.sin(angle)
+        perp_y = math.cos(angle)
+
+        # Sample 5 rows: centerline + 4 rows near each edge.
+        sword_half_h = 11
+        row_offsets = [0.0, sword_half_h * 0.5, -sword_half_h * 0.5, sword_half_h * 0.9, -sword_half_h * 0.9]
+
         steps = 10
-        # Start from base to tip to find the first point of contact
-        for i in range(1, steps + 1):
-            t = i / steps
-            check_x = base_x + (tip_x - base_x) * t
-            check_y = base_y + (tip_y - base_y) * t
-            dist = math.hypot(check_x - defender.x, check_y - defender.y)
-            if dist < defender.radius + 3:
-                return (check_x, check_y), t
+        best_hit = None
+        best_t = None
+
+        for row in row_offsets:
+            row_base_x = base_x + perp_x * row
+            row_base_y = base_y + perp_y * row
+            row_tip_x = tip_x + perp_x * row
+            row_tip_y = tip_y + perp_y * row
+        
+            for i in range(1, steps + 1):
+                t = i / steps
+                check_x = row_base_x + (row_tip_x - row_base_x) * t
+                check_y = row_base_y + (row_tip_y - row_base_y) * t
+                dist = math.hypot(check_x - defender.x, check_y - defender.y)
+                if dist < defender.radius + 3:
+                    if best_t is None or t < best_t:
+                        best_hit = (check_x, check_y)
+                        best_t = t
+        
+        if best_hit:
+            return best_hit, best_t
+
         return None, 0.0
 
     @staticmethod

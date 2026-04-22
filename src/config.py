@@ -87,7 +87,7 @@ BOUNCE_ENERGY = 1.0  # Full energy retained on wall bounce
 # Game constants (tuned for ~15s matches)
 FPS = 60
 FIGHTER_RADIUS = 30  # Smaller fighters
-SWORD_LENGTH = 55
+SWORD_LENGTH = 40
 SWORD_WIDTH = 6
 BASE_HEALTH = 250  # Increased for longer, more exciting fights
 DAMAGE_PER_HIT = 15  # +50% damage for faster kills

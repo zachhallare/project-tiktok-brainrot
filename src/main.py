@@ -39,6 +39,8 @@ from renderers.ui_renderer import UIRenderer
 # Main game class - DVD logo style combat with rotating swords.
 class Game:    
     def __init__(self, f1_color, f2_color, f1_name="Blue", f2_name="Red"):
+        import sys
+        self.is_test_mode = "--test-mode" in sys.argv
         self.f1_name = f1_name
         self.f2_name = f2_name
         self.f1_color = f1_color
@@ -172,7 +174,9 @@ class Game:
         self.blue.vy = 0
         self.red.vx = 0
         self.red.vy = 0
-        self.blue.sword_angle = 0
+        self.blue.rotation_angle = 0.0
+        self.blue.sword_angle = 0.0
+        self.red.rotation_angle = math.pi
         self.red.sword_angle = math.pi
     
     def _unlock_fighters(self):
@@ -291,9 +295,9 @@ class Game:
         winner_color_name = self.f1_name if winner == self.blue else self.f2_name
         loser_color_name = self.f2_name if winner == self.blue else self.f1_name
 
-        if hp_percent <= 10:
+        if hp_percent <= 15:
             category = "clutch"
-        elif hp_percent >= 25:
+        elif hp_percent >= 20:
             category = "blowout"
         else:
             category = "standard"
@@ -332,9 +336,11 @@ class Game:
         self.viral_title_idea = title_idea
         
         # Save the picked index to the tracker (not the string)
-        tracker_data[category].append(chosen_index)
-        with open(tracker_file, 'w') as f:
-            json.dump(tracker_data, f, indent=4)
+        # Only persist to used_titles.json when recording with OBS (not in test mode)
+        if not self.is_test_mode:
+            tracker_data[category].append(chosen_index)
+            with open(tracker_file, 'w') as f:
+                json.dump(tracker_data, f, indent=4)
             
 
 

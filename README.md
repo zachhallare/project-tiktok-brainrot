@@ -15,7 +15,7 @@
 4. **Resolution** → Slow-motion death sequence with particle explosion
 5. **Finish** → The game terminates to finalize OBS recording or advance batch
 
-The aesthetic features a sharp **cel-shaded** style—solid neon colors with centralized dark outlines, chunky bordered swords, and elegant fading tip trails. The combat *feels* incredibly punchy thanks to dramatic ricochet physics, hit-stop, screen shake, and slow-motion effects.
+The aesthetic features a sharp **cel-shaded** style—solid neon colors with centralized dark outlines, high-fidelity sword sprites, and elegant fading tip trails. The arena uses a textured **Dark Grey background** (#1a1a1a) to maximize the visual pop of neon effects, trails, and particle explosions. Combat *feels* incredibly punchy thanks to dramatic ricochet physics, hit-stop, screen shake, and slow-motion effects.
 
 ---
 
@@ -42,12 +42,13 @@ There is no player failure state—this is an automated simulation. Both fighter
 The combat is a **"Beyblade" style auto-battler**. There are no directional slash attacks; instead, fighters spin continuously with persistent, always-active sword hitboxes.
 
 - **Constant Rotation:** Fighters maintain a continuous 360-degree spin.
-- **Sword Parry System:** Persistent sword-to-sword collision creates a dynamic parry system with high-knockback ricochet physics.
+- **Energy-Based Parry System:** Persistent sword-to-sword collision triggers a parry. Each parry consumes **Parry Energy**.
+- **Guard Break Mechanic:** If a fighter runs out of energy, they suffer a **Guard Break**—taking penalty damage, receiving massive knockback, and facing a temporary stun.
 - **Always-Active Damage:** Damage is driven exclusively by physical sword-to-body intersection. 
 
 ### Damage & Collision
-- **Hit Detection:** If any point along the chunky sword intersects the opponent's body, damage is dealt.
-- **Invincibility Frames:** Increased immunity frames after taking damage prevent unintended instant-death multi-hits from the continuous spinning blade.
+- **Hit Detection:** If the sword sprite intersects the opponent's body, damage is dealt.
+- **Invincibility Frames:** Increased immunity frames after taking damage prevent unintended instant-death multi-hits.
 - **Ricochet Physics:** Extreme, dramatic knockback is applied upon impact, bouncing fighters off each other like spinning tops.
 
 ### Hit Feedback
@@ -78,7 +79,7 @@ If a fighter ever stops moving (velocity = 0), they're given a random directiona
 When bouncing off walls, fighters receive a **4 pixel/frame velocity boost toward the arena center**. This prevents corner camping and naturally guides fighters back into combat.
 
 ### Sword Orientation & Rotation
-The sword rotates 360 degrees constantly. The weapon leaves a smooth, fading, semi-transparent light trail at the tip to emphasize the speed and direction of the spin, with a thick cel-shaded black outline.
+The sword is rendered as a high-quality sprite, scaled to **2x** for better visual clarity. It rotates 360 degrees constantly. The weapon leaves a smooth, fading, semi-transparent light trail at the tip to emphasize the speed and direction of the spin.
 
 ---
 
@@ -164,8 +165,10 @@ python record.py
 
 Fighter colors are strictly limited to a customized 8-color high-contrast `NEON_PALETTE` for aesthetics. When you run `main.py` or the batch recorder, colors are dynamically injected. The batch recorder fully randomizes these colors automatically. The chosen colors don't just change the fighters—they globally cascade and replace visual variables across the simulation:
 - The game's standard arena borders dynamically swap between Fighter 1 and Fighter 2 colors every 3 seconds.
-- The UI features a persistent, flush, **Tekken-style HUD** displaying robust health bars dynamically themed to the chosen fighters' colors, bordered with a dark cel-shaded outline.
-- The **Winner Announcer** dynamically renders a sleek, color-coded dot corresponding to the winning fighter followed by "WINS" to keep text sizing absolutely uniform across all outcomes.
+- The UI features a persistent, flush, **Tekken-style HUD** displaying robust health bars dynamically themed to the chosen fighters' colors. 
+    - **Minimum Width:** Health bars maintain a 1px minimum width as long as the fighter is alive to prevent "phantom death" visual bugs at low health.
+    - **Energy Bars:** Secondary cyan bars below health track **Parry Energy**, informing you of upcoming Guard Breaks.
+- The **Winner Announcer** dynamically renders a sleek, color-coded dot corresponding to the winning fighter followed by "WINS".
 
 ---
 
@@ -200,7 +203,7 @@ This project is built to automate the creation of YouTube shorts content. It inc
 | `BASE_HEALTH`         | 250   | Hit points per fighter               |
 | `DAMAGE_PER_HIT`      | 15    | Base damage (before multipliers)     |
 | `FIGHTER_RADIUS`      | 30    | Fighter body size                    |
-| `SWORD_LENGTH`        | 55    | Sword reach in pixels                |
+| `SWORD_LENGTH`        | 40    | Sword reach in pixels                |
 | `ROUND_MAX_TIME`      | 18    | Force resolution after 18 seconds    |
 
 ---
