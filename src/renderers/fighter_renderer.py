@@ -80,16 +80,16 @@ class FighterRenderer:
         base_sx = fighter.x + ox + cos_a * (r + 3)
         base_sy = fighter.y + oy + sin_a * (r + 3)
 
-        # Recolor
-        colored = self._weapon_base.copy()
-        colored.fill(
-            (*fighter.render_color[:3], 180),
-            special_flags=pygame.BLEND_RGBA_MULT
-        )
+        # # Recolor the weapon.
+        # colored = self._weapon_base.copy()
+        # colored.fill(
+        #     (*fighter.render_color[:3], 180),
+        #     special_flags=pygame.BLEND_RGBA_MULT
+        # )
 
         # Rotate CW by angle
         angle_deg = math.degrees(angle)
-        rotated = pygame.transform.rotate(colored, -angle_deg)
+        rotated = pygame.transform.rotate(self._weapon_base, -angle_deg)    
 
         # Sprite center = handle_pos + (orig_w / 2) along blade axis
         rot_center_x = base_sx + (self._orig_w / 2) * cos_a
