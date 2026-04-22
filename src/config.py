@@ -129,3 +129,82 @@ GAME_SETTINGS = {
     'arena_size': 500,
     'slow_motion_death': True,
 }
+
+# ── Weapon Configurations ─────────────────────────────────────────────────────
+# sprite_size  : (width, height) in pixels — sword is the reference at (87, 27)
+# sword_length : reach in px from the body edge to the tip (drives hitbox)
+# damage_mult  : multiplier applied to base damage (bigger/heavier = more damage)
+# handle_ratio : t-values below this are handle — no damage zone
+# hitbox_profile: list of (t, half_width_px)
+#   t=0.0 = handle attachment point, t=1.0 = weapon tip
+#   half_width_px = dangerous radius of the weapon cross-section at that point
+WEAPON_CONFIGS = {
+    'sword': {
+        'sprite_file': 'sword.png',
+        'sprite_size': (87, 27),
+        'sword_length': 40,
+        'damage_mult': 1.0,
+        'handle_ratio': 0.25,
+        'hitbox_profile': [
+            (0.25, 6),
+            (0.50, 9),
+            (0.75, 7),
+            (1.00, 4),
+        ],
+    },
+    'dagger': {
+        'sprite_file': 'dagger.png',
+        'sprite_size': (38, 18),
+        'sword_length': 17,
+        'damage_mult': 0.75,
+        'handle_ratio': 0.30,
+        'hitbox_profile': [
+            (0.30, 4),
+            (0.60, 5),
+            (0.85, 4),
+            (1.00, 2),
+        ],
+    },
+    'spear': {
+        'sprite_file': 'spear.png',
+        'sprite_size': (174, 18),
+        'sword_length': 148,
+        'damage_mult': 0.9,
+        'handle_ratio': 0.72,   # almost all shaft — only tip scores
+        'hitbox_profile': [
+            (0.72,  3),
+            (0.85,  6),
+            (0.93,  7),
+            (1.00,  3),
+        ],
+    },
+    'axe': {
+        'sprite_file': 'axe.png',
+        'sprite_size': (70, 56),
+        'sword_length': 33,
+        'damage_mult': 1.4,
+        'handle_ratio': 0.45,
+        'hitbox_profile': [
+            (0.45,  5),
+            (0.62, 18),
+            (0.78, 24),
+            (0.90, 22),
+            (1.00, 14),
+        ],
+    },
+    'hammer': {
+        'sprite_file': 'hammer.png',
+        'sprite_size': (63, 50),
+        'sword_length': 29,
+        'damage_mult': 1.6,
+        'handle_ratio': 0.48,
+        'hitbox_profile': [
+            (0.48,  4),
+            (0.65, 20),
+            (0.80, 22),
+            (0.93, 22),
+            (1.00, 18),
+        ],
+    },
+}
+

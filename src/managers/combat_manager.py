@@ -13,50 +13,54 @@ class CombatManager:
         pass
 
     def _check_sword_hit(self, attacker, defender):
-        """Check if sword hits defender body, returning point and impact ratio."""
-        
-        # Early-out: skip if defender is too far for any sword point to reach
+        """
+        Profile-based hitbox using per-weapon cross-section data.
+
+        Each weapon defines a hitbox_profile — a list of (t, half_width_px):
+        t=0 is the handle attachment, t=1 is the tip.
+        half_width_px is the dangerous radius of the weapon at that point.
+
+        A hit registers when the defender's circle overlaps the weapon's
+        cross-section circle at any profile point in the damage zone.
+        This correctly ignores empty sprite pixels and handle regions.
+        """
+        cfg = attacker.weapon_config
+        profile      = cfg.get('hitbox_profile', [])
+        handle_ratio = cfg.get('handle_ratio', 0.25)
+
+        if not profile:
+            return None, 0.0
+
+        # Broad-phase early-out
+        max_half_w  = max(hw for _, hw in profile)
+        max_reach   = attacker.radius + 3 + attacker.sword_length + defender.radius + max_half_w
         fighter_dist = math.hypot(attacker.x - defender.x, attacker.y - defender.y)
-        scaled_sword_length = attacker.sword_length
-        max_reach = attacker.radius + 3 + scaled_sword_length + defender.radius + 3
         if fighter_dist > max_reach:
             return None, 0.0
-        
+
         (base_x, base_y), (tip_x, tip_y) = attacker.get_sword_hitbox()
-        
-        # Perpendicular direction across the blade thickness.
-        angle = attacker.sword_angle
-        perp_x = -math.sin(angle)
-        perp_y = math.cos(angle)
 
-        # Sample 5 rows: centerline + 4 rows near each edge.
-        sword_half_h = 11
-        row_offsets = [0.0, sword_half_h * 0.5, -sword_half_h * 0.5, sword_half_h * 0.9, -sword_half_h * 0.9]
-
-        steps = 10
         best_hit = None
-        best_t = None
+        best_t   = None
 
-        for row in row_offsets:
-            row_base_x = base_x + perp_x * row
-            row_base_y = base_y + perp_y * row
-            row_tip_x = tip_x + perp_x * row
-            row_tip_y = tip_y + perp_y * row
-        
-            for i in range(1, steps + 1):
-                t = i / steps
-                check_x = row_base_x + (row_tip_x - row_base_x) * t
-                check_y = row_base_y + (row_tip_y - row_base_y) * t
-                dist = math.hypot(check_x - defender.x, check_y - defender.y)
-                if dist < defender.radius + 3:
-                    if best_t is None or t < best_t:
-                        best_hit = (check_x, check_y)
-                        best_t = t
-        
-        if best_hit:
-            return best_hit, best_t
+        for (t, half_w) in profile:
+            if t < handle_ratio:
+                continue  # handle — no damage
 
-        return None, 0.0
+            # World position of this profile point along the blade centerline
+            px = base_x + (tip_x - base_x) * t
+            py = base_y + (tip_y - base_y) * t
+
+            # Hit if defender circle overlaps the weapon cross-section circle
+            dist = math.hypot(px - defender.x, py - defender.y)
+            if dist < half_w + defender.radius:
+                # Keep the hit closest to the handle (smallest t) for impact_ratio
+                if best_t is None or t < best_t:
+                    best_hit = (px, py)
+                    best_t   = t
+
+        return (best_hit, best_t) if best_hit else (None, 0.0)
+
 
     @staticmethod
     def _cross(o, a, b):

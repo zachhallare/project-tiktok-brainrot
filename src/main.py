@@ -38,9 +38,10 @@ from renderers.ui_renderer import UIRenderer
 
 # Main game class - DVD logo style combat with rotating swords.
 class Game:    
-    def __init__(self, f1_color, f2_color, f1_name="Blue", f2_name="Red"):
+    def __init__(self, f1_color, f2_color, f1_name="Blue", f2_name="Red", weapon="sword"):
         import sys
         self.is_test_mode = "--test-mode" in sys.argv
+        self.weapon = weapon
         self.f1_name = f1_name
         self.f2_name = f2_name
         self.f1_color = f1_color
@@ -72,9 +73,9 @@ class Game:
         spawn_margin = 100
         center_y = SCREEN_HEIGHT // 2
         self.blue = Fighter(ARENA_MARGIN + spawn_margin, center_y, 
-                            self.f1_color, self.f1_bright, is_blue=True)
+                            self.f1_color, self.f1_bright, is_blue=True, weapon=weapon)
         self.red = Fighter(SCREEN_WIDTH - ARENA_MARGIN - spawn_margin, center_y, 
-                            self.f2_color, self.f2_bright, is_blue=False)
+                            self.f2_color, self.f2_bright, is_blue=False, weapon=weapon)
         
         # Lock fighters for countdown
         self._lock_fighters_for_countdown()
@@ -777,8 +778,18 @@ class Game:
 if __name__ == "__main__":
     import sys
     import random
-    from config import BASE_COLORS
+    from config import BASE_COLORS, WEAPON_CONFIGS
     
+    weapon = "sword"
+    if "--weapon" in sys.argv:
+        idx = sys.argv.index("--weapon")
+        if idx + 1 < len(sys.argv):
+            w = sys.argv[idx + 1]
+            if w in WEAPON_CONFIGS:
+                weapon = w
+            else:
+                print(f"[WARN] Unknown weapon '{w}', defaulting to sword.")
+
     # Randomly pick two distinct color names from the 12-slice wheel
     name_1, name_2 = random.sample(list(BASE_COLORS.keys()), 2)
     
@@ -786,5 +797,5 @@ if __name__ == "__main__":
     print(f"Fighter 1: {name_1}")
     print(f"Fighter 2: {name_2}")
     
-    game = Game(BASE_COLORS[name_1], BASE_COLORS[name_2], name_1, name_2)
+    game = Game(BASE_COLORS[name_1], BASE_COLORS[name_2], name_1, name_2, weapon=weapon)
     game.run()

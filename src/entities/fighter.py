@@ -1,6 +1,6 @@
 """
-Simplified fighter with bounce-only movement and Beyblade constant-spin combat.
-DVD logo style - fighters bounce around arena with always-spinning swords.
+Fighter with bounce-only movement and Beyblade constant-spin combat.
+Supports multiple weapon types via WEAPON_CONFIGS.
 """
 
 import pygame
@@ -9,18 +9,17 @@ import random
 
 from config import (
     WHITE, BLACK,
-    FIGHTER_RADIUS, SWORD_LENGTH, SWORD_WIDTH, BASE_HEALTH,
+    FIGHTER_RADIUS, SWORD_WIDTH, BASE_HEALTH,
     DRAG, MAX_VELOCITY, MIN_VELOCITY, BOUNCE_ENERGY,
     WALL_BOOST_STRENGTH, TRAIL_LENGTH, TRAIL_FADE_RATE,
-    GLOW_ALPHA, GLOW_RADIUS_MULT
+    GLOW_ALPHA, GLOW_RADIUS_MULT,
+    WEAPON_CONFIGS
 )
 
 from renderers.fighter_renderer import FighterRenderer
 
 class Fighter:
-    """Simplified fighter with wall-bounce movement and Beyblade spin combat."""
-    
-    def __init__(self, x, y, color, color_bright, is_blue=True):
+    def __init__(self, x, y, color, color_bright, is_blue=True, weapon="sword"):
         self.x = x
         self.y = y
         self.start_x = x
@@ -34,13 +33,17 @@ class Fighter:
         self.health = BASE_HEALTH
         self.max_health = BASE_HEALTH
         self.speed_multiplier = 1.0
+
+        # Weapon
+        self.weapon = weapon
+        self.weapon_config = WEAPON_CONFIGS[weapon]
         
         # Body rotation — the whole unit (body + sword) spins together.
         # sword_angle is kept in sync so combat_manager.py needs no changes.
         self.rotation_angle = 0.0
         self.sword_angle = 0.0          # always == rotation_angle
-        self.sword_length = SWORD_LENGTH
-        self.base_sword_length = SWORD_LENGTH
+        self.sword_length = self.weapon_config["sword_length"]
+        self.base_sword_length = self.sword_length
         self.last_sword_angle = 0.0
         self.sword_angular_velocity = 0.0
         
@@ -73,7 +76,8 @@ class Fighter:
         
         self.trail = []
         
-        self._renderer = FighterRenderer()
+        self._renderer = FighterRenderer(weapon)
+
 
     def update_rotation(self, opponent=None, frame_count=0):
         """
@@ -93,6 +97,7 @@ class Fighter:
         if self.parry_cooldown > 0:
             self.parry_cooldown -= 1
 
+
     def update(self, opponent, arena_bounds, particles, shockwaves):
         """Update fighter — bounce-only movement with ninja wall boosts."""
         if self.locked:
@@ -106,16 +111,12 @@ class Fighter:
         
         self.last_sword_angle = self.sword_angle
         self.update_rotation(opponent, 0)
+        delta = (self.sword_angle - self.last_sword_angle + math.pi) % (2 * math.pi) - math.pi
+        self.sword_angular_velocity = delta
         
-        delta_angle = (self.sword_angle - self.last_sword_angle + math.pi) % (2 * math.pi) - math.pi
-        self.sword_angular_velocity = delta_angle
-        
-        if self.flash_timer > 0:
-            self.flash_timer -= 1
-        if self.attack_cooldown > 0:
-            self.attack_cooldown -= 1
-        if self.invincible > 0:
-            self.invincible -= 1
+        if self.flash_timer > 0: self.flash_timer -= 1
+        if self.attack_cooldown > 0: self.attack_cooldown -= 1
+        if self.invincible > 0: self.invincible -= 1
 
         self.vx *= DRAG
         self.vy *= DRAG
@@ -131,43 +132,34 @@ class Fighter:
             self.vx = (self.vx / speed) * min_vel
             self.vy = (self.vy / speed) * min_vel
         elif speed == 0:
-            angle = random.uniform(0, 2 * math.pi)
-            self.vx = math.cos(angle) * min_vel
-            self.vy = math.sin(angle) * min_vel
+            a = random.uniform(0, 2 * math.pi)
+            self.vx = math.cos(a) * min_vel
+            self.vy = math.sin(a) * min_vel
         
         self.x += self.vx
         self.y += self.vy
         
         ax, ay, aw, ah = arena_bounds
         r = self.radius
+        cx = ax + aw / 2
+        cy = ay + ah / 2
         
         if self.x - r < ax:
             self.x = ax + r
             self.vx = abs(self.vx) * BOUNCE_ENERGY
-            center_x = ax + aw / 2
-            if self.x < center_x:
-                self.vx += WALL_BOOST_STRENGTH
-        
+            if self.x < cx: self.vx += WALL_BOOST_STRENGTH
         if self.x + r > ax + aw:
             self.x = ax + aw - r
             self.vx = -abs(self.vx) * BOUNCE_ENERGY
-            center_x = ax + aw / 2
-            if self.x > center_x:
-                self.vx -= WALL_BOOST_STRENGTH
-        
+            if self.x > cx: self.vx -= WALL_BOOST_STRENGTH
         if self.y - r < ay:
             self.y = ay + r
             self.vy = abs(self.vy) * BOUNCE_ENERGY
-            center_y = ay + ah / 2
-            if self.y < center_y:
-                self.vy += WALL_BOOST_STRENGTH
-        
+            if self.y < cy: self.vy += WALL_BOOST_STRENGTH
         if self.y + r > ay + ah:
             self.y = ay + ah - r
             self.vy = -abs(self.vy) * BOUNCE_ENERGY
-            center_y = ay + ah / 2
-            if self.y > center_y:
-                self.vy -= WALL_BOOST_STRENGTH
+            if self.y > cy: self.vy -= WALL_BOOST_STRENGTH
         
         if self.victory_bounce > 0:
             self.victory_bounce -= 1
@@ -183,7 +175,7 @@ class Fighter:
         return (base_x, base_y), (tip_x, tip_y)
     
     def get_attack_damage_multiplier(self):
-        return 1.0
+        return self.weapon_config.get("damage_mult", 1.0)
 
     def draw(self, surface, offset=(0, 0)):
         self._renderer.render(self, surface, offset)
