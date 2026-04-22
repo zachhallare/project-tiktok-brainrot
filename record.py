@@ -3,6 +3,12 @@ import time
 import sys
 import os
 
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 
 WEAPON_NAMES = ['sword', 'dagger', 'spear', 'axe', 'hammer']
 
@@ -18,6 +24,37 @@ def pick_weapon():
         print(f"  Please enter a number between 1 and {len(WEAPON_NAMES)}.")
 
 
+def check_obs_connection():
+    """Block until OBS is open and reachable, or user cancels."""
+    print("\n[INFO] Checking OBS connection before proceeding...")
+    while True:
+        try:
+            import obsws_python as obsws
+            import io
+            import contextlib
+
+            port = int(os.environ.get("OBS_PORT", 4455))
+            password = os.environ.get("OBS_PASSWORD", "")
+            with contextlib.redirect_stderr(io.StringIO()):
+                cl = obsws.ReqClient(host="localhost", port=port, password=password, timeout=3)
+                cl.get_version()
+                cl.disconnect()
+            print("[OK] OBS is open and connected. Proceeding...\n")
+            return True
+        except ConnectionRefusedError:
+            print(f"[WAITING] OBS is not open or WebSocket is not enabled (port {os.environ.get('OBS_PORT', 4455)}).")
+            retry = input("Open OBS and press ENTER to retry, or type 'skip' to cancel: ").strip().lower()
+            if retry == 'skip':
+                print("[CANCELLED] Exiting.")
+                return False
+        except Exception as e:
+            print(f"[WAITING] Could not connect to OBS: {type(e).__name__}: {e}")
+            retry = input("Open OBS and press ENTER to retry, or type 'skip' to cancel: ").strip().lower()
+            if retry == 'skip':
+                print("[CANCELLED] Exiting.")
+                return False
+
+
 def main():
     print("=" * 50)
     print("  TikTok / YT Shorts Automation Recorder  ")
@@ -26,6 +63,11 @@ def main():
     test_mode_input = input("Run in test mode? (y/n): ").strip().lower()
     is_test_mode = test_mode_input == 'y'
     mode_name = "Test Mode" if is_test_mode else "Batch Recording"
+
+    # Check OBS connection before anything else if recording
+    if not is_test_mode:
+        if not check_obs_connection():
+            return
 
     weapon = pick_weapon()
     print(f"[INFO] Weapon selected: {weapon.upper()}")
@@ -46,7 +88,7 @@ def main():
     if is_test_mode:
         print("[INFO] OBS recording is disabled.\n")
     else:
-        print("[INFO] Please ensure OBS Studio is open in the background.\n")
+        print("[INFO] OBS confirmed open. Starting batch...\n")
 
     root_dir    = os.path.dirname(os.path.abspath(__file__))
     main_script = os.path.join(root_dir, "src", "main.py")
