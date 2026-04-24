@@ -49,7 +49,8 @@ class Fighter:
         
         # Beyblade spin state
         self.spin_direction = 1 if self.is_blue else -1
-        self.spin_speed = 0.25
+        self.base_spin_speed = 0.25 * self.weapon_config.get("spin_speed_mult", 1.0)
+        self.spin_speed = self.base_spin_speed
         self.parry_cooldown = 0
         self.max_parry_energy = 100.0
         self.parry_energy = self.max_parry_energy
@@ -206,7 +207,7 @@ class Fighter:
         self.sword_length = self.base_sword_length
         
         self.spin_direction = 1 if self.is_blue else -1
-        self.spin_speed = 0.25
+        self.spin_speed = self.base_spin_speed
         self.parry_cooldown = 0
         self.parry_energy = self.max_parry_energy
         self.sword_trail = []

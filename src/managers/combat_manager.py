@@ -2,7 +2,7 @@ import math
 import random
 
 from config import (
-    BASE_KNOCKBACK, HIT_STOP_FRAMES, SCREEN_SHAKE_INTENSITY,
+    BASE_KNOCKBACK, HIT_STOP_FRAMES, HAMMER_HIT_STOP_FRAMES, SCREEN_SHAKE_INTENSITY,
     HIT_SLOWMO_FRAMES, CRIT_CHANCE, CRIT_MULTIPLIER, CRIT_IMPACT_FRAMES
 )
 
@@ -57,7 +57,7 @@ class CombatManager:
                 # Keep the hit closest to the handle (smallest t) for impact_ratio
                 if best_t is None or t < best_t:
                     best_hit = (px, py)
-                    best_t   = t
+                    best_t = t
 
         return (best_hit, best_t) if best_hit else (None, 0.0)
 
@@ -115,9 +115,11 @@ class CombatManager:
                 
                 both_parried = True
                 for fighter in (blue, red):
-                    if fighter.parry_energy >= fighter.parry_cost:
+                    other = red if fighter is blue else blue
+                    effective_cost = fighter.parry_cost * other.weapon_config.get("parry_drain_mult", 1.0)
+                    if fighter.parry_energy >= effective_cost:
                         # SUCCESSFUL PARRY
-                        fighter.parry_energy -= fighter.parry_cost
+                        fighter.parry_energy -= effective_cost
                         fighter.spin_direction *= -1
                         fighter.parry_cooldown = 15
                     else:
@@ -168,15 +170,23 @@ class CombatManager:
                 total_damage_mult = damage_mult * crit_mult
                 
                 angle = math.atan2(defender.y - attacker.y, defender.x - attacker.x)
-                knockback = BASE_KNOCKBACK * crit_mult * (1.0 + (total_damage_mult - 1.0) * 0.5) * 1.5
+
+                weapon_kb_mult = attacker.weapon_config.get("knockback_mult", 1.0)
+                knockback = BASE_KNOCKBACK * crit_mult * (1.0 + (total_damage_mult - 1.0) * 0.5) * 1.5 * weapon_kb_mult
                 
                 if hasattr(game, 'chaos'):
                     knockback *= game.chaos.get_knockback_mult()
                     if game.chaos.is_ultra_knockback():
                         game.screen_shake = max(game.screen_shake, SCREEN_SHAKE_INTENSITY * 3)
 
+
                 # Dynamic Sweet Spot Damage System
-                if impact_ratio < 0.7:
+                # all_sweet_spot weapons (axe, hammer) always score sweet-spot hits.
+                # Other weapons use a per-weapon threshold instead of the hardcoded 0.
+                all_sweet_spot = attacker.weapon_config.get("all_sweet_spot", False)
+                sweet_spot_threshold = attacker.weapon_config.get("sweet_spot_threshold", 0.70)
+
+                if not all_sweet_spot and impact_ratio < sweet_spot_threshold:
                     # The Grinding Hit
                     base_damage = 10
                     shake_intensity = 4
@@ -219,6 +229,16 @@ class CombatManager:
                     game.hit_slowmo_frames = HIT_SLOWMO_FRAMES
                     game._reset_inactivity()
                     
+
+                    # Weapon special effects on hit
+                    # Hammer: disorient defender by reversing their spin direction,
+                    # then slam hit_stop to the maximum value.
+                    if attacker.weapon_config.get('reverses_spin', False):
+                        defender.spin_direction *= -1
+                    if attacker.weapon_config.get('max_hitstop', False):
+                        game.hit_stop = max(game.hit_stop, HAMMER_HIT_STOP_FRAMES)
+
+
                     # Critical Hit: Trigger anime impact sequence (Decomposition for tip hits)
                     if is_crit and is_sweet_spot:
                         game.decomp_slowmo_frames = 30  # Phase 2: 0.5 seconds at 10% timescale
@@ -230,6 +250,9 @@ class CombatManager:
                         game.particles.emit_explosion(hit_pos[0], hit_pos[1], (0, 255, 255), count=25) # Cyan
                         game.particles.emit_explosion(hit_pos[0], hit_pos[1], (255, 0, 255), count=25) # Magenta
                         game.particles.emit_explosion(hit_pos[0], hit_pos[1], (255, 255, 255), count=15) # White
+                        
+                        if attacker.weapon_config.get("max_hitstop", False):
+                            game.hit_stop = max(game.hit_stop, HAMMER_HIT_STOP_FRAMES)
                     elif is_crit:
                         game.crit_impact_frames = CRIT_IMPACT_FRAMES
                         game.crit_impact_accumulator = 0.0

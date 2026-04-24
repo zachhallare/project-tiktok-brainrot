@@ -1,6 +1,17 @@
 
-
 =======================================================
+
+Last-minute chaos_manager.py notes before you wire it in:
+1. BLACKOUT will need sword color coverage
+Right now it sets render_color and render_color_bright to black — but your fighter_renderer.py almost certainly draws the sword using the fighter's color too. Before you add weapons, make sure blackout also blacks out the sword body/tip. Otherwise you'll have invisible fighters with a glowing sword giving them away.
+2. get_knockback_mult() and Axe's 2x knockback need a decision
+The Axe has its own 2x knockback multiplier and ULTRA KNOCKBACK returns 4.0x. When both are active simultaneously, decide now: multiplicative (8x total, absolutely chaotic) or capped (one wins). Multiplicative is funnier for the content format, but you need to be intentional. Currently combat_manager.py is probably just applying the chaos multiplier — you'll want to chain it with the weapon's value.
+3. get_damage_mult() is a stub — keep it that way
+It returns 1.0 hardcoded. Weapon damage multipliers (Spear tip = 2x, Axe sweet-spot-everywhere, etc.) should live on the weapon stats, not here. This is the right architecture — chaos_manager controls chaos-specific modifiers, weapons control weapon-specific modifiers, and combat_manager multiplies them together.
+4. THE CRUSHER + Spear is broken by design (keep it)
+The Crusher shrinks the arena; the Spear has ~85px reach vs. the default 55px sword. In a half-size arena the Spear can hit across nearly the whole space. This is a chaotic, content-worthy interaction — don't "fix" it.
+5. HYPER SPEED won't conflict with Dagger's fast spin
+As long as speed_multiplier only touches movement velocity and spin speed is a separate property, they're independent. Just make sure when you add spin_speed to Fighter, it's not accidentally driven by speed_multiplier.
 
 ========================================================
 

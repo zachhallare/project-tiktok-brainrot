@@ -38,10 +38,11 @@ from renderers.ui_renderer import UIRenderer
 
 # Main game class - DVD logo style combat with rotating swords.
 class Game:    
-    def __init__(self, f1_color, f2_color, f1_name="Blue", f2_name="Red", weapon="sword"):
+    def __init__(self, f1_color, f2_color, f1_name="Blue", f2_name="Red", f1_weapon="sword", f2_weapon="sword"):
         import sys
         self.is_test_mode = "--test-mode" in sys.argv
-        self.weapon = weapon
+        self.f1_weapon = f1_weapon
+        self.f2_weapon = f2_weapon
         self.f1_name = f1_name
         self.f2_name = f2_name
         self.f1_color = f1_color
@@ -73,9 +74,9 @@ class Game:
         spawn_margin = 100
         center_y = SCREEN_HEIGHT // 2
         self.blue = Fighter(ARENA_MARGIN + spawn_margin, center_y, 
-                            self.f1_color, self.f1_bright, is_blue=True, weapon=weapon)
+                            self.f1_color, self.f1_bright, is_blue=True, weapon=f1_weapon)
         self.red = Fighter(SCREEN_WIDTH - ARENA_MARGIN - spawn_margin, center_y, 
-                            self.f2_color, self.f2_bright, is_blue=False, weapon=weapon)
+                            self.f2_color, self.f2_bright, is_blue=False, weapon=f2_weapon)
         
         # Lock fighters for countdown
         self._lock_fighters_for_countdown()
@@ -145,7 +146,7 @@ class Game:
         
         # Load Arena Watermark Logo
         import os
-        logo_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "images", "logo-dark-grey-text.png")
+        logo_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "images", "logos", "logo-dark-grey-text.png")
         try:
             logo_img = pygame.image.load(logo_path).convert_alpha()
             # Scale down to be a watermark (max ~400px wide)
@@ -780,15 +781,23 @@ if __name__ == "__main__":
     import random
     from config import BASE_COLORS, WEAPON_CONFIGS
     
-    weapon = "sword"
-    if "--weapon" in sys.argv:
-        idx = sys.argv.index("--weapon")
-        if idx + 1 < len(sys.argv):
-            w = sys.argv[idx + 1]
-            if w in WEAPON_CONFIGS:
-                weapon = w
-            else:
-                print(f"[WARN] Unknown weapon '{w}', defaulting to sword.")
+    all_weapon = list(WEAPON_CONFIGS.keys())
+
+    def _pick_weapon(flag, default="sword"):
+        if flag in sys.argv:
+            idx = sys.argv.index(flag)
+            if idx + 1 < len(sys.argv):
+                w = sys.argv[idx + 1]
+                if w in WEAPON_CONFIGS:
+                    return w
+                print(f"[WARN] Unknown weapon '{w}', defaulting to {default}.")
+        return default
+
+    if "--weapons" in sys.argv and sys.argv[sys.argv.index("--weapons") + 1] == "random":
+        f1_weapon, f2_weapon = random.sample(all_weapon, 2)
+    else:
+        f1_weapon = _pick_weapon("--f1-weapon")
+        f2_weapon = _pick_weapon("--f2-weapon")
 
     # Randomly pick two distinct color names from the 12-slice wheel
     name_1, name_2 = random.sample(list(BASE_COLORS.keys()), 2)
@@ -797,5 +806,6 @@ if __name__ == "__main__":
     print(f"Fighter 1: {name_1}")
     print(f"Fighter 2: {name_2}")
     
-    game = Game(BASE_COLORS[name_1], BASE_COLORS[name_2], name_1, name_2, weapon=weapon)
+    game = Game(BASE_COLORS[name_1], BASE_COLORS[name_2], name_1, name_2,
+                f1_weapon=f1_weapon, f2_weapon=f2_weapon)
     game.run()

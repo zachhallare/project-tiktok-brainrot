@@ -10,7 +10,7 @@ class FighterRenderer:
         cfg = WEAPON_CONFIGS[weapon]
         weapons_dir = os.path.join(
             os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-            "assets", "weapons"
+            "assets", "images", "weapons"
         )
         raw = pygame.image.load(
             os.path.join(weapons_dir, cfg['sprite_file'])

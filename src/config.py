@@ -99,6 +99,7 @@ SLOW_MOTION_SPEED = 0.20  # 20% of normal speed
 
 # Hit effects
 HIT_STOP_FRAMES = 8
+HAMMER_HIT_STOP_FRAMES = 22
 SCREEN_SHAKE_INTENSITY = 15
 SCREEN_SHAKE_DECAY = 0.85
 
@@ -107,7 +108,7 @@ HIT_SLOWMO_FRAMES = 5          # Duration in frames
 HIT_SLOWMO_TIMESCALE = 0.60    # Time scale (60% speed)
 
 # Critical Hit System
-CRIT_CHANCE = 0.15             # 15% chance per attack (more spectacle in short matches)
+CRIT_CHANCE = 0.20             # 15% chance per attack (more spectacle in short matches)
 CRIT_MULTIPLIER = 2.0          # 2x damage and knockback
 CRIT_IMPACT_FRAMES = 12        # Frames of anime impact freeze
 CRIT_IMPACT_TIMESCALE = 0.02   # 2% speed (near-frozen) during impact
@@ -138,10 +139,21 @@ GAME_SETTINGS = {
 # hitbox_profile: list of (t, half_width_px)
 #   t=0.0 = handle attachment point, t=1.0 = weapon tip
 #   half_width_px = dangerous radius of the weapon cross-section at that point
+#
+# ── Behaviour fields (new) ────────────────────────────────────────────────────
+# spin_speed_mult   : multiplies the base 0.25 rad/frame spin speed
+# knockback_mult    : weapon-level knockback multiplier (stacks with chaos mult)
+# sweet_spot_threshold : impact_ratio >= this value → sweet-spot hit
+#                        ignored when all_sweet_spot is True
+# all_sweet_spot    : True  → every hit is treated as a sweet-spot hit
+# reverses_spin     : True  → on a successful body hit, flip defender's spin_direction
+# max_hitstop       : True  → override hit_stop to HAMMER_HIT_STOP_FRAMES on every hit
+# parry_drain_mult  : multiplier on the defender's parry_cost when blocking this weapon
+#                     >1.0 makes the weapon expensive to parry (dagger)
 WEAPON_CONFIGS = {
     'sword': {
         'sprite_file': 'sword.png',
-        'sprite_size': (87, 27),
+        'sprite_size': (87, 23),
         'sword_length': 40,
         'damage_mult': 1.0,
         'handle_ratio': 0.25,
@@ -151,10 +163,19 @@ WEAPON_CONFIGS = {
             (0.75, 7),
             (1.00, 4),
         ],
+        # default behavior.
+        'spin_speed_mult': 1.0,
+        'knockback_mult': 1.0,
+        'sweet_spot_threshold': 0.70,
+        'all_sweet_spot': False,
+        'reverse_spin': False,
+        'max_hitstop': False,
+        'parry_drain_mult': 1.0
     },
+
     'dagger': {
         'sprite_file': 'dagger.png',
-        'sprite_size': (38, 18),
+        'sprite_size': (38, 11),
         'sword_length': 17,
         'damage_mult': 0.75,
         'handle_ratio': 0.30,
@@ -164,10 +185,19 @@ WEAPON_CONFIGS = {
             (0.85, 4),
             (1.00, 2),
         ],
+        # behaviour — fast spin, cheap hits, bleeds parry energy dry
+        'spin_speed_mult': 2.2,
+        'knockback_mult': 0.7,
+        'sweet_spot_threshold': 0.70,
+        'all_sweet_spot': False,
+        'reverse_spin': False,
+        'max_hitstop': False,
+        'parry_drain_mult': 2.5
     },
+
     'spear': {
         'sprite_file': 'spear.png',
-        'sprite_size': (174, 18),
+        'sprite_size': (174, 13),
         'sword_length': 148,
         'damage_mult': 0.9,
         'handle_ratio': 0.72,   # almost all shaft — only tip scores
@@ -177,10 +207,20 @@ WEAPON_CONFIGS = {
             (0.93,  7),
             (1.00,  3),
         ],
+        # behaviour — slow, tip-only sweet spot, doubled tip damage via damage_mult
+        # (the 0.9 base + handle_ratio gate means only tip hits land; tip = sweet spot)
+        'spin_speed_mult': 0.75,
+        'knockback_mult': 1.0,
+        'sweet_spot_threshold': 0.85,  # last 15 % of blade is the hot zone
+        'all_sweet_spot': False,
+        'reverses_spin': False,
+        'max_hitstop': False,
+        'parry_drain_mult': 1.0,
     },
+
     'axe': {
         'sprite_file': 'axe.png',
-        'sprite_size': (70, 56),
+        'sprite_size': (70, 32),
         'sword_length': 33,
         'damage_mult': 1.4,
         'handle_ratio': 0.45,
@@ -191,10 +231,19 @@ WEAPON_CONFIGS = {
             (0.90, 22),
             (1.00, 14),
         ],
+        # behaviour — slow and heavy, every hit is a sweet-spot, 2x knockback
+        'spin_speed_mult': 0.6,
+        'knockback_mult': 2.0,
+        'sweet_spot_threshold': 0.0,   # irrelevant — all_sweet_spot overrides
+        'all_sweet_spot': True,
+        'reverses_spin': False,
+        'max_hitstop': False,
+        'parry_drain_mult': 1.0,
     },
+
     'hammer': {
         'sprite_file': 'hammer.png',
-        'sprite_size': (63, 50),
+        'sprite_size': (63, 25),
         'sword_length': 29,
         'damage_mult': 1.6,
         'handle_ratio': 0.48,
@@ -205,6 +254,14 @@ WEAPON_CONFIGS = {
             (0.93, 22),
             (1.00, 18),
         ],
+        # behaviour — every hit reverses spin and applies max hitstop
+        'spin_speed_mult': 0.45,
+        'knockback_mult': 1.5,
+        'sweet_spot_threshold': 0.0,   # irrelevant — all_sweet_spot overrides
+        'all_sweet_spot': True,
+        'reverses_spin': True,
+        'max_hitstop': True,
+        'parry_drain_mult': 1.0,
     },
 }
 
