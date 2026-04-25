@@ -185,9 +185,7 @@ class Game:
         """Unlock fighters and trigger a magnetic pulse toward the center."""
         self.blue.locked = False
         self.red.locked = False
-        
-        # Trigger the visual and audio pulse effect
-        self._trigger_arena_pulse()
+        self._trigger_arena_pulse()     # Trigger the visual and audio pulse effect
         
         # Launch them directly at the center for a massive opening clash
         from config import SCREEN_WIDTH, SCREEN_HEIGHT
@@ -195,19 +193,22 @@ class Game:
         
         center_x = SCREEN_WIDTH // 2
         center_y = SCREEN_HEIGHT // 2
-        
+
+        # Only sword vs sword gets the opening clash. Everything else gets the vertical jitter.
+        vertical_jitter = 0 if (self.blue.weapon == "sword" and self.red.weapon == "sword") else random.uniform(-6, 6)
+
         # Calculate launch vectors
         dx_b = center_x - self.blue.x
         dy_b = center_y - self.blue.y
         dist_b = max(1, math.hypot(dx_b, dy_b))
         self.blue.vx = (dx_b / dist_b) * 18  # High-speed initial launch
-        self.blue.vy = (dy_b / dist_b) * 18
+        self.blue.vy = (dy_b / dist_b) * 18 + vertical_jitter
         
         dx_r = center_x - self.red.x
         dy_r = center_y - self.red.y
         dist_r = max(1, math.hypot(dx_r, dy_r))
         self.red.vx = (dx_r / dist_r) * 18
-        self.red.vy = (dy_r / dist_r) * 18
+        self.red.vy = (dy_r / dist_r) * 18 - vertical_jitter
     
 
     
@@ -513,7 +514,7 @@ class Game:
         # Update fighters with effective arena
         self.blue.update(self.red, effective_arena, self.particles, self.shockwaves)
         self.red.update(self.blue, effective_arena, self.particles, self.shockwaves)
-        
+    
         # Body-to-body collision separation (prevent overlap that causes phantom sword hits)
         dx = self.red.x - self.blue.x
         dy = self.red.y - self.blue.y

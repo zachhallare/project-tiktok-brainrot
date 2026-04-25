@@ -21,10 +21,13 @@ COMBO_TRACKER_FILE = "used_weapon_combos.json"
 def pick_weapon(label):
     """Prompt the user to pick a single weapon for one fighter."""
     print(f"\n  Weapons available for {label}:")
+    print(f"    0. random")
     for i, name in enumerate(WEAPON_NAMES, 1):
         print(f"    {i}. {name}")
     while True:
         choice = input(f"  Pick weapon for {label} (1-{len(WEAPON_NAMES)}): ").strip()
+        if choice == '0':
+            return random.choice(WEAPON_NAMES)
         if choice.isdigit() and 1 <= int(choice) <= len(WEAPON_NAMES):
             return WEAPON_NAMES[int(choice) - 1]
         print(f"    Please enter a number between 1 and {len(WEAPON_NAMES)}.")
@@ -100,7 +103,7 @@ def check_obs_connection():
 
 def main():
     print("=" * 50)
-    print("           YT Shorts Automation Recorder  ")
+    print("          YT Shorts Automation Recorder  ")
     print("=" * 50)
 
     test_mode_input = input("Run in test mode? (y/n): ").strip().lower()

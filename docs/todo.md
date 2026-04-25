@@ -1,3 +1,11 @@
+todos:
+- change from an async hitbox to a sync hitbox.
+
+
+
+
+
+
 
 =======================================================
 

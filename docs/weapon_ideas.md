@@ -1,3 +1,22 @@
+1. sword vs sword
+2. dagger vs dagger
+3. spear vs spear
+4. axe vs axe
+5. hammer vs hammer
+6. dagger vs hammer 
+7. dagger vs axe
+8. dagger vs sword
+9. dagger vs spear
+10. hammer vs axe
+11. hammer vs sword
+12. hammer vs spear
+13. sword vs spear
+14. sword vs axe
+15. spear vs axe
+
+
+========================================================================
+
 1. Sword — The baseline. Balanced everything. No changes. The benchmark other weapons are measured against.
 
 ==========================================================================
