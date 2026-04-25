@@ -1,12 +1,12 @@
 # Color Battle by AlgoRot
 
-> A fast-paced, minimalist 2D sword fighting simulation inspired by DVD screensaver physics. Watch as two AI-controlled fighters bounce around an arena, trading blows with swinging swords in epic, bite-sized battles perfect for social media content.
+> A fast-paced, minimalist 2D fighting simulation inspired by DVD screensaver physics. Watch as two AI-controlled fighters bounce around an arena, trading blows with various spinning weapons in epic, bite-sized battles perfect for social media content.
 
 ---
 
 ## Project Overview
 
-**Color Battle** is an automated AI-vs-AI combat simulation built for endless, satisfying content loops. The game features two circular fighters bouncing around an arena like a DVD screensaver while wielding swords in a continuous "Beyblade-style" spin. Out of the box, it supports a dynamic 6-color Neon Palette selector prior to initialization.
+**Color Battle** is an automated AI-vs-AI combat simulation built for endless, satisfying content loops. The game features two circular fighters bouncing around an arena like a DVD screensaver while wielding various weapons in a continuous "Beyblade-style" spin. Out of the box, it supports a dynamic 12-color Neon Palette selector prior to initialization.
 
 ### Core Loop
 1. **Countdown** → "3-2-1-FIGHT" initiates each round (accompanied by audio beeps)
@@ -15,7 +15,7 @@
 4. **Resolution** → Slow-motion death sequence with particle explosion
 5. **Finish** → The game terminates to finalize OBS recording or advance batch
 
-The aesthetic features a sharp **cel-shaded** style—solid neon colors with centralized dark outlines, high-fidelity sword sprites, and elegant fading tip trails. The arena uses a textured **Dark Grey background** (#1a1a1a) to maximize the visual pop of neon effects, trails, and particle explosions. Combat *feels* incredibly punchy thanks to dramatic ricochet physics, hit-stop, screen shake, and slow-motion effects.
+The aesthetic features a sharp **cel-shaded** style—solid neon colors with centralized dark outlines and high-fidelity weapon sprites. The arena uses a textured **Dark Grey background** (#1a1a1a) to maximize the visual pop of neon effects, body trails, and particle explosions. Combat *feels* incredibly punchy thanks to dramatic ricochet physics, hit-stop, screen shake, and slow-motion effects.
 
 ---
 
@@ -39,15 +39,16 @@ There is no player failure state—this is an automated simulation. Both fighter
 ## Combat Mechanics
 
 ### Weapon System: Beyblade Auto-Battler
-The combat is a **"Beyblade" style auto-battler**. There are no directional slash attacks; instead, fighters spin continuously with persistent, always-active sword hitboxes.
+The combat is a **"Beyblade" style auto-battler**. There are no directional slash attacks; instead, fighters spin continuously with persistent, always-active weapon hitboxes. The game features multiple distinct weapon types (Sword, Dagger, Spear, Axe, Hammer), each with unique attributes, reach, and special effects.
 
 - **Constant Rotation:** Fighters maintain a continuous 360-degree spin.
-- **Energy-Based Parry System:** Persistent sword-to-sword collision triggers a parry. Each parry consumes **Parry Energy**.
+- **Energy-Based Parry System:** Persistent weapon-to-weapon collision triggers a parry. Each parry consumes **Parry Energy**.
 - **Guard Break Mechanic:** If a fighter runs out of energy, they suffer a **Guard Break**—taking penalty damage, receiving massive knockback, and facing a temporary stun.
-- **Always-Active Damage:** Damage is driven exclusively by physical sword-to-body intersection. 
+- **Always-Active Damage:** Damage is driven exclusively by physical weapon-to-body intersection. 
+- **Momentum System:** Landing consecutive hits builds up momentum stacks, increasing the damage multiplier of subsequent attacks. Taking damage resets a fighter's momentum back to zero.
 
 ### Damage & Collision
-- **Hit Detection:** If the sword sprite intersects the opponent's body, damage is dealt.
+- **Hit Detection:** If the weapon sprite intersects the opponent's body, damage is dealt. Hit detection utilizes profile-based hitboxes matching the specific shape and sweet spots of each weapon.
 - **Invincibility Frames:** Increased immunity frames after taking damage prevent unintended instant-death multi-hits.
 - **Ricochet Physics:** Extreme, dramatic knockback is applied upon impact, bouncing fighters off each other like spinning tops.
 
@@ -78,8 +79,8 @@ If a fighter ever stops moving (velocity = 0), they're given a random directiona
 ### Ninja Wall Boosts
 When bouncing off walls, fighters receive a **4 pixel/frame velocity boost toward the arena center**. This prevents corner camping and naturally guides fighters back into combat.
 
-### Sword Orientation & Rotation
-The sword is rendered as a high-quality sprite, scaled to **2x** for better visual clarity. It rotates 360 degrees constantly. The weapon leaves a smooth, fading, semi-transparent light trail at the tip to emphasize the speed and direction of the spin.
+### Weapon Orientation & Rotation
+Weapons are rendered as high-quality sprites, scaled for optimal visual clarity. They rotate 360 degrees constantly. Each weapon aligns its rotation center dynamically to match the physics hitbox perfectly.
 
 ---
 
@@ -117,7 +118,7 @@ If no combat occurs for **2 seconds**, an **Arena Pulse** triggers.
 ### Project Structure
 ```text
 project_root/
-├── assets/           # Media assets (audio, images) extracted to root
+├── assets/           # Media assets (audios, images) extracted to root
 ├── src/
 │   ├── config.py           # Constants, physics values, and configuration
 │   ├── effects.py          # Particle, shockwave, and slash effects
