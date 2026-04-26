@@ -32,7 +32,7 @@ class FighterRenderer:
 
         flashing     = fighter.flash_timer > 0
         body_color   = WHITE if flashing else fighter.color
-        border_color = WHITE if flashing else fighter.color_bright
+        border_color = WHITE if flashing else tuple(max(0, c - 80) for c in fighter.color)
 
         pygame.draw.circle(surface, border_color, (cx, cy), int(r) + BORDER_THICKNESS)
         pygame.draw.circle(surface, body_color,   (cx, cy), int(r))
@@ -119,4 +119,3 @@ class FighterRenderer:
         rot_rect = rotated.get_rect(center=(int(rot_center_x), int(rot_center_y)))
         surface.blit(rotated, rot_rect)
 
-        

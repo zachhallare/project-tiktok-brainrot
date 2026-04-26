@@ -162,7 +162,7 @@ WEAPON_CONFIGS = {
             (0.85, 4),
             (1.00, 2),
         ],
-        'spin_speed_mult': 2.2,
+        'spin_speed_mult': 1.25,
         'knockback_mult': 0.7,
         'sweet_spot_threshold': 0.70,
         'all_sweet_spot': False,
@@ -171,7 +171,7 @@ WEAPON_CONFIGS = {
         'parry_drain_mult': 1.75,
         'momentum_gain': 1,
         'base_health': 200,
-        'move_speed_mult': 1.35,
+        'move_speed_mult': 1.3,
         'trail_length': 5
     },
 
