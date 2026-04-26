@@ -2,7 +2,8 @@ import math
 import random
 
 from config import (
-    BASE_KNOCKBACK, HIT_STOP_FRAMES, HAMMER_HIT_STOP_FRAMES, SCREEN_SHAKE_INTENSITY,
+    BASE_KNOCKBACK, HIT_STOP_FRAMES, HAMMER_HIT_STOP_FRAMES, HAMMER_NORMAL_HIT_STOP,
+    SCREEN_SHAKE_INTENSITY,
     HIT_SLOWMO_FRAMES, CRIT_CHANCE, CRIT_MULTIPLIER, CRIT_IMPACT_FRAMES,
     MOMENTUM_MAX_STACKS, MOMENTUM_DAMAGE_BONUS
 )
@@ -22,9 +23,6 @@ class CombatManager:
                        used for particle / damage number placement.
           damage_t   — t of the HANDLE-MOST overlapping profile point,
                        used for sweet-spot / impact-ratio calculations.
-
-        Separating the two means spear particles spawn at the actual tip,
-        not at the shaft-junction where the handle_ratio gate starts.
         """
         cfg = attacker.weapon_config
         profile      = cfg.get('hitbox_profile', [])
@@ -33,7 +31,6 @@ class CombatManager:
         if not profile:
             return None, 0.0
 
-        # Broad-phase early-out
         max_half_w   = max(hw for _, hw in profile)
         max_reach    = attacker.radius + 3 + attacker.sword_length + defender.radius + max_half_w
         fighter_dist = math.hypot(attacker.x - defender.x, attacker.y - defender.y)
@@ -42,23 +39,21 @@ class CombatManager:
 
         (base_x, base_y), (tip_x, tip_y) = attacker.get_sword_hitbox()
 
-        best_damage_t = None   # smallest t — for impact_ratio / sweet-spot logic
-        best_spawn_t  = None   # largest  t — for visual spawn position
+        best_damage_t  = None
+        best_spawn_t   = None
         best_spawn_pos = None
 
         for (t, half_w) in profile:
             if t < handle_ratio:
-                continue  # handle — no damage
+                continue
 
             px = base_x + (tip_x - base_x) * t
             py = base_y + (tip_y - base_y) * t
 
             dist = math.hypot(px - defender.x, py - defender.y)
             if dist < half_w + defender.radius:
-                # Damage ratio: keep closest to handle (smallest t)
                 if best_damage_t is None or t < best_damage_t:
                     best_damage_t = t
-                # Spawn position: keep closest to tip (largest t) — visually correct
                 if best_spawn_t is None or t > best_spawn_t:
                     best_spawn_t = t
                     best_spawn_pos = (px, py)
@@ -114,13 +109,13 @@ class CombatManager:
                         fighter.parry_cooldown = 15
                     else:
                         both_parried = False
-                        game.particles.emit(ix_point[0], ix_point[1], (255, 0, 0),   count=40, size=6)
+                        game.particles.emit(ix_point[0], ix_point[1], (255, 0, 0),    count=40, size=6)
                         game.particles.emit(ix_point[0], ix_point[1], (255, 255, 255), count=20, size=4)
 
                         guard_break_dmg = random.randint(15, 25)
-                        fighter.health     -= guard_break_dmg
+                        fighter.health      -= guard_break_dmg
                         fighter.parry_energy = 0
-                        fighter.momentum    = 0   # guard break also resets momentum
+                        fighter.momentum     = 0
 
                         fighter.vx = -fighter.vx * 1.5
                         fighter.vy = -fighter.vy * 1.5
@@ -131,11 +126,11 @@ class CombatManager:
                                                       guard_break_dmg, fighter.color, True)
 
                 if both_parried:
-                    game.hit_stop    = 8
+                    game.hit_stop     = 8
                     game.screen_shake = 12
                     game.particles.emit(ix_point[0], ix_point[1], (255, 255, 100), count=20, size=4)
                 else:
-                    game.hit_stop    = 12
+                    game.hit_stop     = 12
                     game.screen_shake = 20
 
                 if hasattr(game, 'sound_manager'):
@@ -151,7 +146,6 @@ class CombatManager:
             crit_mult = CRIT_MULTIPLIER if is_crit else 1.0
 
             damage_mult       = attacker.get_attack_damage_multiplier()
-            # Momentum bonus: each stack adds MOMENTUM_DAMAGE_BONUS to the multiplier
             momentum_bonus    = attacker.momentum * MOMENTUM_DAMAGE_BONUS
             total_damage_mult = damage_mult * crit_mult * (1.0 + momentum_bonus)
 
@@ -207,26 +201,33 @@ class CombatManager:
                 game.hit_slowmo_frames = HIT_SLOWMO_FRAMES
                 game._reset_inactivity()
 
-                # Increment attacker momentum (weapon-specific rate, hammer=0)
                 gain = attacker.weapon_config.get("momentum_gain", 1)
                 attacker.momentum = min(MOMENTUM_MAX_STACKS, attacker.momentum + gain)
 
                 # Weapon special effects
                 if attacker.weapon_config.get("reverses_spin", False):
                     defender.spin_direction *= -1
+
+                # Hammer hitstop: normal hits get a moderate freeze (12 frames),
+                # only crits get the full dramatic freeze (30 frames).
+                # This keeps the chaos identity without exhausting the viewer.
                 if attacker.weapon_config.get("max_hitstop", False):
-                    game.hit_stop = max(game.hit_stop, HAMMER_HIT_STOP_FRAMES)
+                    if is_crit:
+                        game.hit_stop = max(game.hit_stop, HAMMER_HIT_STOP_FRAMES)
+                    else:
+                        game.hit_stop = max(game.hit_stop, HAMMER_NORMAL_HIT_STOP)
 
                 # Critical hit sequences
                 if is_crit and is_sweet_spot:
-                    game.decomp_slowmo_frames    = 30
+                    game.decomp_slowmo_frames      = 30
                     game.decomp_slowmo_accumulator = 0.0
-                    game.hit_slowmo_frames       = 0
-                    game.hit_stop                = 4
-                    game.screen_shake            = max(game.screen_shake, 35)
+                    game.hit_slowmo_frames         = 0
+                    game.hit_stop                  = 4
+                    game.screen_shake              = max(game.screen_shake, 35)
                     game.particles.emit_explosion(hit_pos[0], hit_pos[1], (0, 255, 255),   count=25)
                     game.particles.emit_explosion(hit_pos[0], hit_pos[1], (255, 0, 255),   count=25)
                     game.particles.emit_explosion(hit_pos[0], hit_pos[1], (255, 255, 255), count=15)
+                    # Hammer crit: override the decomp hit_stop=4 with full freeze
                     if attacker.weapon_config.get("max_hitstop", False):
                         game.hit_stop = max(game.hit_stop, HAMMER_HIT_STOP_FRAMES)
                 elif is_crit:
@@ -234,3 +235,6 @@ class CombatManager:
                     game.crit_impact_accumulator = 0.0
                     game.crit_flash_phase        = 1
                     game.screen_shake            = max(game.screen_shake, SCREEN_SHAKE_INTENSITY * 2)
+
+
+                    

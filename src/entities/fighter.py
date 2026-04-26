@@ -30,13 +30,24 @@ class Fighter:
         self.color = color
         self.color_bright = color_bright
         self.is_blue = is_blue
-        self.health = BASE_HEALTH
-        self.max_health = BASE_HEALTH
-        self.speed_multiplier = 1.0
 
         # Weapon
         self.weapon = weapon
         self.weapon_config = WEAPON_CONFIGS[weapon]
+
+        # Health
+        weapon_health = self.weapon_config.get('base_health', BASE_HEALTH)
+        self.health = weapon_health
+        self.max_health = weapon_health
+
+        # Speed_Multiplier is used by chaos (HYPER SPEED sets it to 2.5, resets to 1.0)
+        # weapon_speed_mult is the weapon's intrinsic movement modifier — kept separate
+        # so chaos reset doesn't erase the weapon's base speed
+        self.speed_multiplier = 1.0
+        self.weapon_speed_mult = self.weapon_config.get('move_speed_mult', 1.0)
+
+        # Per-Weapon Trail Length
+        self.trail_length = self.weapon_config.get('trail_length', TRAIL_LENGTH)
 
         # Body rotation
         self.rotation_angle = 0.0
@@ -116,13 +127,15 @@ class Fighter:
         self.vx *= DRAG
         self.vy *= DRAG
 
+        combined_mult = self.speed_multiplier * self.weapon_speed_mult
+
         speed = math.hypot(self.vx, self.vy)
-        max_vel = MAX_VELOCITY * self.speed_multiplier
+        max_vel = MAX_VELOCITY * combined_mult
         if speed > max_vel:
             self.vx = (self.vx / speed) * max_vel
             self.vy = (self.vy / speed) * max_vel
 
-        min_vel = MIN_VELOCITY * self.speed_multiplier
+        min_vel = MIN_VELOCITY * combined_mult
         if speed < min_vel and speed > 0:
             self.vx = (self.vx / speed) * min_vel
             self.vy = (self.vy / speed) * min_vel
@@ -160,6 +173,7 @@ class Fighter:
             self.victory_bounce -= 1
             self.y += math.sin(self.victory_bounce * 0.4) * 5
 
+
     def get_sword_hitbox(self):
         r = self.radius
         base_x = self.x + math.cos(self.sword_angle) * (r + 3)
@@ -167,6 +181,7 @@ class Fighter:
         tip_x = base_x + math.cos(self.sword_angle) * self.sword_length
         tip_y = base_y + math.sin(self.sword_angle) * self.sword_length
         return (base_x, base_y), (tip_x, tip_y)
+
 
     def get_attack_damage_multiplier(self):
         return self.weapon_config.get("damage_mult", 1.0)
@@ -185,13 +200,14 @@ class Fighter:
         self.momentum = 0
         return True
 
+
     def reset(self):
         self.x = self.start_x
         self.y = self.start_y
         self.vx = random.uniform(-8, 8)
         self.vy = random.uniform(-8, 8)
         self.radius = FIGHTER_RADIUS
-        self.health = BASE_HEALTH
+        self.health = self.max_health
 
         self.rotation_angle = 0.0 if self.is_blue else math.pi
         self.sword_angle = self.rotation_angle
@@ -202,6 +218,7 @@ class Fighter:
 
         self.spin_direction = 1 if self.is_blue else -1
         self.spin_speed = self.base_spin_speed
+        self.speed_multiplier = 1.0     # reset chaos override.
         self.parry_cooldown = 0
         self.parry_energy = self.max_parry_energy
         self.sword_trail = []
@@ -220,3 +237,5 @@ class Fighter:
 
         self.last_hit_frame = -100
         self.trail.clear()
+
+        

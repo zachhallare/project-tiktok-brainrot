@@ -1,11 +1,67 @@
 todos:
-- change from an async hitbox to a sync hitbox.
+=======================================================
+
+double check these if its all fair:
+1. sword vs sword - good.
+2. dagger vs dagger - animation need to be better
+3. spear vs spear
+4. axe vs axe
+5. hammer vs hammer
+
+6. dagger vs hammer
+    - round 1 winner: 
+    - round 2 winner: 
+    - round 3 winner:
+
+7. dagger vs axe
+    - round 1 winner: 
+    - round 2 winner: 
+    - round 3 winner:
+
+8. dagger vs sword
+    - round 1 winner: 
+    - round 2 winner: 
+    - round 3 winner:
+
+9. dagger vs spear
+    - round 1 winner: 
+    - round 2 winner: 
+    - round 3 winner:
+
+10. hammer vs axe
+    - round 1 winner: 
+    - round 2 winner: 
+    - round 3 winner:
+
+11. hammer vs sword
+    - round 1 winner: 
+    - round 2 winner: 
+    - round 3 winner:
+
+12. hammer vs spear
+    - round 1 winner: 
+    - round 2 winner: 
+    - round 3 winner:
+
+13. sword vs spear 
+    - round 1 winner: 
+    - round 2 winner: 
+    - round 3 winner:
+
+14. sword vs axe
+    - round 1 winner: 
+    - round 2 winner: 
+    - round 3 winner:
+
+15. spear vs axe
+    - round 1 winner: 
+    - round 2 winner: 
+    - round 3 winner:
 
 
+=======================================================
 
-
-
-
+- change from an async hitbox to a sync hitbox for better animation?
 
 =======================================================
 
