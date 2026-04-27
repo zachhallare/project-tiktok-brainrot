@@ -21,13 +21,10 @@ COMBO_TRACKER_FILE = "used_weapon_combos.json"
 def pick_weapon(label):
     """Prompt the user to pick a single weapon for one fighter."""
     print(f"\n  Weapons available for {label}:")
-    print(f"    0. random")
     for i, name in enumerate(WEAPON_NAMES, 1):
         print(f"    {i}. {name}")
     while True:
         choice = input(f"  Pick weapon for {label} (1-{len(WEAPON_NAMES)}): ").strip()
-        if choice == '0':
-            return random.choice(WEAPON_NAMES)
         if choice.isdigit() and 1 <= int(choice) <= len(WEAPON_NAMES):
             return WEAPON_NAMES[int(choice) - 1]
         print(f"    Please enter a number between 1 and {len(WEAPON_NAMES)}.")
@@ -115,22 +112,34 @@ def main():
 
     # TEST MODE
     if is_test_mode:
-        print("\n[TEST MODE] One match only — pick a weapon for each fighter.")
+        print("\n[TEST MODE] Pick a weapon for each fighter.")
         f1_weapon = pick_weapon("Fighter 1")
         f2_weapon = pick_weapon("Fighter 2")
+
+        try:
+            count_str = input("\nHow many rounds to test? (Default: 1): ").strip()
+            count = int(count_str) if count_str else 1
+            if count <= 0:
+                count = 1
+        except ValueError:
+            count = 1
  
         print(f"\n[TEST MODE] Fighter 1: {f1_weapon.upper()}  |  Fighter 2: {f2_weapon.upper()}")
-        print("[INFO] OBS recording is disabled.\n")
+        print(f"[INFO] Running {count} round(s). OBS recording is disabled.\n")
  
-        subprocess.run([
-            sys.executable, main_script,
-            "--test-mode",
-            "--f1-weapon", f1_weapon,
-            "--f2-weapon", f2_weapon,
-        ])
+        for i in range(count):
+            print(f"\n{'='*40}")
+            print(f"[TEST] ROUND {i+1} OF {count}")
+            print(f"{'='*40}")
+            subprocess.run([
+                sys.executable, main_script,
+                "--test-mode",
+                "--f1-weapon", f1_weapon,
+                "--f2-weapon", f2_weapon,
+            ])
  
         print("\n" + "=" * 50)
-        print("TEST MATCH COMPLETE!")
+        print("TEST MATCH(ES) COMPLETE!")
         print("=" * 50)
         return
 

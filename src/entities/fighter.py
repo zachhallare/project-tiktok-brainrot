@@ -112,7 +112,7 @@ class Fighter:
         self.parry_energy = min(self.max_parry_energy, self.parry_energy + self.energy_regen_rate)
 
         self.trail.insert(0, (self.x, self.y))
-        if len(self.trail) > TRAIL_LENGTH:
+        if len(self.trail) > self.trail_length:
             self.trail.pop()
 
         self.last_sword_angle = self.sword_angle

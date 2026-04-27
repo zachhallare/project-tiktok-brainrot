@@ -1,69 +1,80 @@
 todos:
 =======================================================
 
-double check these if its all fair:
-1. sword vs sword - good.
-2. dagger vs dagger - animation need to be better
-3. spear vs spear
-4. axe vs axe
-5. hammer vs hammer
+Current Task - Balancing the weapons:
 
-6. dagger vs hammer
-    - round 1 winner: 
-    - round 2 winner: 
-    - round 3 winner:
+i've tested every weapon to see if its balanced, these are the results, what do you think? how i balance it more based on the outcome of the winners per round and their health percentage left? (keep in mind, i only want these weapon combos):
 
-7. dagger vs axe
-    - round 1 winner: 
-    - round 2 winner: 
-    - round 3 winner:
+1. sword vs sword (keep) - good, no need for testing.
 
-8. dagger vs sword
-    - round 1 winner: 
-    - round 2 winner: 
-    - round 3 winner:
+2. axe vs axe (keep) - good, no need for testing.
 
-9. dagger vs spear
-    - round 1 winner: 
-    - round 2 winner: 
-    - round 3 winner:
+3. dagger vs hammer (keep) 
+    - round 1 winner: hammer, won by a big margin.
+    - round 2 winner: hammer, won with 75% of health left.
+    - round 3 winner: hammer, won with 15% of health left.
 
-10. hammer vs axe
-    - round 1 winner: 
-    - round 2 winner: 
-    - round 3 winner:
+4. dagger vs axe (keep)
+    - round 1 winner: axe, won with 50% of health left.
+    - round 2 winner: axe, won with 60% of health left.
+    - round 3 winner: axe, won with 50% of health left.
 
-11. hammer vs sword
-    - round 1 winner: 
-    - round 2 winner: 
-    - round 3 winner:
+5. dagger vs sword (depends)
+    - round 1 winner: sword, won with 40% of health left.
+    - round 2 winner: sword, won with 30% of health left.
+    - round 3 winner: sword, won with 20% of health left.
 
-12. hammer vs spear
-    - round 1 winner: 
-    - round 2 winner: 
-    - round 3 winner:
+6. dagger vs spear (depends)
+    - round 1 winner: spear, won with 40% of health left.
+    - round 2 winner: dagger, won with 70% of health left.
+    - round 3 winner: spear, won with 40% of health left.
 
-13. sword vs spear 
-    - round 1 winner: 
-    - round 2 winner: 
-    - round 3 winner:
+7. hammer vs axe (keep)
+    - round 1 winner: axe, won with 40% of health left.
+    - round 2 winner: axe, won with 40% of health left.
+    - round 3 winner: axe, won with 30% of health left.
 
-14. sword vs axe
-    - round 1 winner: 
-    - round 2 winner: 
-    - round 3 winner:
+8. hammer vs sword (keep)
+    - round 1 winner: hammer, won with 20% of health left.
+    - round 2 winner: hammer, won with 30% of health left.
+    - round 3 winner: hammer, won with 20% of health left.
 
-15. spear vs axe
-    - round 1 winner: 
-    - round 2 winner: 
-    - round 3 winner:
+9. hammer vs spear (keep)
+    - round 1 winner: hammer, won with 15% of health left.
+    - round 2 winner: hammer, won with 10% of health left.
+    - round 3 winner: spear, won with less than 5% of health left.
+
+10. sword vs spear (depends)
+    - round 1 winner: spear, won with 15% of health left.
+    - round 2 winner: spear, won with 10% of health left.
+    - round 3 winner: sword, won with less than 5% of health left.
+
+11. sword vs axe (keep)
+    - round 1 winner: axe, won with 75% of health left.
+    - round 2 winner: axe, won with 5% of health left.
+    - round 3 winner: axe, won with 75% of health left.
+
+12. spear vs axe (depends)
+    - round 1 winner: axe, won with 10% of health left.
+    - round 2 winner: axe, won with 40% of health left.
+    - round 3 winner: spear, won with 10% of health left.
+
+
 
 
 =======================================================
 
-- change from an async hitbox to a sync hitbox for better animation?
+what to do after:
+1. for the general movement, make a system where they cant be stuck going up and down, its boring. sometimes it happens and its pretty much like spawn camping.
+2. change from an async hitbox to a sync hitbox for better animation?
+3. try adding impact frames per fighter/circle.
+4. better sounds.
 
 =======================================================
+=======================================================
+=======================================================
+
+Do if applicable only. Focus on tasks above.
 
 Last-minute chaos_manager.py notes before you wire it in:
 1. BLACKOUT will need sword color coverage

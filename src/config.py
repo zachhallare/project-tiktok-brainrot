@@ -162,7 +162,7 @@ WEAPON_CONFIGS = {
             (0.85, 4),
             (1.00, 2),
         ],
-        'spin_speed_mult': 1.25,
+        'spin_speed_mult': 1.2,
         'knockback_mult': 0.7,
         'sweet_spot_threshold': 0.70,
         'all_sweet_spot': False,
