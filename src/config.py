@@ -129,7 +129,7 @@ WEAPON_CONFIGS = {
         'sprite_file': 'sword.png',
         'sprite_size': (87, 23),
         'sword_length': 40,
-        'damage_mult': 1.0,
+        'damage_mult': 1.05,
         'handle_ratio': 0.25,
         'hitbox_profile': [
             (0.25, 6),
@@ -154,7 +154,7 @@ WEAPON_CONFIGS = {
         'sprite_file': 'dagger.png',
         'sprite_size': (48, 14),
         'sword_length': 20,
-        'damage_mult': 1.4,
+        'damage_mult': 1.35,
         'handle_ratio': 0.30,
         'hitbox_profile': [
             (0.30, 4),
@@ -170,16 +170,16 @@ WEAPON_CONFIGS = {
         'max_hitstop': False,
         'parry_drain_mult': 1.75,
         'momentum_gain': 1,
-        'base_health': 220,
-        'move_speed_mult': 1.5,
-        'trail_length': 5
+        'base_health': 235,
+        'move_speed_mult': 1.25,
+        'trail_length': 12
     },
 
     'spear': {
         'sprite_file': 'spear.png',
         'sprite_size': (174, 13),
         'sword_length': 148,
-        'damage_mult': 1.15,
+        'damage_mult': 1.20,
         'handle_ratio': 0.78,
         'hitbox_profile': [
             (0.72,  3),
@@ -204,7 +204,7 @@ WEAPON_CONFIGS = {
         'sprite_file': 'axe.png',
         'sprite_size': (70, 32),
         'sword_length': 33,
-        'damage_mult': 0.9,
+        'damage_mult': 1.10,
         'handle_ratio': 0.45,
         'hitbox_profile': [
             (0.45,  4),
@@ -221,7 +221,7 @@ WEAPON_CONFIGS = {
         'max_hitstop': False,
         'parry_drain_mult': 1.0,
         'momentum_gain': 1,
-        'base_health': 270,
+        'base_health': 265,
         'move_speed_mult': 0.85,
         'trail_length': 8
     },
@@ -230,7 +230,7 @@ WEAPON_CONFIGS = {
         'sprite_file': 'hammer.png',
         'sprite_size': (63, 25),
         'sword_length': 29,
-        'damage_mult': 0.75,
+        'damage_mult': 0.85,
         'handle_ratio': 0.48,
         'hitbox_profile': [
             (0.48,  4),

@@ -4,13 +4,20 @@ todos:
 
 i noticed the following (self-reflection):
 
+maybe for specific battles like Hammer vs Axe where the fights last longer, the damage can be slightly increase so its not too boring watching two tanks fight it out?
+
+
 it should only start blinking at the last 10% of HP, blinking gets more extreme at 5%.
+
+based on the statistics of the HP %, adjust the video titles n
+
+
 
 =========================================================
 
 
 1. for the general movement, make a system where they cant be stuck going up and down, its boring. sometimes it happens and its pretty much like spawn camping.
-2. if the fighters hit each other body to body, they should knock each other back slightly (what do you think of this?). its like a kick in a sword fight, not effective a damage dealer, but just enough to keep distance.
+2. if the fighters hit each other body to body, they should knock each other back slightly (what do you think of this?). its like a kick in a sword fight, not effective a damage dealer, but just enough to keep distance. an exception to this is sword to sword battles because of how it relies on body to body contact at first
 3. change from an async hitbox to a sync hitbox for better animation?
 4. try adding impact frames per fighter/circle.
 

@@ -41,6 +41,7 @@ class Game:
     def __init__(self, f1_color, f2_color, f1_name="Blue", f2_name="Red", f1_weapon="sword", f2_weapon="sword"):
         import sys
         self.is_test_mode = "--test-mode" in sys.argv
+        self.is_headless = "--headless" in sys.argv
         self.f1_weapon = f1_weapon
         self.f2_weapon = f2_weapon
         self.f1_name = f1_name
@@ -55,7 +56,8 @@ class Game:
         pygame.font.init()
         
         # Create the game window.
-        self.window = pygame.display.set_mode((DISPLAY_WIDTH, DISPLAY_HEIGHT), pygame.NOFRAME)
+        flags = pygame.NOFRAME | pygame.HIDDEN if getattr(self, 'is_headless', False) else pygame.NOFRAME
+        self.window = pygame.display.set_mode((DISPLAY_WIDTH, DISPLAY_HEIGHT), flags)
         self.canvas = pygame.Surface((CANVAS_WIDTH, CANVAS_HEIGHT))
         self.screen = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
         pygame.display.set_caption("Red vs Blue Battle - YT Shorts Edition")
@@ -167,6 +169,8 @@ class Game:
         # Initialize centralized SoundManager
         from managers.sound_manager import SoundManager
         self.sound_manager = SoundManager()
+        if "--mute-sounds" in sys.argv or getattr(self, 'is_headless', False):
+            self.sound_manager.muted = True
         
     def _lock_fighters_for_countdown(self):
         """Lock fighters in place for countdown."""
@@ -268,7 +272,7 @@ class Game:
         self.round_ending = True
         self.winner = winner
         # Extended from 120 to 300 to allow delay before displaying win text
-        self.reset_timer = 60  # 1 second end sequence (60 frames at 60fps)
+        self.reset_timer = 0 if getattr(self, 'is_headless', False) else 60  # 1 second end sequence (60 frames at 60fps)
         
         if winner == self.blue:
             self.winner_text = "WINS"
@@ -740,7 +744,8 @@ class Game:
         import sys
         if "--auto-start" in sys.argv:
             self.game_state = 'PLAYING'
-            self.obs_manager.start_recording()
+            if not getattr(self, 'is_headless', False):
+                self.obs_manager.start_recording()
             self.obs_startup_timer = 60
         elif "--test-mode" in sys.argv:
             self.game_state = 'PLAYING'
@@ -772,14 +777,19 @@ class Game:
                         self.obs_startup_timer = 60  # Delay on start
             
             if self.game_state == 'TITLE':
-                self._draw_title_screen()
+                if not getattr(self, 'is_headless', False):
+                    self._draw_title_screen()
             else:
                 self.update()
-                self.draw()
-            self.clock.tick(FPS)
+                if not getattr(self, 'is_headless', False):
+                    self.draw()
+            
+            if not getattr(self, 'is_headless', False):
+                self.clock.tick(FPS)
         
         # Stop OBS before shutting down entirely
-        self.obs_manager.stop_recording(getattr(self, 'viral_title_idea', None))
+        if not getattr(self, 'is_headless', False):
+            self.obs_manager.stop_recording(getattr(self, 'viral_title_idea', None))
         pygame.quit()
 
 

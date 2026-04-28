@@ -134,6 +134,9 @@ def main():
                 break
             print("Please enter 1 or 2.")
 
+        mute_choice = input("\nMute sound effects for this test? (y/n): ").strip().lower()
+        mute_flag = ["--mute-sounds"] if mute_choice == 'y' else []
+
         # --- MANUAL TEST ---
         if test_choice == '1':
             print("\n[MANUAL TEST] Pick a weapon for each fighter.")
@@ -160,7 +163,7 @@ def main():
                     "--test-mode",
                     "--f1-weapon", f1_weapon,
                     "--f2-weapon", f2_weapon,
-                ])
+                ] + mute_flag)
 
             print("\n" + "=" * 50)
             print("TEST MATCH(ES) COMPLETE!")
@@ -209,9 +212,10 @@ def main():
                     [
                         sys.executable, main_script,
                         "--test-mode",
+                        "--headless",
                         "--f1-weapon", w1,
                         "--f2-weapon", w2,
-                    ],
+                    ] + mute_flag,
                     capture_output=True,
                     text=True,
                 )
