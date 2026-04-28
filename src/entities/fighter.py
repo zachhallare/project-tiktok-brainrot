@@ -71,6 +71,9 @@ class Fighter:
         # Momentum
         self.momentum = 0
 
+        # Rotation tracking for damage scaling
+        self.rotation_since_last_hit = 0.0
+
         # Visual
         self.flash_timer = 0
         self.victory_bounce = 0
@@ -92,11 +95,17 @@ class Fighter:
 
 
     def update_rotation(self, opponent=None, frame_count=0):
-        self.rotation_angle += self.spin_speed * self.spin_direction
+        delta_rot = self.spin_speed * self.spin_direction
+        self.rotation_angle += delta_rot
         if self.rotation_angle > math.pi:
             self.rotation_angle -= 2 * math.pi
         elif self.rotation_angle < -math.pi:
             self.rotation_angle += 2 * math.pi
+
+        # Accumulate rotation since last hit (cap at 2π)
+        self.rotation_since_last_hit = min(
+            2 * math.pi, self.rotation_since_last_hit + abs(delta_rot)
+        )
 
         self.sword_angle = self.rotation_angle
 
@@ -224,6 +233,7 @@ class Fighter:
         self.sword_trail = []
 
         self.momentum = 0
+        self.rotation_since_last_hit = 0.0
 
         self.flash_timer = 0
         self.victory_bounce = 0

@@ -297,6 +297,12 @@ class Game:
         hp_percent = (winner.health / winner.max_health) * 100
         winner_color_name = self.f1_name if winner == self.blue else self.f2_name
         loser_color_name = self.f2_name if winner == self.blue else self.f1_name
+        winner_weapon = self.f1_weapon if winner == self.blue else self.f2_weapon
+        loser_weapon = self.f2_weapon if winner == self.blue else self.f1_weapon
+
+        # Structured result for auto-test parsing
+        if self.is_test_mode:
+            print(f"[RESULT] winner={winner_weapon} hp_pct={hp_percent:.0f}")
 
         if hp_percent <= 15:
             category = "clutch"

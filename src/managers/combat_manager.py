@@ -159,19 +159,22 @@ class CombatManager:
                 if game.chaos.is_ultra_knockback():
                     game.screen_shake = max(game.screen_shake, SCREEN_SHAKE_INTENSITY * 3)
 
+            # Rotation damage multiplier
+            rotation_mult = self._get_rotation_mult(attacker.rotation_since_last_hit)
+
             # Sweet-spot logic
             all_sweet_spot       = attacker.weapon_config.get("all_sweet_spot", False)
             sweet_spot_threshold = attacker.weapon_config.get("sweet_spot_threshold", 0.70)
 
             if not all_sweet_spot and impact_ratio < sweet_spot_threshold:
-                base_damage     = 10
+                base_damage     = 13
                 shake_intensity = 4
                 spark_count     = 10
                 spark_color     = (255, 255, 0)
                 spark_size      = 4
                 is_sweet_spot   = False
             else:
-                base_damage     = 15
+                base_damage     = 18
                 if is_crit:
                     base_damage = 4
                 shake_intensity = 15
@@ -180,7 +183,10 @@ class CombatManager:
                 spark_size      = 6
                 is_sweet_spot   = True
 
-            damage = base_damage * total_damage_mult
+            damage = base_damage * total_damage_mult * rotation_mult
+
+            # Reset rotation accumulator on hit
+            attacker.rotation_since_last_hit = 0.0
 
             if defender.take_damage(damage, angle, knockback, game.particles):
                 game.particles.emit(hit_pos[0], hit_pos[1], spark_color,
@@ -237,4 +243,18 @@ class CombatManager:
                     game.screen_shake            = max(game.screen_shake, SCREEN_SHAKE_INTENSITY * 2)
 
 
-                    
+
+    @staticmethod
+    def _get_rotation_mult(rotation):
+        """
+        Rotation-based damage scaling:
+          < π   (accidental / graze)  → 0.6x damage penalty
+          π–2π  (standard hit)        → 1.0x normal damage
+          ≥ 2π  (full rotation)       → 1.3x damage bonus
+        """
+        if rotation < math.pi:
+            return 0.6
+        elif rotation < 2 * math.pi:
+            return 1.0
+        else:
+            return 1.3

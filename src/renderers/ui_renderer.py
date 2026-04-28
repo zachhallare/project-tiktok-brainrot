@@ -1,5 +1,6 @@
 import pygame
 import random
+import math
 
 
 class UIRenderer:
@@ -37,30 +38,49 @@ class UIRenderer:
 
         # --- Blue (Left) Bar ---
         bar_x = ax
-        blue_fill_w = int(bar_width * blue_hp_pct)
+        blue_fill_w = max(0, min(bar_width, int(bar_width * blue_hp_pct)))
 
+        bx = int(bar_x + blue_shake_x)
+        by = int(bar_y + blue_shake_y)
         pygame.draw.rect(self.screen, self.bg_color,
-                         (bar_x + blue_shake_x, bar_y + blue_shake_y, bar_width, bar_height))
+                         (bx, by, bar_width, bar_height))
         if blue_fill_w > 0:
-            pygame.draw.rect(self.screen, game.blue.color,
-                             (bar_x + blue_shake_x, bar_y + blue_shake_y, blue_fill_w, bar_height))
+            blue_bar_color = self._get_bar_color(game.blue)
+            pygame.draw.rect(self.screen, blue_bar_color,
+                             (bx, by, blue_fill_w, bar_height))
         pygame.draw.rect(self.screen, self.dark_border_color,
-                         (bar_x + blue_shake_x, bar_y + blue_shake_y, bar_width, bar_height), 2)
+                         (bx, by, bar_width, bar_height), 2)
 
         # --- Red (Right) Bar ---
         bar_x = ax + aw - bar_width
-        red_fill_w = int(bar_width * red_hp_pct)
+        red_fill_w = max(0, min(bar_width, int(bar_width * red_hp_pct)))
 
+        rx = int(bar_x + red_shake_x)
+        ry = int(bar_y + red_shake_y)
         pygame.draw.rect(self.screen, self.bg_color,
-                         (bar_x + red_shake_x, bar_y + red_shake_y, bar_width, bar_height))
+                         (rx, ry, bar_width, bar_height))
         if red_fill_w > 0:
-            fill_x = bar_x + (bar_width - red_fill_w)
-            pygame.draw.rect(self.screen, game.red.color,
-                             (fill_x + red_shake_x, bar_y + red_shake_y, red_fill_w, bar_height))
+            fill_x = int(bar_x + (bar_width - red_fill_w))
+            red_bar_color = self._get_bar_color(game.red)
+            pygame.draw.rect(self.screen, red_bar_color,
+                             (int(fill_x + red_shake_x), ry, red_fill_w, bar_height))
         pygame.draw.rect(self.screen, self.dark_border_color,
-                         (bar_x + red_shake_x, bar_y + red_shake_y, bar_width, bar_height), 2)
+                         (rx, ry, bar_width, bar_height), 2)
 
         # --- VS Text ---
         vs_surface = self.font_small.render("VS", True, self.white)
         vs_rect = vs_surface.get_rect(center=(ax + (aw // 2), bar_y + (bar_height // 2)))
         self.screen.blit(vs_surface, vs_rect)
+
+    def _get_bar_color(self, fighter):
+        """Return the health bar color, blinking when HP < 15%."""
+        hp_pct = max(0.0, fighter.health / fighter.max_health)
+        if hp_pct < 0.15 and hp_pct > 0:
+            # Rapid blink: alternate every 100ms between normal and dark shade
+            if (pygame.time.get_ticks() // 100) % 2 == 0:
+                return fighter.health_bar_color
+            else:
+                # 40% darker shade
+                r, g, b = fighter.health_bar_color
+                return (int(r * 0.4), int(g * 0.4), int(b * 0.4))
+        return fighter.health_bar_color

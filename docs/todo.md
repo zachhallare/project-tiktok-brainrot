@@ -1,74 +1,68 @@
 todos:
 =======================================================
 
-Current Task - Balancing the weapons:
 
-i've tested every weapon to see if its balanced, these are the results, what do you think? how i balance it more based on the outcome of the winners per round and their health percentage left? (keep in mind, i only want these weapon combos):
+i noticed the following (self-reflection):
 
-1. sword vs sword (keep) - good, no need for testing.
+it should only start blinking at the last 10% of HP, blinking gets more extreme at 5%.
 
-2. axe vs axe (keep) - good, no need for testing.
+=========================================================
 
-3. dagger vs hammer (keep) 
-    - round 1 winner: hammer, won by a big margin.
-    - round 2 winner: hammer, won with 75% of health left.
-    - round 3 winner: hammer, won with 15% of health left.
 
-4. dagger vs axe (keep)
-    - round 1 winner: axe, won with 50% of health left.
-    - round 2 winner: axe, won with 60% of health left.
-    - round 3 winner: axe, won with 50% of health left.
-
-5. dagger vs sword (depends)
-    - round 1 winner: sword, won with 40% of health left.
-    - round 2 winner: sword, won with 30% of health left.
-    - round 3 winner: sword, won with 20% of health left.
-
-6. dagger vs spear (depends)
-    - round 1 winner: spear, won with 40% of health left.
-    - round 2 winner: dagger, won with 70% of health left.
-    - round 3 winner: spear, won with 40% of health left.
-
-7. hammer vs axe (keep)
-    - round 1 winner: axe, won with 40% of health left.
-    - round 2 winner: axe, won with 40% of health left.
-    - round 3 winner: axe, won with 30% of health left.
-
-8. hammer vs sword (keep)
-    - round 1 winner: hammer, won with 20% of health left.
-    - round 2 winner: hammer, won with 30% of health left.
-    - round 3 winner: hammer, won with 20% of health left.
-
-9. hammer vs spear (keep)
-    - round 1 winner: hammer, won with 15% of health left.
-    - round 2 winner: hammer, won with 10% of health left.
-    - round 3 winner: spear, won with less than 5% of health left.
-
-10. sword vs spear (depends)
-    - round 1 winner: spear, won with 15% of health left.
-    - round 2 winner: spear, won with 10% of health left.
-    - round 3 winner: sword, won with less than 5% of health left.
-
-11. sword vs axe (keep)
-    - round 1 winner: axe, won with 75% of health left.
-    - round 2 winner: axe, won with 5% of health left.
-    - round 3 winner: axe, won with 75% of health left.
-
-12. spear vs axe (depends)
-    - round 1 winner: axe, won with 10% of health left.
-    - round 2 winner: axe, won with 40% of health left.
-    - round 3 winner: spear, won with 10% of health left.
-
+1. for the general movement, make a system where they cant be stuck going up and down, its boring. sometimes it happens and its pretty much like spawn camping.
+2. if the fighters hit each other body to body, they should knock each other back slightly (what do you think of this?). its like a kick in a sword fight, not effective a damage dealer, but just enough to keep distance.
+3. change from an async hitbox to a sync hitbox for better animation?
+4. try adding impact frames per fighter/circle.
 
 
 
 =======================================================
 
-what to do after:
-1. for the general movement, make a system where they cant be stuck going up and down, its boring. sometimes it happens and its pretty much like spawn camping.
-2. change from an async hitbox to a sync hitbox for better animation?
-3. try adding impact frames per fighter/circle.
-4. better sounds.
+what to do after: better sounds.
+
+Listed directory audios
+Listed directory weapons
+Listed directory models
+Listed directory project-tiktok-brainrot
+Listed directory src
+Listed directory audios
+Listed directory weapons
+Viewed config.py:1-254
+Viewed sound_manager.py:1-100
+
+Based on the current weapon configurations (Sword, Dagger, Spear, Axe, Hammer) and the existing audio files, you currently only have generic combat sounds (`hit_1`, `hit_2`, `critical_hit`, `sword_clash`). 
+
+To make the combat feel much more visceral and unique, you should add **weapon-specific sound effects** that highlight their distinct mechanics and weights. Here are the types of sound effects you should add next:
+
+### 1. Weapon-Specific Impact Sounds
+Right now, every weapon shares the same hit sounds. You should add distinct impact sounds for each weapon to emphasize their damage types:
+*   **Dagger (Fast, low reach):** Sharp, quick **"slice"** or **"shing"** sounds.
+*   **Spear (Long reach, tip sweet-spot):** A piercing, visceral **"stab"** or **"puncture"** sound when hitting the sweet spot. 
+*   **Axe (High knockback/damage):** A heavy, resonant **"chop"** or **"cleave"** sound.
+*   **Hammer (Heavy, guaranteed sweet-spot):** A deep, booming **"thud"** or **"crush"** with a bit of bass.
+
+### 2. Weapon-Specific Swing / "Whoosh" Sounds
+Adding swing sounds based on the weapon's `spin_speed_mult` and weight will make the arena feel much more alive:
+*   **Dagger (1.2x spin speed):** Quick, high-pitched, rapid **"swish"** sounds.
+*   **Hammer / Axe (0.7x / 0.55x spin speed):** Low-pitched, heavy **"wub"** or thick air-displacement sounds to make them feel massive.
+
+### 3. Mechanic-Specific Audio Cues
+Your weapons have unique behaviors that are currently missing audio feedback:
+*   **Hammer Spin Reversal:** The hammer's core identity is that it reverses the defender's spin on hit. Add a distinct **"whiplash"** or heavy **"clang/daze"** sound effect when this triggers.
+*   **Dagger Guard Crush (Parry Drain):** The dagger has a 1.75x parry drain multiplier. You should add a **"guard break"** or **"shattering glass"** sound for when a fighter's parry is completely drained.
+*   **Momentum Stacks:** You have a momentum system with up to 3 stacks. Add a subtle **power-up hum or chime** that pitches up each time a fighter gains a momentum stack (maybe a fast ascending tone).
+
+### 4. Differentiated Clash Sounds
+Instead of a single `sword_clash.mp3`, you could implement light vs. heavy clashes. 
+*   **Dagger vs Sword:** A light, sharp **"tink"**.
+*   **Hammer vs Axe:** A massive, reverberating **"gong"** or heavy **"clang"** that matches the high hit-stop frames of those weapons.
+
+**Recommendation on what to tackle first:** 
+I highly recommend starting with the **Weapon-Specific Impact Sounds** (especially the heavy Thud for the Hammer and the Chop for the Axe). Since you already have `HIT_SLOWMO_FRAMES` and `HIT_STOP_FRAMES` scaling for heavy hits, pairing those screen pauses with heavy, booming sound effects will instantly make the combat feel 10x more impactful!
+
+
+
+
 
 =======================================================
 =======================================================
