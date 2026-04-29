@@ -1,60 +1,16 @@
 todos:
-=======================================================
-
-(CURRENTLY BEING IMPLEMENTED)
-
-1. for the general movement, make a system where they cant be stuck going up and down, its boring. sometimes it happens and its pretty much like spawn camping.
-2. if the fighters hit each other body to body, they should knock each other back slightly (what do you think of this?). its like a kick in a sword fight, not effective a damage dealer, but just enough to keep distance. an exception to this is sword to sword battles because of how it relies on body to body contact at first
-
-prompt:
-""""
-I need to update the physics and collision logic in my Python/Pygame 2D auto-battler. Please provide the code to implement these two specific physics changes to the fighter entities:
-
-1. Anti-Looping Wall Bounce (Jitter): 
-Right now, fighters use elastic DVD-screensaver style physics. Sometimes they hit a wall perfectly parallel and get stuck bouncing purely up and down (or left and right). Update the wall-collision logic so that if a fighter bounces and their resulting velocity on the perpendicular axis is exactly or very close to 0, it injects a small random float (e.g., between -0.5 and 0.5) to that axis to break the loop naturally.
-
-2. Soft Body-to-Body Repulsion:
-Implement a soft-collision check between the two fighters. If the distance between their centers is less than (FIGHTER_RADIUS * 2), they should slightly knock each other back to prevent sprite overlapping. Apply a small instantaneous velocity push outward along the vector between their centers. 
-EXCEPTION: Do not apply this body repulsion if BOTH fighters are currently equipped with the "Sword" weapon type, as sword logic requires point-blank grinding. 
-""""
-
-
-=========================================================
-
-
-3. change from an async hitbox to a sync hitbox for better animation?
-
-""""
-I need to fix a visual/physics desync issue in my Python/Pygame 2D auto-battler. Currently, my weapon hitboxes are asynchronous, which causes "phantom hits" where the hit-stop, screen shake, and particle effects trigger before the weapon sprite visually connects with the opponent on screen.
-
-I need to refactor this to a fully synchronous hitbox system. 
-1. The physics collision check must happen in the exact same frame, and at the exact same rotation angle, as the visual sprite rendering.
-2. Provide the logic to ensure that the weapon's underlying hitbox polygon/rect perfectly transforms and rotates to match the sprite's rotation angle BEFORE the combat manager runs the intersection/damage check. 
-
-Show me how to tightly couple the rotation math of the sprite with the collision polygon so that a hit only registers when the pixels actually touch.
-""""
-
-
 
 =======================================================
 
 
-4. try adding impact frames per fighter/circle.
+implement the video titles update.
 
 
 =======================================================
+
+not needed for now:
 
 5. what to do after: better sounds.
-
-Listed directory audios
-Listed directory weapons
-Listed directory models
-Listed directory project-tiktok-brainrot
-Listed directory src
-Listed directory audios
-Listed directory weapons
-Viewed config.py:1-254
-Viewed sound_manager.py:1-100
 
 Based on the current weapon configurations (Sword, Dagger, Spear, Axe, Hammer) and the existing audio files, you currently only have generic combat sounds (`hit_1`, `hit_2`, `critical_hit`, `sword_clash`). 
 

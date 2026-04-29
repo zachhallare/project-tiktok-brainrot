@@ -526,29 +526,7 @@ class Game:
         self.blue.update(self.red, effective_arena, self.particles, self.shockwaves)
         self.red.update(self.blue, effective_arena, self.particles, self.shockwaves)
     
-        # Body-to-body soft repulsion (prevent overlap + gentle knockback)
-        # Exception: sword vs sword relies on body grinding, so skip entirely
-        both_swords = self.blue.weapon == "sword" and self.red.weapon == "sword"
-        if not both_swords:
-            dx = self.red.x - self.blue.x
-            dy = self.red.y - self.blue.y
-            body_dist = math.hypot(dx, dy)
-            min_sep = self.blue.radius + self.red.radius
-            if body_dist < min_sep and body_dist > 0:
-                overlap = (min_sep - body_dist) / 2.0
-                nx = dx / body_dist
-                ny = dy / body_dist
-                # Position correction (prevent overlap)
-                self.blue.x -= nx * overlap
-                self.blue.y -= ny * overlap
-                self.red.x += nx * overlap
-                self.red.y += ny * overlap
-                # Soft velocity push (gentle bump)
-                push = 1.5
-                self.blue.vx -= nx * push
-                self.blue.vy -= ny * push
-                self.red.vx += nx * push
-                self.red.vy += ny * push
+
         
 
         
