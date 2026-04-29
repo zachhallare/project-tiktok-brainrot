@@ -5,7 +5,11 @@ from config import (
     BASE_KNOCKBACK, HIT_STOP_FRAMES, HAMMER_HIT_STOP_FRAMES, HAMMER_NORMAL_HIT_STOP,
     SCREEN_SHAKE_INTENSITY,
     HIT_SLOWMO_FRAMES, CRIT_CHANCE, CRIT_MULTIPLIER, CRIT_IMPACT_FRAMES,
-    MOMENTUM_MAX_STACKS, MOMENTUM_DAMAGE_BONUS
+    MOMENTUM_MAX_STACKS, MOMENTUM_DAMAGE_BONUS,
+    PARRY_COOLDOWN_FRAMES,
+    GUARD_BREAK_STUN_FRAMES, GUARD_BREAK_KNOCKBACK,
+    GUARD_BREAK_HIT_STOP, GUARD_BREAK_DAMAGE_MIN, GUARD_BREAK_DAMAGE_MAX,
+    GUARD_BREAK_SCREEN_SHAKE
 )
 
 class CombatManager:
@@ -106,32 +110,41 @@ class CombatManager:
                     if fighter.parry_energy >= effective_cost:
                         fighter.parry_energy -= effective_cost
                         fighter.spin_direction *= -1
-                        fighter.parry_cooldown = 15
+                        fighter.parry_cooldown = PARRY_COOLDOWN_FRAMES
                     else:
                         both_parried = False
-                        game.particles.emit(ix_point[0], ix_point[1], (255, 0, 0),    count=40, size=6)
-                        game.particles.emit(ix_point[0], ix_point[1], (255, 255, 255), count=20, size=4)
+                        # === GUARD BREAK EVENT ===
+                        game.particles.emit(ix_point[0], ix_point[1], (255, 0, 0),    count=50, size=7)
+                        game.particles.emit(ix_point[0], ix_point[1], (255, 255, 255), count=25, size=5)
 
-                        guard_break_dmg = random.randint(15, 25)
+                        guard_break_dmg = random.randint(GUARD_BREAK_DAMAGE_MIN, GUARD_BREAK_DAMAGE_MAX)
                         fighter.health      -= guard_break_dmg
                         fighter.parry_energy = 0
                         fighter.momentum     = 0
 
-                        fighter.vx = -fighter.vx * 1.5
-                        fighter.vy = -fighter.vy * 1.5
-                        fighter.parry_cooldown = 30
+                        # Directional knockback away from opponent
+                        kb_angle = math.atan2(fighter.y - other.y, fighter.x - other.x)
+                        fighter.vx = math.cos(kb_angle) * GUARD_BREAK_KNOCKBACK
+                        fighter.vy = math.sin(kb_angle) * GUARD_BREAK_KNOCKBACK
+
+                        # Stun: weapon stops spinning, fighter slides to a halt
+                        fighter.guard_break_stun = GUARD_BREAK_STUN_FRAMES
+                        fighter.invincible = 0  # fully vulnerable during stun
+                        fighter.parry_cooldown = GUARD_BREAK_STUN_FRAMES
 
                         if guard_break_dmg > 0:
                             game.damage_numbers.spawn(ix_point[0], ix_point[1] - 30,
                                                       guard_break_dmg, fighter.color, True)
 
                 if both_parried:
+                    # Act 1: The Clash — metallic sparks, moderate freeze
                     game.hit_stop     = 8
                     game.screen_shake = 12
                     game.particles.emit(ix_point[0], ix_point[1], (255, 255, 100), count=20, size=4)
                 else:
-                    game.hit_stop     = 12
-                    game.screen_shake = 20
+                    # Act 2: The Break — dramatic guard break freeze
+                    game.hit_stop     = GUARD_BREAK_HIT_STOP
+                    game.screen_shake = GUARD_BREAK_SCREEN_SHAKE
 
                 if hasattr(game, 'sound_manager'):
                     game.sound_manager.play_clash()

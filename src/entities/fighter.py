@@ -13,7 +13,9 @@ from config import (
     DRAG, MAX_VELOCITY, MIN_VELOCITY, BOUNCE_ENERGY,
     WALL_BOOST_STRENGTH, TRAIL_LENGTH, TRAIL_FADE_RATE,
     GLOW_ALPHA, GLOW_RADIUS_MULT,
-    WEAPON_CONFIGS, MOMENTUM_MAX_STACKS
+    WEAPON_CONFIGS, MOMENTUM_MAX_STACKS,
+    BASE_PARRY_ENERGY, PARRY_DRAIN_BASE, PARRY_REGEN_RATE,
+    PARRY_COOLDOWN_FRAMES, GUARD_BREAK_STUN_FRAMES
 )
 
 from renderers.fighter_renderer import FighterRenderer
@@ -62,11 +64,14 @@ class Fighter:
         self.base_spin_speed = 0.25 * self.weapon_config.get("spin_speed_mult", 1.0)
         self.spin_speed = self.base_spin_speed
         self.parry_cooldown = 0
-        self.max_parry_energy = 100.0
+        self.max_parry_energy = float(BASE_PARRY_ENERGY)
         self.parry_energy = self.max_parry_energy
-        self.energy_regen_rate = 0.5
-        self.parry_cost = 35.0
+        self.energy_regen_rate = PARRY_REGEN_RATE
+        self.parry_cost = float(PARRY_DRAIN_BASE)
         self.sword_trail = []
+
+        # Guard break stun (weapon stops spinning, heavy drag)
+        self.guard_break_stun = 0
 
         # Momentum
         self.momentum = 0
@@ -95,6 +100,12 @@ class Fighter:
 
 
     def update_rotation(self, opponent=None, frame_count=0):
+        # During guard break stun, weapon hangs limp — no rotation
+        if self.guard_break_stun > 0:
+            if self.parry_cooldown > 0:
+                self.parry_cooldown -= 1
+            return
+
         delta_rot = self.spin_speed * self.spin_direction
         self.rotation_angle += delta_rot
         if self.rotation_angle > math.pi:
@@ -133,6 +144,22 @@ class Fighter:
         if self.attack_cooldown > 0: self.attack_cooldown -= 1
         if self.invincible > 0:      self.invincible -= 1
 
+        # Guard break stun: heavy drag, slide to a stop, skip normal movement
+        if self.guard_break_stun > 0:
+            self.guard_break_stun -= 1
+            self.vx *= 0.88
+            self.vy *= 0.88
+            self.x += self.vx
+            self.y += self.vy
+            # Simple arena clamp (no wall boost)
+            ax, ay, aw, ah = arena_bounds
+            r = self.radius
+            if self.x - r < ax: self.x = ax + r; self.vx = 0
+            if self.x + r > ax + aw: self.x = ax + aw - r; self.vx = 0
+            if self.y - r < ay: self.y = ay + r; self.vy = 0
+            if self.y + r > ay + ah: self.y = ay + ah - r; self.vy = 0
+            return
+
         self.vx *= DRAG
         self.vy *= DRAG
 
@@ -165,18 +192,26 @@ class Fighter:
             self.x = ax + r
             self.vx = abs(self.vx) * BOUNCE_ENERGY
             if self.x < cx: self.vx += WALL_BOOST_STRENGTH
+            if abs(self.vy) < 0.5:
+                self.vy += random.uniform(-0.5, 0.5) or 0.3
         if self.x + r > ax + aw:
             self.x = ax + aw - r
             self.vx = -abs(self.vx) * BOUNCE_ENERGY
             if self.x > cx: self.vx -= WALL_BOOST_STRENGTH
+            if abs(self.vy) < 0.5:
+                self.vy += random.uniform(-0.5, 0.5) or 0.3
         if self.y - r < ay:
             self.y = ay + r
             self.vy = abs(self.vy) * BOUNCE_ENERGY
             if self.y < cy: self.vy += WALL_BOOST_STRENGTH
+            if abs(self.vx) < 0.5:
+                self.vx += random.uniform(-0.5, 0.5) or 0.3
         if self.y + r > ay + ah:
             self.y = ay + ah - r
             self.vy = -abs(self.vy) * BOUNCE_ENERGY
             if self.y > cy: self.vy -= WALL_BOOST_STRENGTH
+            if abs(self.vx) < 0.5:
+                self.vx += random.uniform(-0.5, 0.5) or 0.3
 
         if self.victory_bounce > 0:
             self.victory_bounce -= 1
@@ -231,6 +266,8 @@ class Fighter:
         self.parry_cooldown = 0
         self.parry_energy = self.max_parry_energy
         self.sword_trail = []
+
+        self.guard_break_stun = 0
 
         self.momentum = 0
         self.rotation_since_last_hit = 0.0

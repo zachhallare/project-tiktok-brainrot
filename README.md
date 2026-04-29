@@ -44,9 +44,9 @@ The game features **5 distinct weapon types**, each with unique sprites, hitbox 
 | Weapon   | Reach | Damage | Spin Speed | Knockback | HP  | Move Speed | Special |
 |----------|-------|--------|------------|-----------|-----|------------|---------|
 | **Sword**   | 40px  | 1.05×  | 0.75×      | 1.0×      | 250 | 1.0×       | Balanced all-rounder |
-| **Dagger**  | 20px  | 1.45×  | 0.95×      | 0.5×      | 250 | 1.25×      | 1.75× parry drain, +2 momentum per hit, longer trail |
+| **Dagger**  | 20px  | 1.45×  | 0.95×      | 0.5×      | 260 | 1.25×      | 2.5× parry drain, +2 momentum per hit, longer trail |
 | **Spear**   | 148px | 1.20×  | 0.58×      | 0.8×      | 215 | 1.0×       | Massive reach, high handle ratio (0.78) with tip sweet-spot |
-| **Hammer**  | 29px  | 0.72×  | 0.53×      | 1.2×      | 260 | 0.8×       | Reverses defender spin, all hits are sweet-spot, max hitstop on crits |
+| **Hammer**  | 29px  | 0.72×  | 0.53×      | 0.9×      | 275 | 0.88×      | Reverses defender spin, all hits are sweet-spot, max hitstop on crits |
 | **Axe**     | 33px  | 1.10×  | 0.41×      | 1.5×      | 245 | 0.85×      | Wide hitbox profile, highest knockback |
 
 Each weapon has a unique **hitbox profile** — a series of `(t, half_width)` sampling points along the blade that define the cross-sectional collision shape. This means the Spear's narrow tip behaves differently from the Axe's wide head.
@@ -89,7 +89,7 @@ Each successful hit triggers:
 
 ### Weapon Special Effects
 - **Hammer — Spin Reversal:** Every body hit reverses the defender's spin direction, disorienting them.
-- **Dagger — Parry Shredder:** 1.75× parry energy drain on parries makes Guard Breaks far more likely against a Dagger user.
+- **Dagger — Parry Shredder:** 2.5× parry energy drain on parries makes Guard Breaks far more likely against a Dagger user.
 - **Dagger — Momentum Stacker:** Gains 2 momentum stacks per hit instead of the default 1.
 
 ---

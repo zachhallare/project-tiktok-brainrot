@@ -1,6 +1,7 @@
 todos:
 =======================================================
 
+(CURRENTLY BEING IMPLEMENTED)
 
 1. for the general movement, make a system where they cant be stuck going up and down, its boring. sometimes it happens and its pretty much like spawn camping.
 2. if the fighters hit each other body to body, they should knock each other back slightly (what do you think of this?). its like a kick in a sword fight, not effective a damage dealer, but just enough to keep distance. an exception to this is sword to sword battles because of how it relies on body to body contact at first
@@ -34,13 +35,16 @@ Show me how to tightly couple the rotation math of the sprite with the collision
 """"
 
 
-4. try adding impact frames per fighter/circle.
 
+=======================================================
+
+
+4. try adding impact frames per fighter/circle.
 
 
 =======================================================
 
-what to do after: better sounds.
+5. what to do after: better sounds.
 
 Listed directory audios
 Listed directory weapons
@@ -89,6 +93,9 @@ I highly recommend starting with the **Weapon-Specific Impact Sounds** (especial
 =======================================================
 =======================================================
 =======================================================
+
+Note to self: Doubtful, as too much can be boring now, but i do like the concept of blackout.
+
 
 Do if applicable only. Focus on tasks above.
 

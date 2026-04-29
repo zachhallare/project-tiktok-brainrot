@@ -94,6 +94,23 @@ ARENA_PULSE_SHAKE = 6
 MOMENTUM_MAX_STACKS   = 3
 MOMENTUM_DAMAGE_BONUS = 0.06   # +6% per stack → max +18% at 3 stacks
 
+# Parry / Energy System (Three-Act Pacing)
+# Act 1 "The Clash"  — weapons clang, sparks fly, energy burns
+# Act 2 "The Break"  — guard break triggers, dramatic stun
+# Act 3 "The Punish" — real HP damage, every hit is lethal
+BASE_PARRY_ENERGY       = 100       # total energy pool
+PARRY_DRAIN_BASE        = 12        # energy cost per parry (before weapon parry_drain_mult)
+PARRY_REGEN_RATE        = 0.12      # energy restored per frame (~7.2/sec)
+PARRY_COOLDOWN_FRAMES   = 12        # minimum frames between parries
+
+# Guard Break Event
+GUARD_BREAK_STUN_FRAMES   = 45      # paralysis duration (0.75s at 60fps)
+GUARD_BREAK_KNOCKBACK     = 22      # knockback force on guard break
+GUARD_BREAK_HIT_STOP      = 20      # freeze frames on guard break
+GUARD_BREAK_DAMAGE_MIN    = 15      # minimum guard break damage
+GUARD_BREAK_DAMAGE_MAX    = 30      # maximum guard break damage
+GUARD_BREAK_SCREEN_SHAKE  = 30      # screen shake intensity
+
 GAME_SETTINGS = {
     'num_rounds': 3,
     'best_of': 3,
@@ -168,9 +185,9 @@ WEAPON_CONFIGS = {
         'all_sweet_spot': False,
         'reverses_spin': False,
         'max_hitstop': False,
-        'parry_drain_mult': 1.75,
+        'parry_drain_mult': 2.5,
         'momentum_gain': 2,
-        'base_health': 250,
+        'base_health': 260,
         'move_speed_mult': 1.25,
         'trail_length': 12
     },
@@ -240,15 +257,15 @@ WEAPON_CONFIGS = {
             (1.00, 18),
         ],
         'spin_speed_mult': 0.53,
-        'knockback_mult': 1.2,
+        'knockback_mult': 0.9,
         'sweet_spot_threshold': 0.0,
         'all_sweet_spot': True,
         'reverses_spin': True,   # core identity — every hit disorients
         'max_hitstop': True,     
         'parry_drain_mult': 1.0,
         'momentum_gain': 0,
-        'base_health': 260,
-        'move_speed_mult': 0.8,
+        'base_health': 275,
+        'move_speed_mult': 0.88,
         'trail_length': 8
     },
 }
