@@ -2,16 +2,6 @@ todos:
 =======================================================
 
 
-i noticed the following (self-reflection):
-
-maybe for specific battles like Hammer vs Axe where the fights last longer, the damage can be slightly increase so its not too boring watching two tanks fight it out?
-
-
-it should only start blinking at the last 10% of HP, blinking gets more extreme at 5%.
-
-based on the statistics of the HP %, adjust the video titles n
-
-
 
 =========================================================
 

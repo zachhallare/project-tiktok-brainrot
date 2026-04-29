@@ -175,8 +175,6 @@ class CombatManager:
                 is_sweet_spot   = False
             else:
                 base_damage     = 18
-                if is_crit:
-                    base_damage = 4
                 shake_intensity = 15
                 spark_count     = 30
                 spark_color     = (255, 100, 0) if random.random() < 0.5 else (255, 0, 0)

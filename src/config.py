@@ -79,7 +79,7 @@ HIT_SLOWMO_FRAMES = 5
 HIT_SLOWMO_TIMESCALE = 0.60
 
 CRIT_CHANCE = 0.20
-CRIT_MULTIPLIER = 2.0
+CRIT_MULTIPLIER = 1.6
 CRIT_IMPACT_FRAMES = 12
 CRIT_IMPACT_TIMESCALE = 0.02
 GOLD = (255, 215, 0)
@@ -154,7 +154,7 @@ WEAPON_CONFIGS = {
         'sprite_file': 'dagger.png',
         'sprite_size': (48, 14),
         'sword_length': 20,
-        'damage_mult': 1.35,
+        'damage_mult': 1.45,
         'handle_ratio': 0.30,
         'hitbox_profile': [
             (0.30, 4),
@@ -162,15 +162,15 @@ WEAPON_CONFIGS = {
             (0.85, 4),
             (1.00, 2),
         ],
-        'spin_speed_mult': 0.90,
-        'knockback_mult': 0.7,
+        'spin_speed_mult': 0.95,
+        'knockback_mult': 0.5,
         'sweet_spot_threshold': 0.70,
         'all_sweet_spot': False,
         'reverses_spin': False,
         'max_hitstop': False,
         'parry_drain_mult': 1.75,
-        'momentum_gain': 1,
-        'base_health': 235,
+        'momentum_gain': 2,
+        'base_health': 250,
         'move_speed_mult': 1.25,
         'trail_length': 12
     },
@@ -187,15 +187,15 @@ WEAPON_CONFIGS = {
             (0.93,  7),
             (1.00,  3),
         ],
-        'spin_speed_mult': 0.56,
-        'knockback_mult': 0.7,
-        'sweet_spot_threshold': 0.90,
+        'spin_speed_mult': 0.58,
+        'knockback_mult': 0.8,
+        'sweet_spot_threshold': 0.87,
         'all_sweet_spot': False,
         'reverses_spin': False,
         'max_hitstop': False,
         'parry_drain_mult': 1.0,
         'momentum_gain': 1,
-        'base_health': 200,
+        'base_health': 215,
         'move_speed_mult': 1.0,
         'trail_length': 8
     },
@@ -215,13 +215,13 @@ WEAPON_CONFIGS = {
         ],
         'spin_speed_mult': 0.41,
         'knockback_mult': 1.5,
-        'sweet_spot_threshold': 0.60,
+        'sweet_spot_threshold': 0.68,
         'all_sweet_spot': False,
         'reverses_spin': False,
         'max_hitstop': False,
         'parry_drain_mult': 1.0,
         'momentum_gain': 1,
-        'base_health': 265,
+        'base_health': 245,
         'move_speed_mult': 0.85,
         'trail_length': 8
     },
@@ -230,7 +230,7 @@ WEAPON_CONFIGS = {
         'sprite_file': 'hammer.png',
         'sprite_size': (63, 25),
         'sword_length': 29,
-        'damage_mult': 0.85,
+        'damage_mult': 0.72,
         'handle_ratio': 0.48,
         'hitbox_profile': [
             (0.48,  4),
@@ -247,7 +247,7 @@ WEAPON_CONFIGS = {
         'max_hitstop': True,     
         'parry_drain_mult': 1.0,
         'momentum_gain': 0,
-        'base_health': 280,
+        'base_health': 260,
         'move_speed_mult': 0.8,
         'trail_length': 8
     },

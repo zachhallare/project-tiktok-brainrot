@@ -297,8 +297,9 @@ class Game:
         
         self._stop_escalation_sound()
         
-        # Calculate winner's remaining health percentage
-        hp_percent = (winner.health / winner.max_health) * 100
+        # Calculate winner's remaining health percentage (clamp to 0 — both fighters
+        # can take lethal damage in the same frame, leaving the "winner" below zero)
+        hp_percent = max(0, (winner.health / winner.max_health) * 100)
         winner_color_name = self.f1_name if winner == self.blue else self.f2_name
         loser_color_name = self.f2_name if winner == self.blue else self.f1_name
         winner_weapon = self.f1_weapon if winner == self.blue else self.f2_weapon
@@ -308,9 +309,9 @@ class Game:
         if self.is_test_mode:
             print(f"[RESULT] winner={winner_weapon} hp_pct={hp_percent:.0f}")
 
-        if hp_percent <= 15:
+        if hp_percent <= 10:
             category = "clutch"
-        elif hp_percent >= 20:
+        elif hp_percent >= 40:
             category = "blowout"
         else:
             category = "standard"
