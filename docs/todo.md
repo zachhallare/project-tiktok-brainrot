@@ -2,10 +2,9 @@ todos:
 
 =======================================================
 
-current todos:
-- make everything satisfying first.
-- implement the video titles update (five groups).
-- batch record 28 videos.
+future todos:
+- update the sound effects, make it unique for every weapon.
+- experiment, try making super critical hits a "blackout style", where everything turns black and white.
 
 =======================================================
 

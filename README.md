@@ -10,10 +10,11 @@
 
 ### Core Loop
 1. **Countdown** → "3-2-1-FIGHT" initiates each round (accompanied by audio beeps)
-2. **Battle Phase** → Fighters autonomously bounce, collide, and attack via a permanent spin
-3. **Escalation** → Arena Pulse pushes fighters together after 2.5 seconds of inactivity
-4. **Resolution** → Slow-motion death sequence with particle explosion
-5. **Finish** → The game terminates to finalize OBS recording or advance batch
+2. **The Clash** → Fighters are launched directly at the center for a massive choreographed opening sword clash
+3. **Battle Phase** → Fighters autonomously bounce, collide, and attack via a permanent spin
+4. **Escalation** → Arena Pulse pushes fighters together after 2.5 seconds of inactivity
+5. **Resolution** → Slow-motion death sequence with particle explosion
+6. **Finish** → The game terminates to finalize OBS recording or advance batch
 
 The aesthetic features a sharp **cel-shaded** style—solid neon colors with high-fidelity weapon sprites for each weapon type. The arena uses a textured **Dark Grey background** (#1a1a1a) with a faint cyberpunk grid overlay to maximize the visual pop of neon effects, body trails, and particle explosions. Combat *feels* incredibly punchy thanks to dramatic ricochet physics, hit-stop, screen shake, and slow-motion effects.
 
@@ -44,8 +45,8 @@ The game features **5 distinct weapon types**, each with unique sprites, hitbox 
 | Weapon   | Reach | Damage | Spin Speed | Knockback | HP  | Move Speed | Special |
 |----------|-------|--------|------------|-----------|-----|------------|---------|
 | **Sword**   | 40px  | 1.05×  | 0.75×      | 1.0×      | 250 | 1.0×       | Balanced all-rounder |
-| **Dagger**  | 20px  | 1.45×  | 0.95×      | 0.5×      | 260 | 1.25×      | 2.5× parry drain, +2 momentum per hit, longer trail |
-| **Spear**   | 148px | 1.20×  | 0.58×      | 0.8×      | 215 | 1.0×       | Massive reach, high handle ratio (0.78) with tip sweet-spot |
+| **Dagger**  | 20px  | 1.45×  | 0.95×      | 0.5×      | 235 | 1.25×      | 1.6× parry drain, +2 momentum per hit, longer trail |
+| **Spear**   | 148px | 1.20×  | 0.58×      | 0.8×      | 235 | 1.0×       | Massive reach, high handle ratio (0.78) with tip sweet-spot |
 | **Hammer**  | 29px  | 0.72×  | 0.53×      | 0.9×      | 275 | 0.88×      | Reverses defender spin, all hits are sweet-spot, max hitstop on crits |
 | **Axe**     | 33px  | 1.10×  | 0.41×      | 1.5×      | 245 | 0.85×      | Wide hitbox profile, highest knockback |
 
@@ -56,11 +57,12 @@ Each weapon has a unique **hitbox profile** — a series of `(t, half_width)` sa
 ## Combat Mechanics
 
 ### Weapon System: Beyblade Auto-Battler
-The combat is a **"Beyblade" style auto-battler**. There are no directional slash attacks; instead, fighters spin continuously with persistent, always-active weapon hitboxes.
+The combat is a **"Beyblade" style auto-battler**. There are no directional slash attacks; instead, fighters spin continuously with persistent, always-active weapon hitboxes. Combat is structured around a Three-Act Pacing: The Clash, The Break, and The Punish.
 
 - **Constant Rotation:** Fighters maintain a continuous 360-degree spin at weapon-specific speeds.
-- **Energy-Based Parry System:** Persistent weapon-to-weapon collision triggers a parry. Each parry consumes **Parry Energy** (scaled by the attacker's `parry_drain_mult`).
-- **Guard Break Mechanic:** If a fighter runs out of energy, they suffer a **Guard Break**—taking 15–25 penalty damage, receiving massive knockback, and facing a temporary stun.
+- **Energy-Based Parry System:** Persistent weapon-to-weapon collision triggers a parry. Each parry consumes **Parry Energy** (scaled by the attacker's `parry_drain_mult`). Parries have a deterministic tie-breaker (flipping the spin direction based on energy ratios).
+- **Health-Based Stamina Scaling:** Energy regeneration scales with health. At 100% HP, regeneration is fast. As a fighter loses health, regeneration slows down significantly, increasing pressure and making guard breaks inevitable.
+- **Guard Break Mechanic:** If a fighter runs out of energy, they suffer a **Guard Break**—taking 15–30 penalty damage, receiving massive knockback, and facing a 0.75s temporary stun, followed by a post-stun regeneration suppression window.
 - **Always-Active Damage:** Damage is driven exclusively by physical weapon-to-body intersection. 
 - **Momentum System:** Landing consecutive hits builds up momentum stacks (up to 3), increasing the damage multiplier by +6% per stack. Taking damage resets a fighter's momentum back to zero.
 
@@ -288,7 +290,7 @@ Automated batch recording for content creation:
 ### 2. Test Mode
 Two sub-modes for debugging and balance testing:
 
-**Manual Test:** Pick weapons for each fighter, specify round count, watch the battles.
+**Manual Test:** Pick weapons for each fighter, specify round count, watch the battles. Calculates and displays the total duration of each match.
 
 **Auto Test:** Runs all 10 cross-weapon matchups headless with configurable rounds per matchup. Outputs structured results including winner, remaining HP%, and elapsed time per round. Final summary shows win/loss tallies for each matchup.
 
