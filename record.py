@@ -158,12 +158,15 @@ def main():
                 print(f"\n{'='*40}")
                 print(f"[TEST] ROUND {i+1} OF {count}")
                 print(f"{'='*40}")
+                start_time = time.time()
                 subprocess.run([
                     sys.executable, main_script,
                     "--test-mode",
                     "--f1-weapon", f1_weapon,
                     "--f2-weapon", f2_weapon,
                 ] + mute_flag)
+                elapsed = time.time() - start_time
+                print(f"\n[INFO] Round total duration: {elapsed:.2f}s")
 
             print("\n" + "=" * 50)
             print("TEST MATCH(ES) COMPLETE!")

@@ -72,6 +72,7 @@ class Fighter:
 
         # Guard break stun (weapon stops spinning, heavy drag)
         self.guard_break_stun = 0
+        self.regen_suppress_timer = 0
 
         # Momentum
         self.momentum = 0
@@ -129,7 +130,14 @@ class Fighter:
         if self.locked:
             return
 
-        self.parry_energy = min(self.max_parry_energy, self.parry_energy + self.energy_regen_rate)
+        # Regen only when not stunned and not in post-stun suppression
+        if self.regen_suppress_timer > 0:
+            self.regen_suppress_timer -= 1
+        elif self.guard_break_stun <= 0:
+            hp_ratio = max(0.0, self.health / self.max_health)
+            # At full HP: full regen. At 0 HP: only 35% regen — guard breaks are inevitable
+            effective_regen = self.energy_regen_rate * (0.35 + 0.65 * hp_ratio)
+            self.parry_energy = min(self.max_parry_energy, self.parry_energy + effective_regen)
 
         self.trail.insert(0, (self.x, self.y))
         if len(self.trail) > self.trail_length:
@@ -147,6 +155,8 @@ class Fighter:
         # Guard break stun: heavy drag, slide to a stop, skip normal movement
         if self.guard_break_stun > 0:
             self.guard_break_stun -= 1
+            if self.guard_break_stun == 0:
+                self.regen_suppress_timer = 45  # 0.75s of suppressed regen after stun ends
             self.vx *= 0.88
             self.vy *= 0.88
             self.x += self.vx
@@ -238,7 +248,7 @@ class Fighter:
             return False
         self.health -= amount
         self.flash_timer = 6
-        self.invincible = 20
+        self.invincible = 45
         self.vx += math.cos(knockback_angle) * knockback_force
         self.vy += math.sin(knockback_angle) * knockback_force
         self.momentum = 0
@@ -268,6 +278,7 @@ class Fighter:
         self.sword_trail = []
 
         self.guard_break_stun = 0
+        self.regen_suppress_timer = 0
 
         self.momentum = 0
         self.rotation_since_last_hit = 0.0

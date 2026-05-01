@@ -2,9 +2,10 @@ todos:
 
 =======================================================
 
-
-implement the video titles update.
-
+current todos:
+- make everything satisfying first.
+- implement the video titles update (five groups).
+- batch record 28 videos.
 
 =======================================================
 

@@ -1,6 +1,6 @@
 """
 Title pools for AlgoRot match results.
-Categories: clutch (<=10% HP), blowout (>=25% HP), standard (everything else).
+Categories: clutch (<=10% HP), blowout (>=40% HP), standard (everything else).
 No ellipsis (...) or colons (:) in any title.
 """
 

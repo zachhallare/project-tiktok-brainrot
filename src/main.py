@@ -3,6 +3,7 @@ import math
 import random
 import os
 import json
+import time
 from titles import get_title_pools
 
 try:
@@ -127,13 +128,13 @@ class Game:
         self.fight_duration = 15       # 0.25s for FIGHT text (was 30 = 0.5s)
         
 
-        
         # Arena Escalation System
         self.inactivity_timer = 0
         
         # Game State
         self.game_state = 'TITLE'
         self.obs_startup_timer = 0
+        self.match_start_real_time = 0
         
         # Seamless Loop Wipe System
         # Phases: 0=none, 1=flash_in (opacity rising), 2=solid (reset behind),
@@ -186,9 +187,10 @@ class Game:
         self.red.sword_angle = math.pi
     
     def _unlock_fighters(self):
-        """Unlock fighters and trigger a magnetic pulse toward the center."""
+        """Unlock fighters and launch them at each other."""
         self.blue.locked = False
         self.red.locked = False
+        self.match_start_real_time = time.time()
         self._trigger_arena_pulse()     # Trigger the visual and audio pulse effect
         
         # Launch them directly at the center for a massive opening clash
@@ -198,8 +200,7 @@ class Game:
         center_x = SCREEN_WIDTH // 2
         center_y = SCREEN_HEIGHT // 2
 
-        # Only sword vs sword gets the opening clash. Everything else gets the vertical jitter.
-        vertical_jitter = 0 if (self.blue.weapon == "sword" and self.red.weapon == "sword") else random.uniform(-6, 6)
+        vertical_jitter = random.uniform(-6, 6)
 
         # Calculate launch vectors
         dx_b = center_x - self.blue.x
@@ -213,9 +214,7 @@ class Game:
         dist_r = max(1, math.hypot(dx_r, dy_r))
         self.red.vx = (dx_r / dist_r) * 18
         self.red.vy = (dy_r / dist_r) * 18 - vertical_jitter
-    
 
-    
     def _reset_inactivity(self):
         """Reset inactivity timer."""
         self.inactivity_timer = 0
@@ -307,7 +306,8 @@ class Game:
 
         # Structured result for auto-test parsing
         if self.is_test_mode:
-            print(f"[RESULT] winner={winner_weapon} hp_pct={hp_percent:.0f}")
+            duration = time.time() - self.match_start_real_time
+            print(f"[RESULT] winner={winner_weapon} hp_pct={hp_percent:.0f} time={duration:.2f}s")
 
         if hp_percent <= 10:
             category = "clutch"
@@ -400,6 +400,7 @@ class Game:
         
         # Delay for OBS startup between rounds
         self.obs_startup_timer = 60
+
 
     def update(self):
         """Main update loop."""
@@ -513,7 +514,6 @@ class Game:
         self.round_timer += 1
         
 
-        
         # Arena Escalation (Repeating Pulse)
         self.inactivity_timer += 1
         if self.inactivity_timer >= INACTIVITY_PULSE_TIME * FPS:
@@ -526,10 +526,6 @@ class Game:
         self.blue.update(self.red, effective_arena, self.particles, self.shockwaves)
         self.red.update(self.blue, effective_arena, self.particles, self.shockwaves)
     
-
-        
-
-        
         self.combat_manager.handle_collisions(self.blue, self.red, self)
         
         self.particles.update()

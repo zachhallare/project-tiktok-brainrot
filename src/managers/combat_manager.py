@@ -87,6 +87,33 @@ class CombatManager:
         t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denom
         return (x1 + t * (x2 - x1), y1 + t * (y2 - y1))
 
+    def _apply_guard_break(self, broken, breaker, ix_point, game):
+        """Apply guard break effects to the losing fighter."""
+        game.particles.emit(ix_point[0], ix_point[1], (255, 0, 0),    count=50, size=7)
+        game.particles.emit(ix_point[0], ix_point[1], (255, 255, 255), count=25, size=5)
+
+        guard_break_dmg = random.randint(GUARD_BREAK_DAMAGE_MIN, GUARD_BREAK_DAMAGE_MAX)
+        broken.health       -= guard_break_dmg
+        broken.parry_energy  = 0
+        broken.momentum      = 0
+
+        kb_angle = math.atan2(broken.y - breaker.y, broken.x - breaker.x)
+        broken.vx = math.cos(kb_angle) * GUARD_BREAK_KNOCKBACK
+        broken.vy = math.sin(kb_angle) * GUARD_BREAK_KNOCKBACK
+
+        broken.guard_break_stun = GUARD_BREAK_STUN_FRAMES
+        broken.invincible       = 0
+        broken.parry_cooldown   = GUARD_BREAK_STUN_FRAMES
+
+        if guard_break_dmg > 0:
+            game.damage_numbers.spawn(ix_point[0], ix_point[1] - 30,
+                                      guard_break_dmg, broken.color, True)
+
+        game.hit_stop     = GUARD_BREAK_HIT_STOP
+        game.screen_shake = GUARD_BREAK_SCREEN_SHAKE
+        if hasattr(game, 'sound_manager'):
+            game.sound_manager.play_clash()
+
     def handle_collisions(self, blue, red, game):
         """Detect and resolve combat — parry check then body hit check."""
 
@@ -102,55 +129,58 @@ class CombatManager:
                     ix_point = ((blue_base[0] + red_base[0]) / 2,
                                 (blue_base[1] + red_base[1]) / 2)
 
-                both_parried = True
-                for fighter in (blue, red):
-                    other = red if fighter is blue else blue
-                    effective_cost = fighter.parry_cost * other.weapon_config.get("parry_drain_mult", 1.0)
+                # --- determine which fighter(s) can parry ---
+                blue_cost = blue.parry_cost * red.weapon_config.get("parry_drain_mult", 1.0)
+                red_cost  = red.parry_cost  * blue.weapon_config.get("parry_drain_mult", 1.0)
+                blue_can  = blue.parry_energy >= blue_cost
+                red_can   = red.parry_energy  >= red_cost
 
-                    if fighter.parry_energy >= effective_cost:
-                        fighter.parry_energy -= effective_cost
-                        fighter.spin_direction *= -1
-                        fighter.parry_cooldown = PARRY_COOLDOWN_FRAMES
-                    else:
-                        both_parried = False
-                        # === GUARD BREAK EVENT ===
-                        game.particles.emit(ix_point[0], ix_point[1], (255, 0, 0),    count=50, size=7)
-                        game.particles.emit(ix_point[0], ix_point[1], (255, 255, 255), count=25, size=5)
+                if blue_can and red_can:
+                    # Standard clash — both pay energy
+                    blue.parry_energy -= blue_cost
+                    red.parry_energy  -= red_cost
+                    blue.parry_cooldown = PARRY_COOLDOWN_FRAMES
+                    red.parry_cooldown  = PARRY_COOLDOWN_FRAMES
 
-                        guard_break_dmg = random.randint(GUARD_BREAK_DAMAGE_MIN, GUARD_BREAK_DAMAGE_MAX)
-                        fighter.health      -= guard_break_dmg
-                        fighter.parry_energy = 0
-                        fighter.momentum     = 0
+                    # Reverse only the fighter who took the bigger proportional hit
+                    blue_ratio = blue.parry_energy / blue.max_parry_energy
+                    red_ratio  = red.parry_energy  / red.max_parry_energy
+                    if blue_ratio < red_ratio:
+                        blue.spin_direction *= -1
+                    elif red_ratio < blue_ratio:
+                        red.spin_direction *= -1
+                    else: 
+                        # Tie - flip a coin
+                        if random.random() < 0.5:
+                            blue.spin_direction *= -1
+                        else:
+                            red.spin_direction *= -1
 
-                        # Directional knockback away from opponent
-                        kb_angle = math.atan2(fighter.y - other.y, fighter.x - other.x)
-                        fighter.vx = math.cos(kb_angle) * GUARD_BREAK_KNOCKBACK
-                        fighter.vy = math.sin(kb_angle) * GUARD_BREAK_KNOCKBACK
 
-                        # Stun: weapon stops spinning, fighter slides to a halt
-                        fighter.guard_break_stun = GUARD_BREAK_STUN_FRAMES
-                        fighter.invincible = 0  # fully vulnerable during stun
-                        fighter.parry_cooldown = GUARD_BREAK_STUN_FRAMES
-
-                        if guard_break_dmg > 0:
-                            game.damage_numbers.spawn(ix_point[0], ix_point[1] - 30,
-                                                      guard_break_dmg, fighter.color, True)
-
-                if both_parried:
                     # Act 1: The Clash — metallic sparks, moderate freeze
                     game.hit_stop     = 8
                     game.screen_shake = 12
                     game.particles.emit(ix_point[0], ix_point[1], (255, 255, 100), count=20, size=4)
-                else:
-                    # Act 2: The Break — dramatic guard break freeze
-                    game.hit_stop     = GUARD_BREAK_HIT_STOP
-                    game.screen_shake = GUARD_BREAK_SCREEN_SHAKE
+                    if hasattr(game, 'sound_manager'):
+                        game.sound_manager.play_clash()
 
-                if hasattr(game, 'sound_manager'):
-                    game.sound_manager.play_clash()
+                else:
+                    # Guard break — loser is whichever one can't parry.
+                    # If neither can, the one with less energy breaks.
+                    if blue_can and not red_can:
+                        broken, breaker = red, blue
+                    elif red_can and not blue_can:
+                        broken, breaker = blue, red
+                    else:
+                        broken, breaker = (blue, red) if blue.parry_energy <= red.parry_energy else (red, blue)
+
+                    self._apply_guard_break(broken, breaker, ix_point, game)
 
         # === BODY HIT CHECK ===
-        for attacker, defender in [(blue, red), (red, blue)]:
+        pairs = [(blue, red), (red, blue)]
+        random.shuffle(pairs)
+
+        for attacker, defender in pairs:
             hit_pos, impact_ratio = self._check_sword_hit(attacker, defender)
             if hit_pos is None:
                 continue
@@ -268,4 +298,4 @@ class CombatManager:
         elif rotation < 2 * math.pi:
             return 1.0
         else:
-            return 1.3
+            return 1.3
