@@ -4,7 +4,17 @@ todos:
 
 future todos:
 - update the sound effects, make it unique for every weapon.
+
 - experiment, try making super critical hits a "blackout style", where everything turns black and white.
+
+
+- is there a way i can automate even uploading the videos in youtube shorts? (hesitant)
+
+1. The Official Way: YouTube Data API v3 (Recommended)
+You can use Python and Google's official API to upload the videos directly from your hard drive to your channel. You can even write code to automatically generate the titles, descriptions, tags, and set the schedule date (e.g., space them out 12 hours apart).
+
+Pros: Highly reliable, official, and won't get your account banned for botting. You can schedule exactly when they go public.
+Cons: Requires a bit of setup. You have to go to the Google Cloud Console, create a project, enable the YouTube API, download a client_secret.json file, and do a one-time login in your browser to grant your script permission. Also, the free API tier allows for about 6 video uploads per day (which is perfect for your 2 videos/day schedule, but means you can't upload all 60 at once in a single script run—you'd have to upload them gradually).
 
 =======================================================
 
