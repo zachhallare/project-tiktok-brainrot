@@ -286,13 +286,13 @@ def main():
         tracker_file = "used_combos_12.json"
 
     try:
-        count = int(input("How many matches? (Max: 30): ").strip())
+        count = int(input("How many matches? (Max: 100): ").strip())
         if count <= 0:
             print("Please enter a number greater than 0.")
             return
-        if count > 30:
-            print("[INFO] Limiting to 30 matches.")
-            count = 30
+        if count > 100:
+            print("[INFO] Limiting to 100 matches.")
+            count = 100
     except ValueError:
         print("Invalid input. Please enter a number.")
         return
