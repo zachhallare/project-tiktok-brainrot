@@ -1,26 +1,114 @@
 todos:
 
+How Shorts gets discovered
+Shorts has its own dedicated feed, and YouTube distributes them based almost entirely on:
+
+Viewer behavior — watch-through rate (did they watch the whole thing?), replays, likes, shares, comments
+Early engagement signals — how the video performs in the first few hours
+The Shorts feed algorithm — it pushes content to test audiences and expands reach if retention is strong
+
+The Shorts feed is much more like TikTok's For You Page than traditional YouTube search. It's behavior-driven, not keyword-driven.
+What this means practically
+
+Tags on Shorts have negligible impact on reach
+Nobody is really "searching" for Shorts the way they search for tutorials or reviews
+Your hook (first 1-2 seconds), retention rate, and rewatch rate are what actually move the needle
+
+What does matter for Shorts
+
+Hook — if they don't stay past second 2, you're done
+Watch-through rate — Shorts are ranked heavily on whether people watch to the end
+Title — still worth making punchy and curiosity-driven
+Posting consistency — the algorithm rewards accounts that post regularly
+Trending audio — using popular sounds can boost distribution, similar to TikTok
+
+Bottom line: Don't stress about tags for Shorts at all. Put that energy into your first two seconds and making sure the video is rewatchable.You said: is an average percentage viewed of 40% good for yt shorts?is an average percentage viewed of 40% good for yt shorts?9:03 AMClaude responded: For Shorts, 40% is below average — but context matters a lot.Examined YouTube Shorts retention benchmarks for performance evaluationExamined YouTube Shorts retention benchmarks for performance evaluationFor Shorts, 40% is below average — but context matters a lot.
+General Shorts retention benchmarks
+
+Below 60% — Needs improvement; the algorithm is unlikely to push it widely
+60–80% — Decent; the algorithm will give it moderate distribution
+80–100% — Good; YouTube will actively push this to wider audiences
+100%+ (replays counted) — Excellent; signals very strong content
+
+Shorts are held to a much higher retention standard than long-form videos precisely because they're short. YouTube essentially expects people to watch most or all of a Short — if 60% of viewers are dropping off before the end of a 30-second video, that's a red flag to the algorithm.
+Why 40% might be happening
+
+The hook isn't strong enough in the first 1-2 seconds
+The video loses tension or interest in the middle
+The ending is weak or too abrupt
+The content doesn't match what the title/thumbnail promised (if applicable)
+
+What to focus on
+
+Rewrite your hook — the first frame and first line need to create an immediate reason to keep watching
+Cut aggressively — remove any moment that doesn't add energy or information
+Loop-friendly endings — if the end flows back into the beginning, replays go up which boosts your percentage
+Shorter runtime — a 15-second Short with 75% retention beats a 60-second Short with 40%
+
+For your Beyblade battle content specifically, the chaos and action should naturally hold attention — so if retention is low, it might just be a pacing or hook issue rather than the concept itself.You said: does yt push more to the algorithm if it has a higher shorts retention?does yt push more to the algorithm if it has a higher shorts retention?9:08 AMClaude responded: Yes, directly and significantly.Recognized straightforward question requiring direct responseRecognized straightforward question requiring direct responseYes, directly and significantly. Retention is one of the primary signals YouTube uses to decide how widely to distribute a Short.
+How the distribution process works
+YouTube pushes Shorts in waves:
+
+First it shows your Short to a small test audience
+It measures how they respond — mainly retention and engagement
+If the signals are strong, it pushes to a larger audience, then larger again
+Low retention kills the video at step 1 or 2 — it never gets the wider push
+
+Why retention is weighted so heavily for Shorts
+YouTube's goal is to keep people in the Shorts feed as long as possible. A Short with high retention means:
+
+Viewers aren't swiping away (low "skip" signal)
+The content is holding attention
+People may rewatch it (replay = bonus retention %)
+YouTube can confidently show it to more people without risking feed abandonment
+
+Other signals that work alongside retention
+
+Like rate — likes relative to views
+Share rate — one of the strongest signals, especially shares outside YouTube
+Comments — signals the video provoked a reaction
+Rewatch/loop rate — if people replay, it boosts your average % viewed significantly
+
+The compounding effect
+High retention → wider push → more views → more data → even wider push. It snowballs. That's why one Short can blow up while another from the same channel gets 200 views — the algorithm either picks it up in that first test wave or it doesn't.
+So for your auto-generated battle content, optimizing for watch-through (strong hook, fast pacing, satisfying ending) is probably the single highest-leverage thing you can do.You said: back when my videos were shorter, it had more viewer retention.back when my videos were shorter, it had more viewer retention. is it wiser to keep my yt shorts video length short and fast paced, as opposed to my current 30-60 second video with 40% retention?9:23 AMClaude responded: Yes, almost certainly.Evaluated viewer retention data against content strategyEvaluated viewer retention data against content strategyYes, almost certainly. Your own data is telling you the answer here.
+The math works against longer Shorts
+If a 15-second video gets 80% retention vs. a 60-second video getting 40%:
+
+15s × 80% = 12 seconds of average watch time
+60s × 40% = 24 seconds of average watch time
+
+Watch time is slightly higher on the longer one, but YouTube doesn't just look at raw watch time for Shorts — percentage viewed is the dominant signal. A 40% retention tells the algorithm most people bailed, regardless of how long they watched.
+Why shorter works better for your content specifically
+Beyblade-style battle content has a natural tension arc — buildup, clash, winner. If that resolves in 15-20 seconds, the video feels complete and satisfying. Stretching it to 45-60 seconds likely means:
+
+Filler moments between hits that bleed retention
+The payoff comes too late
+Viewers swipe before the satisfying ending, which is the worst outcome
+
+Practical recommendation
+
+Target 15-25 seconds per Short
+Structure it as: hook (1-2s) → action → decisive moment → end
+If the battle naturally runs long, consider cutting straight to the highlight moments rather than showing the full fight
+You could even split longer fights into parts ("Part 1", "Part 2") to keep each video tight
+
+Your instinct is right — lean into what your data already proved worked.
+
+
 =======================================================
 
-future todos:
-- update the sound effects, make it unique for every weapon.
+2.  "blackout" experiment:
+What actually would work for that "blackout" moment feeling:
 
-- experiment, try making super critical hits a "blackout style", where everything turns black and white.
-
-
-- is there a way i can automate even uploading the videos in youtube shorts? (hesitant)
-
-1. The Official Way: YouTube Data API v3 (Recommended)
-You can use Python and Google's official API to upload the videos directly from your hard drive to your channel. You can even write code to automatically generate the titles, descriptions, tags, and set the schedule date (e.g., space them out 12 hours apart).
-
-Pros: Highly reliable, official, and won't get your account banned for botting. You can schedule exactly when they go public.
-Cons: Requires a bit of setup. You have to go to the Google Cloud Console, create a project, enable the YouTube API, download a client_secret.json file, and do a one-time login in your browser to grant your script permission. Also, the free API tier allows for about 6 video uploads per day (which is perfect for your 2 videos/day schedule, but means you can't upload all 60 at once in a single script run—you'd have to upload them gradually).
+Chromatic aberration burst — RGB split on the whole screen for 3-4 frames, then snap back. Screams impact.
+Whiteout flash — full white frame for 1-2 frames (the opposite of blackout). This is what fighting games do for ultra hits because it reads as explosive.
+Oversaturation spike — everything goes hypersaturated/neon for a beat before returning to normal. Fits your existing aesthetic.
+Freeze frame + zoom — 8-12 frame freeze on hit with a slow push-in. This is the most "viral clip" friendly since it gives the viewer a moment to process what happened.
 
 =======================================================
 
-not needed for now:
-
-5. what to do after: better sounds.
+3. update the sound effects, make it unique for every weapon (not needed for now)
 
 Based on the current weapon configurations (Sword, Dagger, Spear, Axe, Hammer) and the existing audio files, you currently only have generic combat sounds (`hit_1`, `hit_2`, `critical_hit`, `sword_clash`). 
 

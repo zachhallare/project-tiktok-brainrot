@@ -270,8 +270,7 @@ class Game:
         """Handle round end."""
         self.round_ending = True
         self.winner = winner
-        # Extended from 120 to 300 to allow delay before displaying win text
-        self.reset_timer = 0 if getattr(self, 'is_headless', False) else 60  # 1 second end sequence (60 frames at 60fps)
+        self.reset_timer = 0 if getattr(self, 'is_headless', False) else 120
         
         if winner == self.blue:
             self.winner_text = "WINS"
@@ -497,7 +496,7 @@ class Game:
             self.reset_timer -= 1
             
             # Play sword_to_ground sound partway through the freeze
-            if getattr(self, 'death_sound_phase', 0) == 1 and self.reset_timer < 50:
+            if getattr(self, 'death_sound_phase', 0) == 1 and self.reset_timer < 100:
                 self.death_sound_phase = 2
                 if hasattr(self, 'sound_manager'):
                     self.sound_manager.play_sword_to_ground()
@@ -618,10 +617,15 @@ class Game:
         self.shockwaves.draw(self.screen, offset)
         
         # Draw fighters
-        if not self.round_ending or self.winner == self.blue:
+        if not self.round_ending:
             self.blue.draw(self.screen, offset)
-        if not self.round_ending or self.winner == self.red:
             self.red.draw(self.screen, offset)
+        elif self.reset_timer > 60:
+            if self.winner == self.blue:
+                self.blue.draw(self.screen, offset)
+            else:
+                self.red.draw(self.screen, offset)
+
         
         self.particles.draw(self.screen, offset)
         self.damage_numbers.draw(self.screen, offset)
@@ -635,7 +639,6 @@ class Game:
             self.screen.fill(WHITE)
         # Phase 3+: Normal render (no flash)
         
-
         
         # Countdown overlay
         if self.countdown_active:
@@ -657,42 +660,72 @@ class Game:
             self.screen.blit(text_surface, text_rect)
         
         # Winner UI Announcement
-        # Show winner text almost immediately after death (0.17s delay)
-        if self.round_ending and self.winner_text and self.reset_timer < 50:
-            text_surface = self.font_large.render(self.winner_text, True, WHITE)
-            
-            # Winner color info
+        if self.round_ending and self.winner_text and self.reset_timer < 60:
+            # Clean slate for the announcement.
+            self.damage_numbers.clear()
+            self.particles.clear()
+
             win_color = self.f1_color if self.winner == self.blue else self.f2_color
             win_color_bright = self.f1_bright if self.winner == self.blue else self.f2_bright
-            border_color = win_color
-            
-            # Layout calculation
-            circle_radius = 25
-            gap = 15
-            total_width = (circle_radius * 2) + gap + text_surface.get_width()
-            
+
             cx = SCREEN_WIDTH // 2
-            cy = SCREEN_HEIGHT // 2
-            start_x = cx - total_width // 2
-            
-            text_rect = text_surface.get_rect(midleft=(start_x + circle_radius * 2 + gap, cy))
-            
-            # Pulsing box effect
-            pulse = abs(math.sin(self.reset_timer * 0.05))
-            pulse_inflate_w = 60 + 30 * pulse
-            pulse_inflate_h = 40 + 30 * pulse
-            
-            bg_rect = pygame.Rect(0, 0, total_width + pulse_inflate_w, max(text_surface.get_height(), circle_radius * 2) + pulse_inflate_h)
-            bg_rect.center = (cx, cy)
-            
-            # Give UI text a dark backing
-            pygame.draw.rect(self.screen, NEON_BG, bg_rect)
-            pygame.draw.rect(self.screen, border_color, bg_rect, max(4, int(6 + 4 * pulse)))
-            
-            # Draw circle indicator
-            pygame.draw.circle(self.screen, win_color, (int(start_x + circle_radius), cy), circle_radius)
-            pygame.draw.circle(self.screen, win_color_bright, (int(start_x + circle_radius), cy), int(circle_radius * 0.6))
-            
+            circle_radius = 40
+            pulse = abs(math.sin(pygame.time.get_ticks() * 0.004))
+
+            # Pre-measure WINS text so we can vertically center the whole unit
+            text_surface = self.font_large.render(self.winner_text, True, WHITE)
+            gap = 15
+            total_height = (circle_radius * 2) + gap + text_surface.get_height()
+            top_y = SCREEN_HEIGHT // 2 - total_height // 2
+            circle_cy = top_y + circle_radius
+            text_cy = top_y + circle_radius * 2 + gap + text_surface.get_height() // 2
+
+            # --- Single soft glow ring ---
+            glow_surf = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+            for i, (extra_r, alpha) in enumerate([(28, 12), (20, 22), (12, 35), (6, 50)]):
+                a = int(alpha * (0.85 + 0.15 * pulse))
+                pygame.draw.circle(glow_surf, (*win_color, a), (cx, circle_cy), circle_radius + extra_r)
+            self.screen.blit(glow_surf, (0, 0))
+
+            # --- Fighter circle ---
+            pygame.draw.circle(self.screen, win_color, (cx, circle_cy), circle_radius)
+            pygame.draw.circle(self.screen, win_color_bright, (cx, circle_cy), int(circle_radius * 0.65))
+
+            # --- Spinning weapon orbiting the circle ---
+            raw_sprite = None
+            orig_w = 0
+            if hasattr(self.winner, '_renderer') and hasattr(self.winner._renderer, '_weapon_base'):
+                raw_sprite = self.winner._renderer._weapon_base
+                orig_w = self.winner._renderer._orig_w
+
+            if raw_sprite:
+                spin_angle = (pygame.time.get_ticks() / 150.0) % (2 * math.pi)
+                cos_a = math.cos(spin_angle)
+                sin_a = math.sin(spin_angle)
+
+                scaled_sprite = pygame.transform.rotozoom(raw_sprite, 0, 1.4)
+                scaled_w = orig_w * 1.4
+
+                handle_x = cx + cos_a * (circle_radius + 5)
+                handle_y = circle_cy + sin_a * (circle_radius + 5)
+
+                angle_deg = math.degrees(spin_angle)
+                rotated = pygame.transform.rotate(scaled_sprite, -angle_deg)
+
+                rot_center_x = handle_x + (scaled_w / 2) * cos_a
+                rot_center_y = handle_y + (scaled_w / 2) * sin_a
+
+                weapon_rect = rotated.get_rect(center=(int(rot_center_x), int(rot_center_y)))
+                self.screen.blit(rotated, weapon_rect)
+
+            # --- "WINS" text with single glow pass ---
+            text_rect = text_surface.get_rect(center=(cx, text_cy))
+
+            glow_surface = self.font_large.render(self.winner_text, True, win_color)
+            glow_surface.set_alpha(90)
+            for dx, dy in [(-4, 0), (4, 0), (0, -4), (0, 4)]:
+                self.screen.blit(glow_surface, text_rect.move(dx, dy))
+
             self.screen.blit(text_surface, text_rect)
         
         # UI Overlays

@@ -197,7 +197,7 @@ WEAPON_CONFIGS = {
         'sprite_size': (174, 13),
         'sword_length': 148,
         'damage_mult': 1.20,
-        'handle_ratio': 0.78,
+        'handle_ratio': 0.8,
         'hitbox_profile': [
             (0.72,  3),
             (0.85,  6),
