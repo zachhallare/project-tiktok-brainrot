@@ -35,6 +35,7 @@ class SoundManager:
         self.sword_to_ground_sound = load_sound("combat", "sword_to_the_ground.mp3", 0.6)
         self.countdown_beep_sound = load_sound("countdown", "countdown_beep.mp3", 0.6)
         self.sword_fight_sound = load_sound("countdown", "sword-fight.mp3", 0.5)
+        self.victory_fireworks_sound = load_sound("ending", "victory_fireworks.mp3", 0.6)
 
     def play_arena_pulse(self):
         if not self.muted and self.arena_pulse_sound:
@@ -55,6 +56,10 @@ class SoundManager:
     def play_sword_fight(self):
         if not self.muted and self.sword_fight_sound:
             self.sword_fight_sound.play()
+
+    def play_victory_fireworks(self):
+        if not self.muted and self.victory_fireworks_sound:
+            self.victory_fireworks_sound.play()
 
     def play_clash(self):
         if self.muted or not self.sword_clash_sound:
@@ -97,3 +102,5 @@ class SoundManager:
             self.countdown_beep_sound.set_volume(0.6 * self.master_volume)
         if hasattr(self, 'sword_fight_sound') and self.sword_fight_sound:
             self.sword_fight_sound.set_volume(0.5 * self.master_volume)
+        if hasattr(self, 'victory_fireworks_sound') and self.victory_fireworks_sound:
+            self.victory_fireworks_sound.set_volume(0.6 * self.master_volume)

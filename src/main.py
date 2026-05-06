@@ -92,9 +92,7 @@ class Game:
         self.shockwaves = ShockwaveSystem()
         self.arena_pulses = ArenaPulseSystem()
         self.damage_numbers = DamageNumberSystem()
-        
-
-        
+                
         # Screen effects.
         self.screen_shake = 0
         self.hit_stop = 0
@@ -115,6 +113,7 @@ class Game:
         self.round_ending = False
         self.winner = None
         self.winner_text = ""
+        self.winner_particles_spawned = False
         self.reset_timer = 0
         
         # UI controls.
@@ -130,7 +129,6 @@ class Game:
         self.countdown_duration = 15   # 0.25s per tick (was 45 = 0.75s)
         self.fight_duration = 15       # 0.25s for FIGHT text (was 30 = 0.5s)
         
-
         # Arena Escalation System
         self.inactivity_timer = 0
         
@@ -368,6 +366,8 @@ class Game:
         self.round_ending = False
         self.winner = None
         self.winner_text = ""
+        self.winner_particles_spawned = False
+
         self.round_timer = 0
         self.particles.clear()
         self.shockwaves.clear()
@@ -399,7 +399,6 @@ class Game:
         self.fight_sound_played = False
         self.death_sound_phase = 0
 
-        
         # Delay for OBS startup between rounds
         self.obs_startup_timer = 60
 
@@ -664,10 +663,23 @@ class Game:
         
         # Winner UI Announcement
         if self.round_ending and self.winner_text and self.reset_timer < 80:
-            self.damage_numbers.clear()
-            self.particles.clear()
-
             win_color = self.f1_color if self.winner == self.blue else self.f2_color
+
+            # Particle burst for fireworks.
+            if not self.winner_particles_spawned:
+                self.winner_particles_spawned = True
+                self.damage_numbers.clear()
+                self.particles.clear()
+                cx_burst = SCREEN_WIDTH // 2
+                cy_burst = SCREEN_HEIGHT // 2
+                self.particles.emit_explosion(cx_burst, cy_burst, win_color, count=60)
+                # Extra particles from corners.
+                for bx, by in [(cx_burst - 80, cy_burst - 60), (cx_burst + 80, cy_burst - 60)]:
+                    self.particles.emit_explosion(bx, by, win_color, count=25)
+                
+                if hasattr(self, 'sound_manager'):
+                    self.sound_manager.play_victory_fireworks()
+
 
             cx = SCREEN_WIDTH // 2
             text_surface = self.font_large.render(self.winner_text, True, WHITE)
@@ -712,6 +724,7 @@ class Game:
                 self.screen.set_clip(clip_rect)
                 self.screen.blit(rotated, weapon_rect)
                 self.screen.set_clip(None)
+
 
             # WINS text
             text_cy = top_y + FIGHTER_RADIUS * 2 + gap + text_surface.get_height() // 2
