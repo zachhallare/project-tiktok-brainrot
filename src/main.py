@@ -4,7 +4,9 @@ import random
 import os
 import json
 import time
+
 from titles import get_title_pools
+from config import FIGHTER_RADIUS
 
 try:
     from dotenv import load_dotenv
@@ -30,6 +32,7 @@ from config import (
     NEON_BG, NEON_GRID,
     CRIT_CHANCE, CRIT_MULTIPLIER, CRIT_IMPACT_FRAMES, CRIT_IMPACT_TIMESCALE
 )
+
 from effects import ParticleSystem, ShockwaveSystem, ArenaPulseSystem, DamageNumberSystem
 from entities.fighter import Fighter
 from managers.obs_manager import OBSManager
@@ -153,10 +156,10 @@ class Game:
         try:
             logo_img = pygame.image.load(logo_path).convert_alpha()
             # Scale down to be a watermark (max ~400px wide)
-            scale_factor = 400.0 / max(logo_img.get_width(), 1)
+            scale_factor = 120.0 / max(logo_img.get_width(), 1)
             new_size = (int(logo_img.get_width() * scale_factor), int(logo_img.get_height() * scale_factor))
             self.bg_logo = pygame.transform.scale(logo_img, new_size)
-            self.bg_logo.set_alpha(80) # Semi-transparent watermark
+            self.bg_logo.set_alpha(45) # Semi-transparent watermark
         except Exception as e:
             print(f"Failed to load background logo: {e}")
             self.bg_logo = None
@@ -603,7 +606,7 @@ class Game:
         
         # Draw background logo watermark
         if hasattr(self, 'bg_logo') and self.bg_logo:
-            # Center logo in current drawn arena
+            # Bottom-right corner of arena with small padding
             logo_rect = self.bg_logo.get_rect(center=(int(ax + aw/2 + offset[0]), int(ay + ah/2 + offset[1])))
             self.screen.blit(self.bg_logo, logo_rect)
         
@@ -620,7 +623,7 @@ class Game:
         if not self.round_ending:
             self.blue.draw(self.screen, offset)
             self.red.draw(self.screen, offset)
-        elif self.reset_timer > 60:
+        elif self.reset_timer > 80:
             if self.winner == self.blue:
                 self.blue.draw(self.screen, offset)
             else:
@@ -660,38 +663,29 @@ class Game:
             self.screen.blit(text_surface, text_rect)
         
         # Winner UI Announcement
-        if self.round_ending and self.winner_text and self.reset_timer < 60:
-            # Clean slate for the announcement.
+        if self.round_ending and self.winner_text and self.reset_timer < 80:
             self.damage_numbers.clear()
             self.particles.clear()
 
             win_color = self.f1_color if self.winner == self.blue else self.f2_color
-            win_color_bright = self.f1_bright if self.winner == self.blue else self.f2_bright
 
             cx = SCREEN_WIDTH // 2
-            circle_radius = 40
-            pulse = abs(math.sin(pygame.time.get_ticks() * 0.004))
-
-            # Pre-measure WINS text so we can vertically center the whole unit
             text_surface = self.font_large.render(self.winner_text, True, WHITE)
-            gap = 15
-            total_height = (circle_radius * 2) + gap + text_surface.get_height()
+            gap = 25
+            total_height = (FIGHTER_RADIUS * 2) + gap + text_surface.get_height()
             top_y = SCREEN_HEIGHT // 2 - total_height // 2
-            circle_cy = top_y + circle_radius
-            text_cy = top_y + circle_radius * 2 + gap + text_surface.get_height() // 2
+            circle_cy = top_y + FIGHTER_RADIUS
 
-            # --- Single soft glow ring ---
+            # Draw winner fighter body repositioned to center
+            draw_offset = (cx - self.winner.x, circle_cy - self.winner.y)
+            self.winner.draw_body_only(self.screen, draw_offset)
+
+            # Very subtle glow
             glow_surf = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
-            for i, (extra_r, alpha) in enumerate([(28, 12), (20, 22), (12, 35), (6, 50)]):
-                a = int(alpha * (0.85 + 0.15 * pulse))
-                pygame.draw.circle(glow_surf, (*win_color, a), (cx, circle_cy), circle_radius + extra_r)
+            pygame.draw.circle(glow_surf, (*win_color, 18), (cx, circle_cy), FIGHTER_RADIUS + 14)
             self.screen.blit(glow_surf, (0, 0))
 
-            # --- Fighter circle ---
-            pygame.draw.circle(self.screen, win_color, (cx, circle_cy), circle_radius)
-            pygame.draw.circle(self.screen, win_color_bright, (cx, circle_cy), int(circle_radius * 0.65))
-
-            # --- Spinning weapon orbiting the circle ---
+            # Spinning weapon on top
             raw_sprite = None
             orig_w = 0
             if hasattr(self.winner, '_renderer') and hasattr(self.winner._renderer, '_weapon_base'):
@@ -703,29 +697,29 @@ class Game:
                 cos_a = math.cos(spin_angle)
                 sin_a = math.sin(spin_angle)
 
-                scaled_sprite = pygame.transform.rotozoom(raw_sprite, 0, 1.4)
-                scaled_w = orig_w * 1.4
+                scaled_sprite = pygame.transform.rotozoom(raw_sprite, 0, 1.0)
+                scaled_w = orig_w * 1.0
 
-                handle_x = cx + cos_a * (circle_radius + 5)
-                handle_y = circle_cy + sin_a * (circle_radius + 5)
+                handle_x = cx + cos_a * (FIGHTER_RADIUS + 5)
+                handle_y = circle_cy + sin_a * (FIGHTER_RADIUS + 5)
 
-                angle_deg = math.degrees(spin_angle)
-                rotated = pygame.transform.rotate(scaled_sprite, -angle_deg)
-
+                rotated = pygame.transform.rotate(scaled_sprite, -math.degrees(spin_angle))
                 rot_center_x = handle_x + (scaled_w / 2) * cos_a
                 rot_center_y = handle_y + (scaled_w / 2) * sin_a
 
                 weapon_rect = rotated.get_rect(center=(int(rot_center_x), int(rot_center_y)))
+                clip_rect = pygame.Rect(int(ax), int(ay), int(aw), int(ah))
+                self.screen.set_clip(clip_rect)
                 self.screen.blit(rotated, weapon_rect)
+                self.screen.set_clip(None)
 
-            # --- "WINS" text with single glow pass ---
+            # WINS text
+            text_cy = top_y + FIGHTER_RADIUS * 2 + gap + text_surface.get_height() // 2
             text_rect = text_surface.get_rect(center=(cx, text_cy))
-
             glow_surface = self.font_large.render(self.winner_text, True, win_color)
             glow_surface.set_alpha(90)
             for dx, dy in [(-4, 0), (4, 0), (0, -4), (0, 4)]:
                 self.screen.blit(glow_surface, text_rect.move(dx, dy))
-
             self.screen.blit(text_surface, text_rect)
         
         # UI Overlays

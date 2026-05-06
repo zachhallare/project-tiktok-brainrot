@@ -40,6 +40,20 @@ class FighterRenderer:
         self._draw_weapon(fighter, surface, offset)
 
 
+    def render_body_only(self, fighter, surface, offset=(0, 0)):
+        ox, oy = offset
+        r = fighter.radius
+        cx = int(fighter.x + ox)
+        cy = int(fighter.y + oy)
+
+        flashing     = fighter.flash_timer > 0
+        body_color   = WHITE if flashing else fighter.color
+        border_color = WHITE if flashing else tuple(max(0, c - 80) for c in fighter.color)
+
+        pygame.draw.circle(surface, border_color, (cx, cy), int(r) + BORDER_THICKNESS)
+        pygame.draw.circle(surface, body_color,   (cx, cy), int(r))
+
+
     def _draw_trail(self, fighter, surface, offset):
         if len(fighter.trail) < 2:
             return

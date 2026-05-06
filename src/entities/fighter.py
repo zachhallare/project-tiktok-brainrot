@@ -240,8 +240,14 @@ class Fighter:
     def get_attack_damage_multiplier(self):
         return self.weapon_config.get("damage_mult", 1.0)
 
+
     def draw(self, surface, offset=(0, 0)):
         self._renderer.render(self, surface, offset)
+
+
+    def draw_body_only(self, surface, offset=(0, 0)):
+        self._renderer.render_body_only(self, surface, offset)
+
 
     def take_damage(self, amount, knockback_angle, knockback_force, particles):
         if self.invincible > 0:
