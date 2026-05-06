@@ -126,8 +126,9 @@ class Game:
         self.countdown_timer = 0
         self.countdown_active = True
         self.countdown_texts = ["3", "2", "1", "FIGHT"]
-        self.countdown_duration = 15   # 0.25s per tick (was 45 = 0.75s)
-        self.fight_duration = 15       # 0.25s for FIGHT text (was 30 = 0.5s)
+        self.countdown_duration = 25   # 0.42s per number tick (~1.25s for 3-2-1)
+        self.fight_duration = 45       # 0.75s for FIGHT text (total countdown ~2s)
+        self.countdown_flash_timer = 0
         
         # Arena Escalation System
         self.inactivity_timer = 0
@@ -393,6 +394,7 @@ class Game:
         self.countdown_stage = 0
         self.countdown_timer = 0
         self.countdown_active = True
+        self.countdown_flash_timer = 0
         
         # Reset countdown and death sound state
         self.countdown_beep_played = [False, False, False]
@@ -417,6 +419,10 @@ class Game:
             self.countdown_timer += 1
             duration = self.fight_duration if self.countdown_stage == 3 else self.countdown_duration
             
+            # Decrement flash timer
+            if self.countdown_flash_timer > 0:
+                self.countdown_flash_timer -= 1
+            
             # Play countdown beep sounds for stages 0, 1, 2 ("3", "2", "1")
             if self.countdown_stage < 3 and self.countdown_timer == 1:
                 if not hasattr(self, 'countdown_beep_played'):
@@ -434,10 +440,20 @@ class Game:
                     self.fight_sound_played = True
                     if hasattr(self, 'sound_manager'):
                         self.sound_manager.play_sword_fight()
+                    # "FIGHT" visual punch: shockwave + particles + shake
+                    self.countdown_flash_timer = 4
+                    self.screen_shake = SCREEN_SHAKE_INTENSITY * 1.5
+                    cx = SCREEN_WIDTH // 2
+                    cy = SCREEN_HEIGHT // 2
+                    self.shockwaves.add(cx, cy, WHITE, 200)
+                    self.particles.emit_explosion(cx, cy, self.f1_color, count=20)
+                    self.particles.emit_explosion(cx, cy, self.f2_color, count=20)
             
             if self.countdown_timer >= duration:
                 self.countdown_timer = 0
                 self.countdown_stage += 1
+                # Brief flash on each number transition
+                self.countdown_flash_timer = 3
                 if self.countdown_stage > 3:
                     self.countdown_active = False
                     self._unlock_fighters()
@@ -642,24 +658,78 @@ class Game:
         # Phase 3+: Normal render (no flash)
         
         
-        # Countdown overlay
+        # Countdown overlay (enhanced hook for Shorts retention)
         if self.countdown_active:
             countdown_text = self.countdown_texts[self.countdown_stage]
+            duration = self.fight_duration if self.countdown_stage == 3 else self.countdown_duration
+            progress = self.countdown_timer / max(1, duration)  # 0.0 → 1.0
+            
+            cx = SCREEN_WIDTH // 2
+            cy = SCREEN_HEIGHT // 2
             
             if countdown_text == "FIGHT":
-                text_surface = self.font_medium.render(countdown_text, True, WHITE)
-                border_color = self.f1_color
-            else:
+                # FIGHT: grows from small to large with dual-color glow
+                ease = 1 - (1 - progress) ** 3  # ease-out cubic
+                scale = 0.6 + ease * 1.0  # 0.6 → 1.6
+                
                 text_surface = self.font_large.render(countdown_text, True, WHITE)
-                border_color = self.f2_color
+                new_w = max(1, int(text_surface.get_width() * scale))
+                new_h = max(1, int(text_surface.get_height() * scale))
+                text_surface = pygame.transform.smoothscale(text_surface, (new_w, new_h))
+                text_rect = text_surface.get_rect(center=(cx, cy))
+                
+                # Dual-color glow halo (both fighter colors)
+                for glow_color, alpha_val in [(self.f1_color, 80), (self.f2_color, 60)]:
+                    glow_surf = self.font_large.render(countdown_text, True, glow_color)
+                    glow_surf = pygame.transform.smoothscale(glow_surf, (new_w, new_h))
+                    glow_surf.set_alpha(alpha_val)
+                    for dx, dy in [(-4,0),(4,0),(0,-4),(0,4),(-3,-3),(3,3),(-3,3),(3,-3)]:
+                        self.screen.blit(glow_surf, text_rect.move(dx, dy))
+                
+                self.screen.blit(text_surface, text_rect)
+            else:
+                # Numbers 3, 2, 1: punch-in (start big → ease to normal)
+                ease = 1 - (1 - progress) ** 2  # ease-out quadratic
+                scale = 2.0 - 1.0 * ease  # 2.0 → 1.0
+                
+                # Color per stage: 3=fighter1, 2=fighter2, 1=white
+                stage_colors = [self.f1_bright, self.f2_bright, WHITE]
+                text_color = stage_colors[self.countdown_stage]
+                
+                text_surface = self.font_large.render(countdown_text, True, text_color)
+                new_w = max(1, int(text_surface.get_width() * scale))
+                new_h = max(1, int(text_surface.get_height() * scale))
+                text_surface = pygame.transform.smoothscale(text_surface, (new_w, new_h))
+                text_rect = text_surface.get_rect(center=(cx, cy))
+                
+                # Drop shadow
+                shadow = self.font_large.render(countdown_text, True, (0, 0, 0))
+                shadow = pygame.transform.smoothscale(shadow, (new_w, new_h))
+                shadow.set_alpha(150)
+                self.screen.blit(shadow, text_rect.move(3, 3))
+                
+                self.screen.blit(text_surface, text_rect)
             
-            text_rect = text_surface.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2))
+            # Matchup nameplate below countdown
+            name_y = cy + 90
+            f1_surf = self.font_small.render(self.f1_name.upper(), True, self.f1_color)
+            f2_surf = self.font_small.render(self.f2_name.upper(), True, self.f2_color)
+            vs_surf = self.font_small.render("VS", True, GRAY)
+            total_w = f1_surf.get_width() + vs_surf.get_width() + f2_surf.get_width() + 30
+            start_x = cx - total_w // 2
+            self.screen.blit(f1_surf, (start_x, name_y - f1_surf.get_height() // 2))
+            vs_x = start_x + f1_surf.get_width() + 15
+            self.screen.blit(vs_surf, (vs_x, name_y - vs_surf.get_height() // 2))
+            f2_x = vs_x + vs_surf.get_width() + 15
+            self.screen.blit(f2_surf, (f2_x, name_y - f2_surf.get_height() // 2))
             
-            bg_rect = text_rect.inflate(50, 30)
-            pygame.draw.rect(self.screen, NEON_BG, bg_rect)
-            pygame.draw.rect(self.screen, border_color, bg_rect, 4)
-            
-            self.screen.blit(text_surface, text_rect)
+            # Flash overlay on transitions
+            if self.countdown_flash_timer > 0:
+                flash_alpha = int(180 * (self.countdown_flash_timer / 4.0))
+                flash_surf = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+                flash_surf.fill(WHITE)
+                flash_surf.set_alpha(flash_alpha)
+                self.screen.blit(flash_surf, (0, 0))
         
         # Winner UI Announcement
         if self.round_ending and self.winner_text and self.reset_timer < 80:
