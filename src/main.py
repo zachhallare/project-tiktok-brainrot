@@ -281,6 +281,7 @@ class Game:
         
         # Color state reversion and death animation rules
         loser.flash_timer = 0
+        winner.flash_timer = 0
         death_color = loser.color
             
         self.particles.emit_explosion(loser.x, loser.y, death_color, count=40)
