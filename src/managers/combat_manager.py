@@ -160,7 +160,7 @@ class CombatManager:
                     # Act 1: The Clash — metallic sparks, moderate freeze
                     game.hit_stop     = 8
                     game.screen_shake = 12
-                    game.particles.emit(ix_point[0], ix_point[1], (255, 255, 100), count=20, size=4)
+                    game.particles.emit_parry(ix_point[0], ix_point[1], (255, 255, 100), count=20)
                     if hasattr(game, 'sound_manager'):
                         game.sound_manager.play_clash()
 

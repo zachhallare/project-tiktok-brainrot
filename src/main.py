@@ -128,8 +128,8 @@ class Game:
         self.countdown_timer = 0
         self.countdown_active = True
         self.countdown_texts = ["3", "2", "1", "FIGHT"]
-        self.countdown_duration = 40   # 40 frames per number (frames 0-40, 41-80, 81-120)
-        self.fight_duration = 45       # 45 frames for FIGHT (frames 121-165)
+        self.countdown_durations = [40, 40, 52, 45]
+        self.fight_punch_frame = False      # 1-frame camera punch on FIGHT reveal.
         self.countdown_flash_timer = 0
         self.countdown_flash_duration = 1  # tracks starting flash length for alpha calc
         
@@ -424,7 +424,7 @@ class Game:
         
         if self.countdown_active:
             self.countdown_timer += 1
-            duration = self.fight_duration if self.countdown_stage == 3 else self.countdown_duration
+            duration = self.countdown_durations[self.countdown_stage]
             
             # Keep weapons spinning during countdown (fighters are locked but rotation updates)
             self.blue.update_rotation(self.red, 0)
@@ -457,6 +457,7 @@ class Game:
                     self.countdown_flash_timer = 6
                     self.countdown_flash_duration = 6
                     self.screen_shake = SCREEN_SHAKE_INTENSITY * 2.0
+                    self.fight_punch_frame = True       # Separate 1-frame spike
                     cx = SCREEN_WIDTH // 2
                     cy = SCREEN_HEIGHT // 2
                     self.shockwaves.add(cx, cy, WHITE, 250)
@@ -621,7 +622,11 @@ class Game:
     def draw(self):
         """Draw game with neon visuals."""
         offset = (0, 0)
-        if self.screen_shake > 0:
+        if getattr(self, 'fight_punch_frame', False):
+            punch = SCREEN_SHAKE_INTENSITY * 7
+            offset = (random.uniform(-punch, punch), random.uniform(-punch, punch))
+            self.fight_punch_frame = False
+        elif self.screen_shake > 0:
             offset = (random.uniform(-self.screen_shake, self.screen_shake),
                      random.uniform(-self.screen_shake, self.screen_shake))
         
@@ -679,7 +684,7 @@ class Game:
         # Countdown overlay (enhanced hook for Shorts retention)
         if self.countdown_active:
             countdown_text = self.countdown_texts[self.countdown_stage]
-            duration = self.fight_duration if self.countdown_stage == 3 else self.countdown_duration
+            duration = self.countdown_durations[self.countdown_stage]
             progress = self.countdown_timer / max(1, duration)  # 0.0 → 1.0
             
             cx = SCREEN_WIDTH // 2
@@ -704,6 +709,11 @@ class Game:
                     for dx, dy in [(-4,0),(4,0),(0,-4),(0,4),(-3,-3),(3,3),(-3,3),(3,-3)]:
                         self.screen.blit(glow_surf, text_rect.move(dx, dy))
                 
+                shadow = self.font_large.render(countdown_text, True, (0, 0, 0))
+                shadow = pygame.transform.smoothscale(shadow, (new_w, new_h))
+                shadow.set_alpha(150)
+                self.screen.blit(shadow, text_rect.move(3, 3))
+
                 self.screen.blit(text_surface, text_rect)
             else:
                 # Numbers 3, 2, 1: punch-in (start big → ease to normal)
@@ -825,6 +835,7 @@ class Game:
         
         pygame.display.flip()
     
+
     def _draw_grid(self, offset):
         """Draw faint grid for cyberpunk aesthetic."""
         ox, oy = offset

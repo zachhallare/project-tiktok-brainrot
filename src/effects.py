@@ -74,6 +74,20 @@ class ParticleSystem:
     def clear(self):
         self.particles.clear()
 
+    def emit_parry(self, x, y, color, count=20):
+        """Directional upward fan — clash sparks that read as deflection,
+        not impact. Visually opposite to emit_explosion's radial burst."""
+        for _ in range(count):
+            # Fan arc: straight up ± ~50 degrees
+            angle = random.uniform(-math.pi / 2 - 0.87, -math.pi / 2 + 0.87)
+            speed = random.uniform(6, 14)
+            velocity = (math.cos(angle) * speed, math.sin(angle) * speed)
+            size = random.uniform(2, 5)      # smaller than crit sparks
+            self.particles.append(
+                Particle(x, y, color, velocity=velocity, size=size, lifetime=20)
+            )                                # lifetime 20 vs crit's 40 — vanish fast
+            
+
 
 class Shockwave:
     """Simple expanding ring."""
@@ -156,7 +170,6 @@ class ArenaPulse:
         
         # Draw pulsing ring
         thickness = max(3, int(8 * alpha))
-        # Blend color with alpha
         r, g, b = self.color
         fade_color = (int(r * alpha), int(g * alpha), int(b * alpha))
         pygame.draw.rect(surface, fade_color, pulse_rect, thickness)
@@ -190,6 +203,13 @@ class ArenaPulseSystem:
         self.pulses.clear()
 
 
+# Outline offset directions: 4 cardinal + 4 diagonal for a solid ring.
+_OUTLINE_OFFSETS = [
+    (-2,  0), ( 2,  0), ( 0, -2), ( 0,  2),
+    (-2, -2), ( 2, -2), (-2,  2), ( 2,  2),
+]
+
+
 class DamageNumber:
     """Floating damage number that rises and fades."""
     
@@ -198,8 +218,12 @@ class DamageNumber:
         self.y = y
         self.damage = int(damage)
         self.is_crit = is_crit
-        # Critical hits: Gold color, 1.5x larger base scale
-        self.color = GOLD if is_crit else color
+        # Normal hits: fighter's color fill, no outline.
+        # Critical hits: white fill (readable on any background color or arena
+        # tile) with the attacker's fighter color as an outline ring, so you
+        # instantly know who landed the crit even when both fire at once.
+        self.color = WHITE if is_crit else color
+        self.outline_color = color if is_crit else None
         self.base_scale = 1.5 if is_crit else 1.0
         self.lifetime = DAMAGE_NUMBER_LIFETIME
         self.max_lifetime = DAMAGE_NUMBER_LIFETIME
@@ -226,26 +250,30 @@ class DamageNumber:
         
         ox, oy = offset
         alpha = min(255, int(255 * (self.lifetime / self.max_lifetime) * 1.5))
-        
-        # Render damage text
         text = str(self.damage)
-        
-        # Create text surface
-        text_surface = font.render(text, True, self.color)
-        
-        # Scale the text
-        if self.scale != 1.0:
-            new_width = int(text_surface.get_width() * self.scale)
-            new_height = int(text_surface.get_height() * self.scale)
-            if new_width > 0 and new_height > 0:
-                text_surface = pygame.transform.scale(text_surface, (new_width, new_height))
-        
-        # Apply alpha by blitting to a transparent surface
-        text_surface.set_alpha(alpha)
-        
-        # Center the text at position
-        text_rect = text_surface.get_rect(center=(int(self.x + ox), int(self.y + oy)))
-        surface.blit(text_surface, text_rect)
+        cx = int(self.x + ox)
+        cy = int(self.y + oy)
+
+        def _make_surf(color):
+            """Render, scale, and alpha-set a text surface."""
+            surf = font.render(text, True, color)
+            if self.scale != 1.0:
+                w = int(surf.get_width() * self.scale)
+                h = int(surf.get_height() * self.scale)
+                if w > 0 and h > 0:
+                    surf = pygame.transform.scale(surf, (w, h))
+            surf.set_alpha(alpha)
+            return surf
+
+        # Crit: stamp fighter-colored outline at each offset, then white fill.
+        if self.outline_color is not None:
+            outline_surf = _make_surf(self.outline_color)
+            for dx, dy in _OUTLINE_OFFSETS:
+                rect = outline_surf.get_rect(center=(cx + dx, cy + dy))
+                surface.blit(outline_surf, rect)
+
+        fill_surf = _make_surf(self.color)
+        surface.blit(fill_surf, fill_surf.get_rect(center=(cx, cy)))
 
 
 class DamageNumberSystem:
@@ -254,30 +282,54 @@ class DamageNumberSystem:
     def __init__(self):
         self.numbers = []
         self.font = None
+        # Private particle system exclusively for crit burst effects.
+        # Kept internal so no other file needs to be changed — crits
+        # self-contain their own explosion when spawned.
+        self._crit_particles = ParticleSystem()
     
     def init_font(self):
         """Initialize font for damage numbers."""
         if self.font is None:
             try:
-                # Try to use a bold/impact font
                 self.font = pygame.font.SysFont("Impact", 28, bold=True)
             except:
                 self.font = pygame.font.Font(None, 32)
     
     def spawn(self, x, y, damage, color, is_crit=False):
-        """Spawn a new damage number."""
+        """Spawn a new damage number.
+        
+        Crits also fire a particle explosion at the impact point in the
+        attacker's color — no external call needed.
+        """
         # Add random offset to prevent stacking
         x += random.uniform(-10, 10)
         y += random.uniform(-5, 5)
         self.numbers.append(DamageNumber(x, y, damage, color, is_crit))
+
+        if is_crit:
+            # Two layers: a dense core burst + a few larger sparks for spread.
+            self._crit_particles.emit_explosion(x, y, color, count=25)
+            # Slower, bigger sparks in a brighter tint of the fighter color
+            bright = tuple(min(255, int(c * 1.4)) for c in color)
+            for _ in range(8):
+                angle = random.uniform(0, 2 * math.pi)
+                speed = random.uniform(2, 6)
+                vel = (math.cos(angle) * speed, math.sin(angle) * speed)
+                self._crit_particles.particles.append(
+                    Particle(x, y, bright, velocity=vel, size=random.uniform(5, 10), lifetime=35)
+                )
     
     def update(self):
         self.numbers = [n for n in self.numbers if n.update()]
+        self._crit_particles.update()
     
     def draw(self, surface, offset=(0, 0)):
         self.init_font()
+        # Particles draw under the number so the text stays legible
+        self._crit_particles.draw(surface, offset)
         for n in self.numbers:
             n.draw(surface, offset, self.font)
     
     def clear(self):
         self.numbers.clear()
+        self._crit_particles.clear()
