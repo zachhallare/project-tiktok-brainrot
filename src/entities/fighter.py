@@ -153,18 +153,20 @@ class Fighter:
             self.parry_cooldown -= 1
 
 
-    def update(self, opponent, arena_bounds: tuple, particles, shockwaves):
+    def update(self, opponent, arena_bounds: tuple, particles, shockwaves, sound_manager=None):
         """Updates physics, energy regeneration, and state timers.
 
-        Movement follows a 'billiard' style with constant friction (DRAG) and 
-        wall boosts. Energy regeneration is dynamically scaled based on 
+        Movement follows a 'billiard' style with constant friction (DRAG) and
+        wall boosts. Energy regeneration is dynamically scaled based on
         current HP ratio to make guard breaks more frequent as health declines.
 
         Args:
-            opponent: The opposing fighter.
-            arena_bounds: (x, y, w, h) of the playable area.
-            particles: Global particle manager.
-            shockwaves: Global shockwave manager.
+            opponent:      The opposing fighter.
+            arena_bounds:  (x, y, w, h) of the playable area.
+            particles:     Global particle manager.
+            shockwaves:    Global shockwave manager.
+            sound_manager: Optional SoundManager; if provided, wall-bounce
+                           audio will be triggered on significant wall impacts.
         """
         if self.locked:
             return
@@ -245,6 +247,11 @@ class Fighter:
         cx = ax + aw / 2
         cy = ay + ah / 2
 
+        # Threshold below which wall hits are too gentle to warrant a sound.
+        _WALL_SOUND_SPEED_MIN = 6.0
+        _hit_wall = False
+        _pre_bounce_speed = math.hypot(self.vx, self.vy)
+
         # Bounces apply a fixed BOUNCE_ENERGY multiplier and a WALL_BOOST_STRENGTH push
         # toward the center to keep fighters engaged in the middle of the arena.
         if self.x - r < ax:
@@ -253,24 +260,30 @@ class Fighter:
             if self.x < cx: self.vx += WALL_BOOST_STRENGTH
             if abs(self.vy) < 0.5:
                 self.vy += random.uniform(-0.5, 0.5) or 0.3
+            _hit_wall = True
         if self.x + r > ax + aw:
             self.x = ax + aw - r
             self.vx = -abs(self.vx) * BOUNCE_ENERGY
             if self.x > cx: self.vx -= WALL_BOOST_STRENGTH
             if abs(self.vy) < 0.5:
                 self.vy += random.uniform(-0.5, 0.5) or 0.3
+            _hit_wall = True
         if self.y - r < ay:
             self.y = ay + r
             self.vy = abs(self.vy) * BOUNCE_ENERGY
             if self.y < cy: self.vy += WALL_BOOST_STRENGTH
             if abs(self.vx) < 0.5:
                 self.vx += random.uniform(-0.5, 0.5) or 0.3
+            _hit_wall = True
         if self.y + r > ay + ah:
             self.y = ay + ah - r
             self.vy = -abs(self.vy) * BOUNCE_ENERGY
             if self.y > cy: self.vy -= WALL_BOOST_STRENGTH
             if abs(self.vx) < 0.5:
                 self.vx += random.uniform(-0.5, 0.5) or 0.3
+            _hit_wall = True
+
+
 
         if self.victory_bounce > 0:
             self.victory_bounce -= 1

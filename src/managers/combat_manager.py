@@ -153,7 +153,7 @@ class CombatManager:
         game.hit_stop     = GUARD_BREAK_HIT_STOP
         game.screen_shake = GUARD_BREAK_SCREEN_SHAKE
         if hasattr(game, 'sound_manager'):
-            game.sound_manager.play_clash()
+            game.sound_manager.play_guard_break()
 
     def handle_collisions(self, blue, red, game):
         """Resolves all combat interactions for the current frame.
@@ -209,7 +209,8 @@ class CombatManager:
                     game.screen_shake = 12
                     game.particles.emit_parry(ix_point[0], ix_point[1], (255, 255, 100), count=20)
                     if hasattr(game, 'sound_manager'):
-                        game.sound_manager.play_clash()
+                        # Use the attacker's clash sound — heavier weapons sound heavier
+                        game.sound_manager.play_weapon_clash(blue.weapon)
 
                 else:
                     # Guard Break: One or both fighters failed the energy check
@@ -288,8 +289,10 @@ class CombatManager:
                                               damage, attacker.color, is_crit or is_sweet_spot)
 
                 if hasattr(game, 'sound_manager'):
-                    if is_sweet_spot: game.sound_manager.play_crit()
-                    else:             game.sound_manager.play_hit()
+                    if is_sweet_spot:
+                        game.sound_manager.play_weapon_sweet_spot(attacker.weapon)
+                    else:
+                        game.sound_manager.play_weapon_hit(attacker.weapon)
 
                 game.hit_slowmo_frames = HIT_SLOWMO_FRAMES
                 game._reset_inactivity()

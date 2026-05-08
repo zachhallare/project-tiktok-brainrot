@@ -376,4 +376,3 @@ class DamageNumberSystem:
     def clear(self):
         self.numbers.clear()
         self._crit_particles.clear()
-s.clear()

@@ -594,9 +594,10 @@ class Game:
         
         effective_arena = tuple(self.arena_bounds)
 
-        # Update fighters with effective arena
-        self.blue.update(self.red, effective_arena, self.particles, self.shockwaves)
-        self.red.update(self.blue, effective_arena, self.particles, self.shockwaves)
+        # Update fighters with effective arena (pass sound_manager for wall-bounce audio)
+        sm = getattr(self, 'sound_manager', None)
+        self.blue.update(self.red, effective_arena, self.particles, self.shockwaves, sm)
+        self.red.update(self.blue, effective_arena, self.particles, self.shockwaves, sm)
     
         self.combat_manager.handle_collisions(self.blue, self.red, self)
         
