@@ -77,11 +77,13 @@ class Game:
         self.arena_bounds = list(self.base_arena)
         
         # Use neon colors for fighters
-        spawn_margin = 100
+        # Spawn 60-70% in from their edges so weapons nearly touch at center
+        arena_half = (SCREEN_WIDTH - ARENA_MARGIN * 2) / 2
+        spawn_inset = arena_half * 0.65  # 65% in from edge
         center_y = SCREEN_HEIGHT // 2
-        self.blue = Fighter(ARENA_MARGIN + spawn_margin, center_y, 
+        self.blue = Fighter(ARENA_MARGIN + spawn_inset, center_y, 
                             self.f1_color, self.f1_bright, is_blue=True, weapon=f1_weapon)
-        self.red = Fighter(SCREEN_WIDTH - ARENA_MARGIN - spawn_margin, center_y, 
+        self.red = Fighter(SCREEN_WIDTH - ARENA_MARGIN - spawn_inset, center_y, 
                             self.f2_color, self.f2_bright, is_blue=False, weapon=f2_weapon)
         
         # Lock fighters for countdown
@@ -121,14 +123,15 @@ class Game:
         self.slow_motion = False
         self.slow_motion_accumulator = 0.0
         
-        # Pre-fight countdown (rapid 0.25s ticks for Shorts retention)
+        # Pre-fight countdown (cinematic hook for Shorts retention)
         self.countdown_stage = 0
         self.countdown_timer = 0
         self.countdown_active = True
         self.countdown_texts = ["3", "2", "1", "FIGHT"]
-        self.countdown_duration = 25   # 0.42s per number tick (~1.25s for 3-2-1)
-        self.fight_duration = 45       # 0.75s for FIGHT text (total countdown ~2s)
+        self.countdown_duration = 40   # 40 frames per number (frames 0-40, 41-80, 81-120)
+        self.fight_duration = 45       # 45 frames for FIGHT (frames 121-165)
         self.countdown_flash_timer = 0
+        self.countdown_flash_duration = 1  # tracks starting flash length for alpha calc
         
         # Arena Escalation System
         self.inactivity_timer = 0
@@ -176,46 +179,48 @@ class Game:
             self.sound_manager.muted = True
         
     def _lock_fighters_for_countdown(self):
-        """Lock fighters in place for countdown."""
+        """Lock fighters in place for countdown — weapons keep spinning."""
         self.blue.locked = True
         self.red.locked = True
         self.blue.vx = 0
         self.blue.vy = 0
         self.red.vx = 0
         self.red.vy = 0
+        # Don't zero rotation — let weapons spin during countdown
+        # Just face each other initially
         self.blue.rotation_angle = 0.0
         self.blue.sword_angle = 0.0
         self.red.rotation_angle = math.pi
         self.red.sword_angle = math.pi
     
     def _unlock_fighters(self):
-        """Unlock fighters and launch them at each other."""
+        """Unlock fighters and launch them at each other from close range."""
         self.blue.locked = False
         self.red.locked = False
         self.match_start_real_time = time.time()
         self._trigger_arena_pulse()     # Trigger the visual and audio pulse effect
         
-        # Launch them directly at the center for a massive opening clash
+        # Launch directly at each other — close spawn means first clash is near-instant
         from config import SCREEN_WIDTH, SCREEN_HEIGHT
         import math
         
         center_x = SCREEN_WIDTH // 2
         center_y = SCREEN_HEIGHT // 2
 
-        vertical_jitter = random.uniform(-6, 6)
+        vertical_jitter = random.uniform(-4, 4)
 
-        # Calculate launch vectors
+        # Calculate launch vectors (high speed for immediate collision)
         dx_b = center_x - self.blue.x
         dy_b = center_y - self.blue.y
         dist_b = max(1, math.hypot(dx_b, dy_b))
-        self.blue.vx = (dx_b / dist_b) * 18  # High-speed initial launch
-        self.blue.vy = (dy_b / dist_b) * 18 + vertical_jitter
+        self.blue.vx = (dx_b / dist_b) * 20  # Faster launch from closer position
+        self.blue.vy = (dy_b / dist_b) * 20 + vertical_jitter
         
         dx_r = center_x - self.red.x
         dy_r = center_y - self.red.y
         dist_r = max(1, math.hypot(dx_r, dy_r))
-        self.red.vx = (dx_r / dist_r) * 18
-        self.red.vy = (dy_r / dist_r) * 18 - vertical_jitter
+        self.red.vx = (dx_r / dist_r) * 20
+        self.red.vy = (dy_r / dist_r) * 20 - vertical_jitter
 
     def _reset_inactivity(self):
         """Reset inactivity timer."""
@@ -396,6 +401,7 @@ class Game:
         self.countdown_timer = 0
         self.countdown_active = True
         self.countdown_flash_timer = 0
+        self.countdown_flash_duration = 1
         
         # Reset countdown and death sound state
         self.countdown_beep_played = [False, False, False]
@@ -420,6 +426,12 @@ class Game:
             self.countdown_timer += 1
             duration = self.fight_duration if self.countdown_stage == 3 else self.countdown_duration
             
+            # Keep weapons spinning during countdown (fighters are locked but rotation updates)
+            self.blue.update_rotation(self.red, 0)
+            self.blue.sword_angle = self.blue.rotation_angle
+            self.red.update_rotation(self.blue, 0)
+            self.red.sword_angle = self.red.rotation_angle
+            
             # Decrement flash timer
             if self.countdown_flash_timer > 0:
                 self.countdown_flash_timer -= 1
@@ -442,19 +454,24 @@ class Game:
                     if hasattr(self, 'sound_manager'):
                         self.sound_manager.play_sword_fight()
                     # "FIGHT" visual punch: shockwave + particles + shake
-                    self.countdown_flash_timer = 4
-                    self.screen_shake = SCREEN_SHAKE_INTENSITY * 1.5
+                    self.countdown_flash_timer = 6
+                    self.countdown_flash_duration = 6
+                    self.screen_shake = SCREEN_SHAKE_INTENSITY * 2.0
                     cx = SCREEN_WIDTH // 2
                     cy = SCREEN_HEIGHT // 2
-                    self.shockwaves.add(cx, cy, WHITE, 200)
-                    self.particles.emit_explosion(cx, cy, self.f1_color, count=20)
-                    self.particles.emit_explosion(cx, cy, self.f2_color, count=20)
+                    self.shockwaves.add(cx, cy, WHITE, 250)
+                    self.particles.emit_explosion(cx, cy, self.f1_color, count=30)
+                    self.particles.emit_explosion(cx, cy, self.f2_color, count=30)
             
             if self.countdown_timer >= duration:
                 self.countdown_timer = 0
                 self.countdown_stage += 1
-                # Brief flash on each number transition
-                self.countdown_flash_timer = 3
+                # Flash on each number transition — escalates toward "1"
+                # Stage 0→1 (3→2): 3 frames, Stage 1→2 (2→1): 5 frames, Stage 2→3 (1→FIGHT): 9 frames
+                flash_durations = [3, 5, 9, 6]
+                flash_val = flash_durations[min(self.countdown_stage - 1, 3)]
+                self.countdown_flash_timer = flash_val
+                self.countdown_flash_duration = flash_val
                 if self.countdown_stage > 3:
                     self.countdown_active = False
                     self._unlock_fighters()
@@ -711,22 +728,10 @@ class Game:
                 
                 self.screen.blit(text_surface, text_rect)
             
-            # Matchup nameplate below countdown
-            name_y = cy + 90
-            f1_surf = self.font_small.render(self.f1_name.upper(), True, self.f1_color)
-            f2_surf = self.font_small.render(self.f2_name.upper(), True, self.f2_color)
-            vs_surf = self.font_small.render("VS", True, GRAY)
-            total_w = f1_surf.get_width() + vs_surf.get_width() + f2_surf.get_width() + 30
-            start_x = cx - total_w // 2
-            self.screen.blit(f1_surf, (start_x, name_y - f1_surf.get_height() // 2))
-            vs_x = start_x + f1_surf.get_width() + 15
-            self.screen.blit(vs_surf, (vs_x, name_y - vs_surf.get_height() // 2))
-            f2_x = vs_x + vs_surf.get_width() + 15
-            self.screen.blit(f2_surf, (f2_x, name_y - f2_surf.get_height() // 2))
             
             # Flash overlay on transitions
             if self.countdown_flash_timer > 0:
-                flash_alpha = int(180 * (self.countdown_flash_timer / 4.0))
+                flash_alpha = int(200 * (self.countdown_flash_timer / max(1, self.countdown_flash_duration)))
                 flash_surf = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
                 flash_surf.fill(WHITE)
                 flash_surf.set_alpha(flash_alpha)
