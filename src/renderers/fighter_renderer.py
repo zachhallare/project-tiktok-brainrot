@@ -1,3 +1,10 @@
+"""
+Rendering system for Fighter entities.
+
+This module handles the visual representation of fighters, including 
+procedural body shapes, sprite-based weapons, and motion trails.
+"""
+
 import os
 import pygame
 import math
@@ -8,7 +15,17 @@ BORDER_THICKNESS = 4
 
 
 class FighterRenderer:
-    def __init__(self, weapon='sword'):
+    """Manages the visual lifecycle of a Fighter.
+
+    Encapsulates all drawing logic, ensuring that entities are rendered 
+    consistently with their physics state and weapon archetype.
+    """
+    def __init__(self, weapon: str = 'sword'):
+        """Loads and pre-processes weapon sprites.
+
+        Args:
+            weapon: The weapon archetype key from WEAPON_CONFIGS.
+        """
         cfg = WEAPON_CONFIGS[weapon]
         weapons_dir = os.path.join(
             os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
@@ -21,7 +38,14 @@ class FighterRenderer:
         self._orig_w, self._orig_h = cfg['sprite_size']
 
 
-    def render(self, fighter, surface, offset=(0, 0)):
+    def render(self, fighter, surface: pygame.Surface, offset=(0, 0)):
+        """Renders the full fighter entity (trail, body, and weapon).
+
+        Args:
+            fighter: The Fighter instance to render.
+            surface: Target Pygame surface.
+            offset: Global camera/arena offset.
+        """
         ox, oy = offset
         r = fighter.radius
 
@@ -40,7 +64,8 @@ class FighterRenderer:
         self._draw_weapon(fighter, surface, offset)
 
 
-    def render_body_only(self, fighter, surface, offset=(0, 0)):
+    def render_body_only(self, fighter, surface: pygame.Surface, offset=(0, 0)):
+        """Renders only the fighter's body, used for specific UI or effect layers."""
         ox, oy = offset
         r = fighter.radius
         cx = int(fighter.x + ox)
@@ -54,7 +79,14 @@ class FighterRenderer:
         pygame.draw.circle(surface, body_color,   (cx, cy), int(r))
 
 
-    def _draw_trail(self, fighter, surface, offset):
+    def _draw_trail(self, fighter, surface: pygame.Surface, offset: tuple):
+        """Renders a fading motion trail behind the fighter.
+
+        Visual density is automatically adjusted based on the weapon's trail 
+        length configuration. Longer trails (e.g., Dagger) use lower alpha and 
+        smaller sizes per segment to create a smooth 'blur' rather than 
+        discrete ghosting.
+        """
         if len(fighter.trail) < 2:
             return
         ox, oy = offset
@@ -94,16 +126,15 @@ class FighterRenderer:
             surface.blit(trail_surf, (int(tx + ox) - trail_r, int(ty + oy) - trail_r))
 
 
-    def _draw_weapon(self, fighter, surface, offset):
-        """
-        Draw weapon rigidly attached to body at rotation_angle.
+    def _draw_weapon(self, fighter, surface: pygame.Surface, offset: tuple):
+        """Renders the weapon sprite with correct rigid attachment and rotation.
 
-        Geometry (Y-down screen space):
-          - Sprite points RIGHT at angle=0.
-          - pygame.transform.rotate is CCW-positive, so to rotate the sprite
-            CW by `angle` (matching screen math): rotate(surf, -degrees(angle)).
-          - Sprite center = handle_pos + (sprite_width / 2) along blade direction.
-            (Handle is at the LEFT edge of the sprite; center is half-width away.)
+        Physics Geometry:
+            - Input angle is CW-positive radians from the horizontal axis.
+            - Pygame's rotate is CCW-positive degrees; conversion is required.
+            - The weapon's 'handle' is the rotation pivot, located at the left 
+              edge of the sprite. The draw position is calculated by offsetting 
+              from the pivot by half the sprite width along the rotation vector.
         """
         ox, oy = offset
         r = fighter.radius

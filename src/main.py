@@ -1,3 +1,15 @@
+"""
+Core orchestration engine for AlgoRot combat simulations.
+
+This module serves as the central entry point and game loop for the simulation. 
+It integrates physics (DVD-logo style), combat logic, visual effects, and 
+automated recording via OBS Studio.
+
+The engine is specifically tuned for short-form video production (YT Shorts), 
+featuring high-impact cinematic hooks, dynamic title generation, and 
+automated batch processing.
+"""
+
 import pygame
 import math
 import random
@@ -40,8 +52,20 @@ from managers.combat_manager import CombatManager
 from renderers.ui_renderer import UIRenderer
 
 
-# Main game class - DVD logo style combat with rotating swords.
-class Game:    
+class Game:
+    """Central game controller for the AlgoRot simulation.
+
+    The Game class manages the lifecycle of a match, including initialization, 
+    the frame-by-frame physics loop, event handling, and the transition 
+    between combat and victory states.
+
+    Attributes:
+        is_test_mode (bool): If True, disables persistent tracking and OBS.
+        is_headless (bool): If True, runs without a visible Pygame window.
+        obs_manager (OBSManager): Orchestrates recording via WebSocket.
+        combat_manager (CombatManager): Handles collision detection/resolution.
+        ui_renderer (UIRenderer): Manages the Tekken-style HUD and victory screens.
+    """
     def __init__(self, f1_color, f2_color, f1_name="Blue", f2_name="Red", f1_weapon="sword", f2_weapon="sword"):
         import sys
         self.is_test_mode = "--test-mode" in sys.argv
@@ -293,10 +317,12 @@ class Game:
         self.shockwaves.add(loser.x, loser.y, death_color, 100)
         winner.victory_bounce = 40
         
+        # Transition to Slow-Motion for the final blow
         self.slow_motion = True
         self.slow_motion_accumulator = 0.0
         
-        # Death sound sequence: death_final_hit first, sword_to_ground after freeze
+        # Audio Pacing: Play the final impact sound immediately, then wait for 
+        # the freeze frame to clear before playing the environmental death cues.
         self.death_sound_phase = 1
         if hasattr(self, 'sound_manager'):
             self.sound_manager.play_death_final_hit()
@@ -356,8 +382,8 @@ class Game:
         title_idea = titles[chosen_index]
         self.viral_title_idea = title_idea
         
-        # Save the picked index to the tracker (not the string)
-        # Only persist to used_titles.json when recording with OBS (not in test mode)
+        # Viral Metadata Synchronization: Persist the used title index to prevent 
+        # content duplication across batch recording sessions.
         if not self.is_test_mode:
             tracker_data[category].append(chosen_index)
             with open(tracker_file, 'w') as f:
@@ -413,7 +439,16 @@ class Game:
 
 
     def update(self):
-        """Main update loop."""
+        """Main update loop driven by the game clock.
+
+        This method orchestrates the 'Three-Act' structure of an AlgoRot match:
+        1. Act I (Countdown): High-impact 'hook' to grab viewer attention.
+        2. Act II (Combat): Physics-driven simulation with hit-stops and slow-mo.
+        3. Act III (Victory): Viral title selection and recording finalization.
+
+        Bottlenecks: Synchronous OBS communication (rename calls) occurs at the 
+        end of the match, which can cause a brief hang if the disk is busy.
+        """
         if self.paused:
             return
         
@@ -426,7 +461,8 @@ class Game:
             self.countdown_timer += 1
             duration = self.countdown_durations[self.countdown_stage]
             
-            # Keep weapons spinning during countdown (fighters are locked but rotation updates)
+            # Retention Strategy: Keep weapons spinning during the countdown to 
+            # maintain visual motion while the fighters are locked in place.
             self.blue.update_rotation(self.red, 0)
             self.blue.sword_angle = self.blue.rotation_angle
             self.red.update_rotation(self.blue, 0)

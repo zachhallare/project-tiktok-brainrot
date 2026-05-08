@@ -1,12 +1,30 @@
+"""
+UI Rendering system for the AlgoRot battle simulation.
+
+This module provides the head-up display (HUD), including Tekken-style 
+health bars, winner announcements, and other cinematic overlays.
+"""
+
 import pygame
 import random
 import math
 
 
 class UIRenderer:
-    """Handles rendering of the HUD, health bars, warnings, and CTA text."""
+    """Manages the visual state of the game's interface.
+
+    Handles the rendering of health bars, VS indicators, and specialized 
+    feedback for low-health (Danger Zone) states.
+    """
     
-    def __init__(self, screen, font_medium, font_small):
+    def __init__(self, screen: pygame.Surface, font_medium: pygame.font.Font, font_small: pygame.font.Font):
+        """Initializes the UI renderer with required assets.
+
+        Args:
+            screen: The main display surface.
+            font_medium: Font used for primary labels.
+            font_small: Font used for secondary details.
+        """
         self.screen = screen
         self.font_medium = font_medium
         self.font_small = font_small
@@ -17,17 +35,22 @@ class UIRenderer:
 
 
     def draw(self, game):
-        """Main draw method for all UI overlays."""
+        """Main entry point for rendering the entire UI overlay."""
         self._draw_hud(game)
 
     def _draw_hud(self, game):
-        """Draw Tekken-style static health bars flush above the arena."""
+        """Renders the static, top-aligned health bars flush above the arena.
+
+        Designed after classic fighting games (Tekken style), these bars 
+        mirror each other and provide visceral feedback (shake/blink) when 
+        health reaches critical levels.
+        """
         ax, ay, aw, ah = game.arena_bounds
         bar_width = (aw // 2) - 20
         bar_height = 20
         bar_y = ay - bar_height - 10
 
-        # Danger Zone shake at 10% HP
+        # Danger Zone Feedback: Shake the bar if HP < 10%
         blue_hp_pct = max(0.0, game.blue.health / game.blue.max_health)
         blue_shake_x = random.randint(-4, 4) if blue_hp_pct <= 0.10 else 0
         blue_shake_y = random.randint(-4, 4) if blue_hp_pct <= 0.10 else 0
@@ -60,6 +83,7 @@ class UIRenderer:
         pygame.draw.rect(self.screen, self.bg_color,
                          (rx, ry, bar_width, bar_height))
         if red_fill_w > 0:
+            # Red bar fills from right to left for symmetry
             fill_x = int(bar_x + (bar_width - red_fill_w))
             red_bar_color = self._get_bar_color(game.red)
             pygame.draw.rect(self.screen, red_bar_color,
@@ -67,20 +91,26 @@ class UIRenderer:
         pygame.draw.rect(self.screen, self.dark_border_color,
                          (rx, ry, bar_width, bar_height), 2)
 
-        # --- VS Text ---
+        # --- VS Text Indicator ---
         vs_surface = self.font_small.render("VS", True, self.white)
         vs_rect = vs_surface.get_rect(center=(ax + (aw // 2), bar_y + (bar_height // 2)))
         self.screen.blit(vs_surface, vs_rect)
 
-    def _get_bar_color(self, fighter):
-        """Return the health bar color, blinking when HP < 15%."""
+    def _get_bar_color(self, fighter) -> tuple:
+        """Returns the fighter's theme color, with a rapid blink effect at low HP.
+
+        Args:
+            fighter: The fighter whose health bar is being colored.
+
+        Returns:
+            An RGB tuple.
+        """
         hp_pct = max(0.0, fighter.health / fighter.max_health)
         if hp_pct < 0.15 and hp_pct > 0:
-            # Rapid blink: alternate every 100ms between normal and dark shade
+            # Rapid blink: alternate every 100ms between normal and 40% darker shade
             if (pygame.time.get_ticks() // 100) % 2 == 0:
                 return fighter.health_bar_color
             else:
-                # 40% darker shade
                 r, g, b = fighter.health_bar_color
                 return (int(r * 0.4), int(g * 0.4), int(b * 0.4))
-        return fighter.health_bar_color
+        return fighter.health_bar_color

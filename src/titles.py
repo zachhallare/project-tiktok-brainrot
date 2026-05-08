@@ -1,17 +1,32 @@
 """
-Title pools for AlgoRot match results.
-Categories:
-  ghost    - exactly 0% HP left (phantom victory, rarest outcome)
-  clutch   - 1-10% HP left (nail-biting survival)
-  standard - 11-39% HP left (competitive, back-and-forth)
-  blowout  - 40-59% HP left (dominant win)
-  stomp    - 60%+ HP left (near-perfect, untouchable run)
-No ellipsis (...) or colons (:) in any title.
+Title generation system for AlgoRot match results.
+
+This module provides curated pools of viral-focused titles categorized by the 
+intensity and outcome of a match. The titles are designed for short-form 
+content (TikTok/YT Shorts), prioritizing high-energy hooks and engagement.
+
+Category Definitions:
+    ghost:    Exactly 0% HP left (phantom victory, rarest outcome).
+    clutch:   1-10% HP left (nail-biting survival).
+    standard: 11-39% HP left (competitive, back-and-forth).
+    blowout:  40-59% HP left (dominant win).
+    stomp:    60%+ HP left (near-perfect, untouchable run).
+
+Note: Titles avoid punctuation like ellipses (...) or colons (:) to maintain 
+clean aesthetics in UI overlays and file names.
 """
 
 
-def get_title_pools(f1_name, f2_name):
-    """Return title pools dict keyed by category."""
+def get_title_pools(f1_name: str, f2_name: str) -> dict:
+    """Returns a dictionary of title pools populated with fighter names.
+
+    Args:
+        f1_name: Name of the first fighter (e.g., "Blue").
+        f2_name: Name of the second fighter (e.g., "Red").
+
+    Returns:
+        dict: Title lists keyed by category ('ghost', 'clutch', etc.).
+    """
 
     ghost = [
         f"The 0 HP win that should not exist in {f1_name} vs {f2_name}",
@@ -501,7 +516,7 @@ def get_title_pools(f1_name, f2_name):
         f"Every hit felt meaningful in this AlgoRot battle",
         f"An AlgoRot match that rewards you for watching every second",
         f"The fight looked even until suddenly it was not in {f1_name} vs {f2_name}",
-        f"This is what a proper AlgoRot battle looks like",
+        f"This is what peak algorithmic combat looks like",
         f"A fight that neither side dominated and only one side won",
         f"The tension in this {f1_name} vs {f2_name} match never fully broke",
         f"A winner emerged but both fighters earned their moment in AlgoRot",
@@ -634,4 +649,4 @@ def get_title_pools(f1_name, f2_name):
         "standard": standard,
         "blowout": blowout,
         "stomp": stomp,
-    }
+    }

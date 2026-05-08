@@ -1,6 +1,10 @@
 """
-Simplified particle and visual effects for performance.
-Enhanced with skill-specific effects and damage numbers.
+Visual effects and particle systems for the AlgoRot battle simulation.
+
+This module provides high-performance visual feedback systems, including 
+standard particles, expanding shockwaves, arena pulses, and floating 
+damage numbers. Effects are designed for maximum "juice" with minimal 
+performance overhead.
 """
 
 import pygame
@@ -11,9 +15,22 @@ from config import WHITE, YELLOW, PURPLE, GOLD, DAMAGE_NUMBER_LIFETIME, DAMAGE_N
 
 
 class Particle:
-    """Simple particle with physics."""
+    """A single visual entity with physical properties.
+
+    Particles use basic Newtonian physics (velocity, gravity, drag) and a 
+    finite lifecycle to create transient visual artifacts like sparks or dust.
+    """
     
-    def __init__(self, x, y, color, velocity=None, size=4, lifetime=25):
+    def __init__(self, x: float, y: float, color: tuple, velocity: tuple = None, size: float = 4, lifetime: int = 25):
+        """Initializes a particle.
+
+        Args:
+            x, y: Starting world coordinates.
+            color: RGB tuple.
+            velocity: (vx, vy) tuple. If None, a random radial burst is generated.
+            size: Starting radius in pixels.
+            lifetime: Duration in frames before the particle is destroyed.
+        """
         self.x = x
         self.y = y
         self.color = color
@@ -28,16 +45,22 @@ class Particle:
         self.lifetime = lifetime
         self.max_lifetime = lifetime
     
-    def update(self):
+    def update(self) -> bool:
+        """Updates physics and reduces lifetime.
+
+        Returns:
+            bool: True if the particle is still alive, False if it should be culled.
+        """
         self.x += self.vx
         self.y += self.vy
-        self.vy += 0.2  # Gravity
-        self.vx *= 0.98
+        self.vy += 0.2  # Gravity simulation
+        self.vx *= 0.98 # Horizontal air resistance
         self.lifetime -= 1
-        self.size = max(1, self.size * 0.95)
+        self.size = max(1, self.size * 0.95) # Gradually shrink
         return self.lifetime > 0
     
-    def draw(self, surface, offset=(0, 0)):
+    def draw(self, surface: pygame.Surface, offset=(0, 0)):
+        """Renders the particle to the surface."""
         if self.lifetime <= 0:
             return
         ox, oy = offset
@@ -47,16 +70,22 @@ class Particle:
 
 
 class ParticleSystem:
-    """Simple particle manager."""
+    """Manager for pools of particles.
+
+    Handles creation, updating, and batch rendering of particles.
+    """
     
     def __init__(self):
+        """Initializes an empty particle system."""
         self.particles = []
     
     def emit(self, x, y, color, count=8, size=4, lifetime=25):
+        """Spawns a standard cluster of particles."""
         for _ in range(count):
             self.particles.append(Particle(x, y, color, size=size, lifetime=lifetime))
     
     def emit_explosion(self, x, y, color, count=30):
+        """Spawns a high-velocity radial burst, typically for critical hits."""
         for _ in range(count):
             angle = random.uniform(0, 2 * math.pi)
             speed = random.uniform(5, 15)
@@ -65,34 +94,45 @@ class ParticleSystem:
             self.particles.append(Particle(x, y, color, velocity=velocity, size=size, lifetime=40))
     
     def update(self):
+        """Updates all active particles and removes dead ones."""
         self.particles = [p for p in self.particles if p.update()]
     
     def draw(self, surface, offset=(0, 0)):
+        """Renders all active particles."""
         for p in self.particles:
             p.draw(surface, offset)
     
     def clear(self):
+        """Removes all particles from the system."""
         self.particles.clear()
 
     def emit_parry(self, x, y, color, count=20):
-        """Directional upward fan — clash sparks that read as deflection,
-        not impact. Visually opposite to emit_explosion's radial burst."""
+        """Spawns a directional upward fan of sparks.
+
+        Visually distinct from explosions, this effect reads as a 'clash' or 
+        deflection rather than a direct impact. Particles move faster and 
+        vanish quicker to simulate high-energy friction.
+        """
         for _ in range(count):
             # Fan arc: straight up ± ~50 degrees
             angle = random.uniform(-math.pi / 2 - 0.87, -math.pi / 2 + 0.87)
             speed = random.uniform(6, 14)
             velocity = (math.cos(angle) * speed, math.sin(angle) * speed)
-            size = random.uniform(2, 5)      # smaller than crit sparks
+            size = random.uniform(2, 5)
             self.particles.append(
                 Particle(x, y, color, velocity=velocity, size=size, lifetime=20)
-            )                                # lifetime 20 vs crit's 40 — vanish fast
-            
+            )
 
 
 class Shockwave:
-    """Simple expanding ring."""
+    """An expanding ring effect that fades over time.
+
+    Typically used to signal high-impact events like round starts or 
+    arena pulses.
+    """
     
     def __init__(self, x, y, color, max_radius=150):
+        """Initializes the shockwave."""
         self.x = x
         self.y = y
         self.color = color
@@ -102,12 +142,14 @@ class Shockwave:
         self.max_lifetime = 15
     
     def update(self):
+        """Expands the radius and reduces thickness/alpha."""
         self.lifetime -= 1
         progress = 1 - (self.lifetime / self.max_lifetime)
         self.radius = 10 + (self.max_radius - 10) * progress
         return self.lifetime > 0
     
     def draw(self, surface, offset=(0, 0)):
+        """Renders the expanding ring."""
         if self.lifetime <= 0:
             return
         ox, oy = offset
@@ -118,7 +160,7 @@ class Shockwave:
 
 
 class ShockwaveSystem:
-    """Simple shockwave manager."""
+    """Manager for active shockwave effects."""
     
     def __init__(self):
         self.shockwaves = []
@@ -138,21 +180,27 @@ class ShockwaveSystem:
 
 
 class ArenaPulse:
-    """Visual pulse wave from arena borders toward center."""
+    """Visual wave that collapses from the arena borders toward the center.
+
+    Used as an 'anti-staleness' mechanic to visually signal an impending 
+    physics boost when fighters are inactive.
+    """
     
     def __init__(self, arena_bounds, color=PURPLE):
         self.ax, self.ay, self.aw, self.ah = arena_bounds
         self.color = color
         self.progress = 0.0  # 0 = at borders, 1 = at center
-        self.lifetime = 30  # frames
+        self.lifetime = 30
         self.max_lifetime = 30
     
     def update(self):
+        """Progresses the pulse toward the center."""
         self.lifetime -= 1
         self.progress = 1 - (self.lifetime / self.max_lifetime)
         return self.lifetime > 0
     
     def draw(self, surface, offset=(0, 0)):
+        """Renders the collapsing pulse rectangle with a neon glow."""
         if self.lifetime <= 0:
             return
         
@@ -174,7 +222,7 @@ class ArenaPulse:
         fade_color = (int(r * alpha), int(g * alpha), int(b * alpha))
         pygame.draw.rect(surface, fade_color, pulse_rect, thickness)
         
-        # Inner glow line
+        # Inner glow line for 'juice'
         if thickness > 2:
             inner_rect = pulse_rect.inflate(-4, -4)
             glow_color = (min(255, int(r * alpha * 1.5)), 
@@ -184,7 +232,7 @@ class ArenaPulse:
 
 
 class ArenaPulseSystem:
-    """Manages arena pulse visual effects."""
+    """Manages active arena pulse animations."""
     
     def __init__(self):
         self.pulses = []
@@ -203,7 +251,6 @@ class ArenaPulseSystem:
         self.pulses.clear()
 
 
-# Outline offset directions: 4 cardinal + 4 diagonal for a solid ring.
 _OUTLINE_OFFSETS = [
     (-2,  0), ( 2,  0), ( 0, -2), ( 0,  2),
     (-2, -2), ( 2, -2), (-2,  2), ( 2,  2),
@@ -211,17 +258,19 @@ _OUTLINE_OFFSETS = [
 
 
 class DamageNumber:
-    """Floating damage number that rises and fades."""
+    """A floating, scaling text element that displays damage dealt.
+
+    Crit numbers are rendered with a white fill and fighter-colored outline 
+    to ensure legibility against any background while still communicating 
+    attacker identity.
+    """
     
-    def __init__(self, x, y, damage, color, is_crit=False):
+    def __init__(self, x: float, y: float, damage: float, color: tuple, is_crit: bool = False):
         self.x = x
         self.y = y
         self.damage = int(damage)
         self.is_crit = is_crit
-        # Normal hits: fighter's color fill, no outline.
-        # Critical hits: white fill (readable on any background color or arena
-        # tile) with the attacker's fighter color as an outline ring, so you
-        # instantly know who landed the crit even when both fire at once.
+        # Crits use white fill + colored outline; normal hits use colored fill.
         self.color = WHITE if is_crit else color
         self.outline_color = color if is_crit else None
         self.base_scale = 1.5 if is_crit else 1.0
@@ -230,21 +279,23 @@ class DamageNumber:
         self.scale = self.base_scale
         self.vy = -DAMAGE_NUMBER_SPEED
     
-    def update(self):
+    def update(self) -> bool:
+        """Handles the 'pop' animation and upward drift."""
         self.y += self.vy
-        self.vy *= 0.95  # Slow down over time
+        self.vy *= 0.95
         self.lifetime -= 1
         
-        # Scale up then down (crits start at 1.5x base)
+        # Pop animation: scale up rapidly then settle down
         progress = 1 - (self.lifetime / self.max_lifetime)
         if progress < 0.2:
-            self.scale = self.base_scale + progress * 2  # Scale up
+            self.scale = self.base_scale + progress * 2
         else:
-            self.scale = (self.base_scale + 0.4) - (progress - 0.2) * 0.5  # Scale back down
+            self.scale = (self.base_scale + 0.4) - (progress - 0.2) * 0.5
         
         return self.lifetime > 0
     
-    def draw(self, surface, offset, font):
+    def draw(self, surface: pygame.Surface, offset: tuple, font: pygame.font.Font):
+        """Renders the damage number with optional outline and scaling."""
         if self.lifetime <= 0:
             return
         
@@ -255,7 +306,7 @@ class DamageNumber:
         cy = int(self.y + oy)
 
         def _make_surf(color):
-            """Render, scale, and alpha-set a text surface."""
+            """Internal helper to render and scale the text surface."""
             surf = font.render(text, True, color)
             if self.scale != 1.0:
                 w = int(surf.get_width() * self.scale)
@@ -265,7 +316,7 @@ class DamageNumber:
             surf.set_alpha(alpha)
             return surf
 
-        # Crit: stamp fighter-colored outline at each offset, then white fill.
+        # Draw the outline for critical hits using multiple offset stamps
         if self.outline_color is not None:
             outline_surf = _make_surf(self.outline_color)
             for dx, dy in _OUTLINE_OFFSETS:
@@ -277,18 +328,15 @@ class DamageNumber:
 
 
 class DamageNumberSystem:
-    """Manages floating damage numbers."""
+    """Central manager for floating damage text and hit bursts."""
     
     def __init__(self):
         self.numbers = []
         self.font = None
-        # Private particle system exclusively for crit burst effects.
-        # Kept internal so no other file needs to be changed — crits
-        # self-contain their own explosion when spawned.
         self._crit_particles = ParticleSystem()
     
     def init_font(self):
-        """Initialize font for damage numbers."""
+        """Lazy-loads the font to prevent errors during early initialization."""
         if self.font is None:
             try:
                 self.font = pygame.font.SysFont("Impact", 28, bold=True)
@@ -296,20 +344,14 @@ class DamageNumberSystem:
                 self.font = pygame.font.Font(None, 32)
     
     def spawn(self, x, y, damage, color, is_crit=False):
-        """Spawn a new damage number.
-        
-        Crits also fire a particle explosion at the impact point in the
-        attacker's color — no external call needed.
-        """
-        # Add random offset to prevent stacking
+        """Spawns a damage number and optional critical particle burst."""
         x += random.uniform(-10, 10)
         y += random.uniform(-5, 5)
         self.numbers.append(DamageNumber(x, y, damage, color, is_crit))
 
         if is_crit:
-            # Two layers: a dense core burst + a few larger sparks for spread.
+            # Multi-layered crit burst: dense core + scattered sparks
             self._crit_particles.emit_explosion(x, y, color, count=25)
-            # Slower, bigger sparks in a brighter tint of the fighter color
             bright = tuple(min(255, int(c * 1.4)) for c in color)
             for _ in range(8):
                 angle = random.uniform(0, 2 * math.pi)
@@ -324,8 +366,9 @@ class DamageNumberSystem:
         self._crit_particles.update()
     
     def draw(self, surface, offset=(0, 0)):
+        """Renders all visual feedback elements."""
         self.init_font()
-        # Particles draw under the number so the text stays legible
+        # Draw particles behind text for clarity
         self._crit_particles.draw(surface, offset)
         for n in self.numbers:
             n.draw(surface, offset, self.font)
@@ -333,3 +376,4 @@ class DamageNumberSystem:
     def clear(self):
         self.numbers.clear()
         self._crit_particles.clear()
+s.clear()

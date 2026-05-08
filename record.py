@@ -1,3 +1,16 @@
+"""
+Automated recording orchestration script for AlgoRot.
+
+This script manages the batch recording pipeline for YouTube Shorts content. 
+It automates the process of selecting fighter matchups, launching the 
+combat simulation, and ensuring OBS Studio is capturing the footage. 
+
+Features:
+    - Batch Recording: Automatically cycles through unique weapon combinations.
+    - Test Mode: Allows for manual or automated balance testing without recording.
+    - Pool Management: Tracks used weapon combinations to ensure content variety.
+"""
+
 import subprocess
 import time
 import sys
@@ -18,8 +31,15 @@ ALL_COMBOS = list(itertools.combinations_with_replacement(WEAPON_NAMES, 2))
 COMBO_TRACKER_FILE = "used_weapon_combos.json"
 
 
-def pick_weapon(label):
-    """Prompt the user to pick a single weapon for one fighter."""
+def pick_weapon(label: str) -> str:
+    """Prompt the user to pick a single weapon for one fighter via CLI.
+
+    Args:
+        label: Descriptive label for the fighter (e.g., "Fighter 1").
+
+    Returns:
+        str: The selected weapon name.
+    """
     print(f"\n  Weapons available for {label}:")
     for i, name in enumerate(WEAPON_NAMES, 1):
         print(f"    {i}. {name}")
@@ -30,23 +50,44 @@ def pick_weapon(label):
         print(f"    Please enter a number between 1 and {len(WEAPON_NAMES)}.")
 
 
-def _load_used_indices(tracker_file):
+def _load_used_indices(tracker_file: str) -> list:
+    """Load indices of weapon combinations already recorded.
+
+    Args:
+        tracker_file: Path to the JSON tracker file.
+
+    Returns:
+        list: List of integer indices corresponding to recorded combos.
+    """
     if os.path.exists(tracker_file):
         with open(tracker_file, 'r') as f:
             return json.load(f).get("used_combos", [])
     return []
  
  
-def _save_used_indices(used, tracker_file):
+def _save_used_indices(used: list, tracker_file: str):
+    """Persist used weapon combination indices to disk.
+
+    Args:
+        used: List of used indices.
+        tracker_file: Target path for the JSON file.
+    """
     with open(tracker_file, 'w') as f:
         json.dump({"used_combos": used}, f, indent=4)
 
 
-def next_random_combo(active_combos, tracker_file):
-    """
-    Pick a combo index that hasn't been used yet this cycle.
-    When all combos are exhausted the pool resets automatically.
-    Returns (f1_weapon, f2_weapon) with fighter assignment randomised.
+def next_random_combo(active_combos: list, tracker_file: str) -> tuple:
+    """Selects a unique weapon combination that hasn't been used in the current cycle.
+
+    This ensures content variety by exhausting all permutations in the 
+    provided 'active_combos' pool before resetting.
+
+    Args:
+        active_combos: The list of available (w1, w2) tuples.
+        tracker_file: Path to the persistence file for this pool.
+
+    Returns:
+        tuple: (f1_weapon, f2_weapon, combo_index)
     """
     used = _load_used_indices(tracker_file)
  
@@ -67,9 +108,16 @@ def next_random_combo(active_combos, tracker_file):
     return w1, w2, chosen_idx
 
 
+def check_obs_connection() -> bool:
+    """Blocking safety gate that verifies OBS Studio is open and WebSocket-enabled.
 
-def check_obs_connection():
-    """Block until OBS is open and reachable, or user cancels."""
+    This prevents the automation script from launching dozens of matches 
+    that aren't being recorded, which would waste local resources and 
+    desynchronize the tracking logs.
+
+    Returns:
+        bool: True if connection is verified, False if user chooses to skip/cancel.
+    """
     print("\n[INFO] Checking OBS connection before proceeding...")
     while True:
         try:
@@ -99,6 +147,7 @@ def check_obs_connection():
 
 
 def main():
+    """Main entry point for the YT Shorts automation recording pipeline."""
     print("=" * 50)
     print("          YT Shorts Automation Recorder  ")
     print("=" * 50)
@@ -327,3 +376,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+ain()

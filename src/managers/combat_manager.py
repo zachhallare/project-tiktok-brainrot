@@ -1,3 +1,11 @@
+"""
+Combat management module for the AlgoRot battle simulation.
+
+This module handles all physical interactions between fighters, including 
+high-fidelity hitbox detection, parry/guard-break resolution, and complex 
+damage scaling based on weapon momentum and impact quality.
+"""
+
 import math
 import random
 
@@ -13,20 +21,33 @@ from config import (
 )
 
 class CombatManager:
-    """Handles combat interactions, collision detection, and damage calculations."""
+    """Orchestrates combat logic and physical resolutions.
+
+    The CombatManager is responsible for the 'game feel' of the simulation, 
+    calculating when hits occur and applying the appropriate visual and 
+    mechanical feedback (hit-stops, screenshake, damage numbers).
+    """
 
     def __init__(self):
+        """Initializes the CombatManager."""
         pass
 
-    def _check_sword_hit(self, attacker, defender):
-        """
-        Profile-based hitbox using per-weapon cross-section data.
+    def _check_sword_hit(self, attacker, defender) -> tuple:
+        """Performs profile-based hitbox detection for a weapon.
 
-        Returns (spawn_pos, damage_t):
-          spawn_pos  — world position of the TIP-MOST overlapping profile point,
-                       used for particle / damage number placement.
-          damage_t   — t of the HANDLE-MOST overlapping profile point,
-                       used for sweet-spot / impact-ratio calculations.
+        Unlike simple line-circle collision, this method checks the weapon's 
+        variable-width cross-sections (profile) against the defender's radius. 
+        This allows for weapons like axes or spears to have accurately 
+        shaped lethal zones.
+
+        Args:
+            attacker: The fighter performing the attack.
+            defender: The fighter being attacked.
+
+        Returns:
+            A tuple of (spawn_pos, damage_t):
+                spawn_pos: World coordinates (x, y) of the hit for visual effects.
+                damage_t: Normalized position [0.0, 1.0] along the blade length.
         """
         cfg = attacker.weapon_config
         profile      = cfg.get('hitbox_profile', [])
@@ -35,6 +56,7 @@ class CombatManager:
         if not profile:
             return None, 0.0
 
+        # Spatial partitioning: quick distance check before expensive profile sampling
         max_half_w   = max(hw for _, hw in profile)
         max_reach    = attacker.radius + 3 + attacker.sword_length + defender.radius + max_half_w
         fighter_dist = math.hypot(attacker.x - defender.x, attacker.y - defender.y)
@@ -47,6 +69,7 @@ class CombatManager:
         best_spawn_t   = None
         best_spawn_pos = None
 
+        # Sample the weapon profile to find the most favorable hit point
         for (t, half_w) in profile:
             if t < handle_ratio:
                 continue
@@ -56,8 +79,10 @@ class CombatManager:
 
             dist = math.hypot(px - defender.x, py - defender.y)
             if dist < half_w + defender.radius:
+                # damage_t is taken from the handle-most point for consistency
                 if best_damage_t is None or t < best_damage_t:
                     best_damage_t = t
+                # spawn_pos is taken from the tip-most point for better visual impact
                 if best_spawn_t is None or t > best_spawn_t:
                     best_spawn_t = t
                     best_spawn_pos = (px, py)
@@ -67,9 +92,14 @@ class CombatManager:
 
     @staticmethod
     def _cross(o, a, b):
+        """Calculates the 2D cross product of vectors (a-o) and (b-o)."""
         return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
 
-    def _segments_intersect(self, p1, p2, p3, p4):
+    def _segments_intersect(self, p1, p2, p3, p4) -> bool:
+        """Checks if two line segments (p1-p2) and (p3-p4) intersect.
+
+        Used primarily for weapon-on-weapon parry detection.
+        """
         d1 = self._cross(p3, p4, p1)
         d2 = self._cross(p3, p4, p2)
         d3 = self._cross(p1, p2, p3)
@@ -79,7 +109,8 @@ class CombatManager:
             return True
         return False
 
-    def _get_intersection_point(self, p1, p2, p3, p4):
+    def _get_intersection_point(self, p1, p2, p3, p4) -> tuple:
+        """Calculates the exact world coordinates of a segment intersection."""
         x1, y1 = p1; x2, y2 = p2; x3, y3 = p3; x4, y4 = p4
         denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4)
         if abs(denom) < 1e-10:
@@ -88,7 +119,17 @@ class CombatManager:
         return (x1 + t * (x2 - x1), y1 + t * (y2 - y1))
 
     def _apply_guard_break(self, broken, breaker, ix_point, game):
-        """Apply guard break effects to the losing fighter."""
+        """Transitions a fighter into the stunned Guard Break state.
+
+        This occurs when a fighter's energy pool is insufficient to block an incoming 
+        weapon clash. The state resets momentum and applies significant knockback.
+
+        Args:
+            broken: The fighter who lost their guard.
+            breaker: The fighter who caused the break.
+            ix_point: The world position of the impact.
+            game: Reference to the main game state for particle/UI triggers.
+        """
         game.particles.emit(ix_point[0], ix_point[1], (255, 0, 0),    count=50, size=7)
         game.particles.emit(ix_point[0], ix_point[1], (255, 255, 255), count=25, size=5)
 
@@ -115,9 +156,19 @@ class CombatManager:
             game.sound_manager.play_clash()
 
     def handle_collisions(self, blue, red, game):
-        """Detect and resolve combat — parry check then body hit check."""
+        """Resolves all combat interactions for the current frame.
 
-        # === PARRY CHECK ===
+        Logic flow:
+            1. Parry Check: If weapons intersect, check energy for a successful block.
+            2. Body Hit Check: If no parry occurred, check if weapons overlap fighter bodies.
+        
+        Args:
+            blue: The blue fighter instance.
+            red: The red fighter instance.
+            game: Reference to the main simulation state.
+        """
+
+        # === PARRY CHECK (Act 1 & 2) ===
         blue_base, blue_tip = blue.get_sword_hitbox()
         red_base,  red_tip  = red.get_sword_hitbox()
 
@@ -129,20 +180,21 @@ class CombatManager:
                     ix_point = ((blue_base[0] + red_base[0]) / 2,
                                 (blue_base[1] + red_base[1]) / 2)
 
-                # --- determine which fighter(s) can parry ---
+                # Determine if fighters have enough energy to sustain the clash
                 blue_cost = blue.parry_cost * red.weapon_config.get("parry_drain_mult", 1.0)
                 red_cost  = red.parry_cost  * blue.weapon_config.get("parry_drain_mult", 1.0)
                 blue_can  = blue.parry_energy >= blue_cost
                 red_can   = red.parry_energy  >= red_cost
 
                 if blue_can and red_can:
-                    # Standard clash — both pay energy
+                    # Successful Parry: Both fighters pay energy and recoil
                     blue.parry_energy -= blue_cost
                     red.parry_energy  -= red_cost
                     blue.parry_cooldown = PARRY_COOLDOWN_FRAMES
                     red.parry_cooldown  = PARRY_COOLDOWN_FRAMES
 
-                    # Reverse only the fighter who took the bigger proportional hit
+                    # Spin reversal logic: the fighter with less remaining energy ratio 
+                    # is the one who is 'overpowered' and forced to reverse spin.
                     blue_ratio = blue.parry_energy / blue.max_parry_energy
                     red_ratio  = red.parry_energy  / red.max_parry_energy
                     if blue_ratio < red_ratio:
@@ -150,14 +202,9 @@ class CombatManager:
                     elif red_ratio < blue_ratio:
                         red.spin_direction *= -1
                     else: 
-                        # Tie - flip a coin
-                        if random.random() < 0.5:
-                            blue.spin_direction *= -1
-                        else:
-                            red.spin_direction *= -1
+                        if random.random() < 0.5: blue.spin_direction *= -1
+                        else:                     red.spin_direction *= -1
 
-
-                    # Act 1: The Clash — metallic sparks, moderate freeze
                     game.hit_stop     = 8
                     game.screen_shake = 12
                     game.particles.emit_parry(ix_point[0], ix_point[1], (255, 255, 100), count=20)
@@ -165,8 +212,7 @@ class CombatManager:
                         game.sound_manager.play_clash()
 
                 else:
-                    # Guard break — loser is whichever one can't parry.
-                    # If neither can, the one with less energy breaks.
+                    # Guard Break: One or both fighters failed the energy check
                     if blue_can and not red_can:
                         broken, breaker = red, blue
                     elif red_can and not blue_can:
@@ -176,7 +222,7 @@ class CombatManager:
 
                     self._apply_guard_break(broken, breaker, ix_point, game)
 
-        # === BODY HIT CHECK ===
+        # === BODY HIT CHECK (Act 3) ===
         pairs = [(blue, red), (red, blue)]
         random.shuffle(pairs)
 
@@ -185,6 +231,7 @@ class CombatManager:
             if hit_pos is None:
                 continue
 
+            # Damage Calculation Strategy
             is_crit   = random.random() < CRIT_CHANCE
             crit_mult = CRIT_MULTIPLIER if is_crit else 1.0
 
@@ -194,6 +241,7 @@ class CombatManager:
 
             angle = math.atan2(defender.y - attacker.y, defender.x - attacker.x)
 
+            # Knockback calculation: scales with damage intensity
             weapon_kb_mult = attacker.weapon_config.get("knockback_mult", 1.0)
             knockback = BASE_KNOCKBACK * crit_mult * (1.0 + (total_damage_mult - 1.0) * 0.5) * 1.5 * weapon_kb_mult
 
@@ -202,10 +250,10 @@ class CombatManager:
                 if game.chaos.is_ultra_knockback():
                     game.screen_shake = max(game.screen_shake, SCREEN_SHAKE_INTENSITY * 3)
 
-            # Rotation damage multiplier
+            # Rotation-based damage multiplier (prevents damage from accidental grazes)
             rotation_mult = self._get_rotation_mult(attacker.rotation_since_last_hit)
 
-            # Sweet-spot logic
+            # Sweet-spot logic: hits near the tip or on specific weapons deal more damage
             all_sweet_spot       = attacker.weapon_config.get("all_sweet_spot", False)
             sweet_spot_threshold = attacker.weapon_config.get("sweet_spot_threshold", 0.70)
 
@@ -226,7 +274,7 @@ class CombatManager:
 
             damage = base_damage * total_damage_mult * rotation_mult
 
-            # Reset rotation accumulator on hit
+            # Reset rotation accumulator on successful hit to prevent back-to-back scaling
             attacker.rotation_since_last_hit = 0.0
 
             if defender.take_damage(damage, angle, knockback, game.particles):
@@ -240,10 +288,8 @@ class CombatManager:
                                               damage, attacker.color, is_crit or is_sweet_spot)
 
                 if hasattr(game, 'sound_manager'):
-                    if is_sweet_spot:
-                        game.sound_manager.play_crit()
-                    else:
-                        game.sound_manager.play_hit()
+                    if is_sweet_spot: game.sound_manager.play_crit()
+                    else:             game.sound_manager.play_hit()
 
                 game.hit_slowmo_frames = HIT_SLOWMO_FRAMES
                 game._reset_inactivity()
@@ -251,20 +297,16 @@ class CombatManager:
                 gain = attacker.weapon_config.get("momentum_gain", 1)
                 attacker.momentum = min(MOMENTUM_MAX_STACKS, attacker.momentum + gain)
 
-                # Weapon special effects
+                # Apply weapon-specific effects (e.g., Hammer's spin reversal)
                 if attacker.weapon_config.get("reverses_spin", False):
                     defender.spin_direction *= -1
 
-                # Hammer hitstop: normal hits get a moderate freeze (12 frames),
-                # only crits get the full dramatic freeze (30 frames).
-                # This keeps the chaos identity without exhausting the viewer.
+                # Hammer hitstop override for extreme impact feel
                 if attacker.weapon_config.get("max_hitstop", False):
-                    if is_crit:
-                        game.hit_stop = max(game.hit_stop, HAMMER_HIT_STOP_FRAMES)
-                    else:
-                        game.hit_stop = max(game.hit_stop, HAMMER_NORMAL_HIT_STOP)
+                    if is_crit: game.hit_stop = max(game.hit_stop, HAMMER_HIT_STOP_FRAMES)
+                    else:       game.hit_stop = max(game.hit_stop, HAMMER_NORMAL_HIT_STOP)
 
-                # Critical hit sequences
+                # High-impact cinematic sequences for critical hits
                 if is_crit and is_sweet_spot:
                     game.decomp_slowmo_frames      = 30
                     game.decomp_slowmo_accumulator = 0.0
@@ -274,7 +316,6 @@ class CombatManager:
                     game.particles.emit_explosion(hit_pos[0], hit_pos[1], (0, 255, 255),   count=25)
                     game.particles.emit_explosion(hit_pos[0], hit_pos[1], (255, 0, 255),   count=25)
                     game.particles.emit_explosion(hit_pos[0], hit_pos[1], (255, 255, 255), count=15)
-                    # Hammer crit: override the decomp hit_stop=4 with full freeze
                     if attacker.weapon_config.get("max_hitstop", False):
                         game.hit_stop = max(game.hit_stop, HAMMER_HIT_STOP_FRAMES)
                 elif is_crit:
@@ -284,14 +325,17 @@ class CombatManager:
                     game.screen_shake            = max(game.screen_shake, SCREEN_SHAKE_INTENSITY * 2)
 
 
-
     @staticmethod
-    def _get_rotation_mult(rotation):
-        """
-        Rotation-based damage scaling:
-          < π   (accidental / graze)  → 0.6x damage penalty
-          π–2π  (standard hit)        → 1.0x normal damage
-          ≥ 2π  (full rotation)       → 1.3x damage bonus
+    def _get_rotation_mult(rotation: float) -> float:
+        """Calculates damage multiplier based on cumulative weapon rotation.
+
+        This ensures that 'grazes' or accidental bumps deal less damage, while 
+        full intentional swings are rewarded.
+
+        Pacing:
+          - < π (Graze): 0.6x penalty
+          - π to 2π (Standard): 1.0x baseline
+          - ≥ 2π (Full Swing): 1.3x bonus
         """
         if rotation < math.pi:
             return 0.6
