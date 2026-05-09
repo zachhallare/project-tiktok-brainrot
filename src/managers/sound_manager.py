@@ -28,10 +28,19 @@ assets/audios/
 
 import pygame
 import os
+import numpy as np
 
 # Canonical weapon identifiers (must match WEAPON_CONFIGS keys in config.py)
 WEAPON_NAMES = ("sword", "dagger", "spear", "axe", "hammer")
 
+def _compute_rms(snd) -> float:
+    """Return the RMS amplitude of a pygame Sound object."""
+    try:
+        samples = pygame.sndarray.array(snd).astype(np.float32)
+        rms = float(np.sqrt(np.mean(samples ** 2)))
+        return rms if rms > 0 else 1.0
+    except Exception:
+        return 1.0
 
 class SoundManager:
     """Central controller for game audio.
@@ -48,7 +57,6 @@ class SoundManager:
         """Initializes the Pygame mixer and pre-loads all audio assets."""
         # Initialize the mixer once to avoid memory leaks or initialization overhead
         pygame.mixer.init()
-
         self.muted = False
         self.master_volume = 1.0
 
@@ -56,6 +64,9 @@ class SoundManager:
             os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
             "assets", "audios"
         )
+
+        # Registry: maps each sound to its desired category weight
+        _sound_registry: dict = {}
 
         def load(subfolder: str, filename: str, volume: float = 0.5):
             """Internal helper: load a sound file and set its base volume.
@@ -71,9 +82,10 @@ class SoundManager:
             path = os.path.join(base_path, subfolder, filename)
             if os.path.exists(path):
                 snd = pygame.mixer.Sound(path)
-                snd.set_volume(volume)
+                _sound_registry[snd] = volume
                 return snd
             return None
+
 
         # ------------------------------------------------------------------
         # Per-weapon sound banks
@@ -117,9 +129,25 @@ class SoundManager:
         # ------------------------------------------------------------------
         self.arena_pulse_sound = load("feedback", "arena_pulse.mp3", 0.50)
 
+        self._sound_registry = _sound_registry
+        self._normalize_all(self._sound_registry)
+
     # ------------------------------------------------------------------
     # Per-weapon playback helpers
     # ------------------------------------------------------------------
+
+    def _normalize_all(self, registry: dict):
+        if not registry:
+            return
+        rms_map = {snd: _compute_rms(snd) for snd in registry}
+        min_rms = min(rms_map.values())
+        for snd, category_weight in registry.items():
+            factor = min_rms / rms_map[snd]
+            snd.set_volume(max(0.0, min(1.0, factor * category_weight * self.master_volume)))
+
+    def set_master_volume(self, level: float):
+        self.master_volume = max(0.0, min(1.0, level))
+        self._normalize_all(self._sound_registry)  # re-runs normalization with new level
 
     def _resolve_weapon(self, weapon: str) -> str:
         """Return the weapon key, falling back to 'sword' if unknown."""
@@ -253,35 +281,4 @@ class SoundManager:
         """Toggles the global mute state."""
         self.muted = not self.muted
 
-    def set_master_volume(self, level: float):
-        """Adjusts the volume of all pre-loaded sounds proportionally.
 
-        Args:
-            level: Target volume multiplier [0.0 – 1.0].
-        """
-        self.master_volume = max(0.0, min(1.0, level))
-        v = self.master_volume
-
-        # Per-weapon banks
-        for wpn in WEAPON_NAMES:
-            for snd in self._weapon_hit_banks[wpn]:
-                if snd: snd.set_volume(0.55 * v)
-            ss = self._weapon_sweet_spot.get(wpn)
-            if ss: ss.set_volume(0.65 * v)
-            cl = self._weapon_clash.get(wpn)
-            if cl: cl.set_volume(0.55 * v)
-
-        # Shared combat
-        if self.death_final_hit_sound:  self.death_final_hit_sound.set_volume(0.70 * v)
-        if self.guard_break_sound:      self.guard_break_sound.set_volume(0.70 * v)
-
-        # Countdown
-        if self.countdown_beep_sound:   self.countdown_beep_sound.set_volume(0.60 * v)
-        if self.sword_fight_sound:      self.sword_fight_sound.set_volume(0.50 * v)
-
-        # Ending
-        if self.sword_to_ground_sound:   self.sword_to_ground_sound.set_volume(0.60 * v)
-        if self.victory_fireworks_sound: self.victory_fireworks_sound.set_volume(0.60 * v)
-
-        # Feedback
-        if self.arena_pulse_sound: self.arena_pulse_sound.set_volume(0.50 * v)
