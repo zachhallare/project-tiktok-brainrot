@@ -90,11 +90,17 @@ class Game:
         self.screen = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
         pygame.display.set_caption("Red vs Blue Battle - YT Shorts Edition")
         self.clock = pygame.time.Clock()
+
+        # Border Flash State
+        self.border_flash_timer = 0
+        self.border_flash_max = 0
+        self.border_flash_color = WHITE
         
         # Fonts for UI text
         self.font_large = pygame.font.Font(None, 120)
         self.font_medium = pygame.font.Font(None, 72)
         self.font_small = pygame.font.Font(None, 36)
+        self.momentum_bias = 0.0  # -1.0 = f2 dominating, +1.0 = f1 dominating
         
         # Define the base arena square.
         self.base_arena = (ARENA_MARGIN, ARENA_MARGIN, ARENA_WIDTH, ARENA_HEIGHT)
@@ -202,6 +208,7 @@ class Game:
         if "--mute-sounds" in sys.argv or getattr(self, 'is_headless', False):
             self.sound_manager.muted = True
         
+
     def _lock_fighters_for_countdown(self):
         """Lock fighters in place for countdown — weapons keep spinning."""
         self.blue.locked = True
@@ -217,6 +224,7 @@ class Game:
         self.red.rotation_angle = math.pi
         self.red.sword_angle = math.pi
     
+
     def _unlock_fighters(self):
         """Unlock fighters and launch them at each other from close range."""
         self.blue.locked = False
@@ -246,10 +254,12 @@ class Game:
         self.red.vx = (dx_r / dist_r) * 20
         self.red.vy = (dy_r / dist_r) * 20 - vertical_jitter
 
+
     def _reset_inactivity(self):
         """Reset inactivity timer."""
         self.inactivity_timer = 0
     
+
     def _trigger_arena_pulse(self):
         """Trigger Arena Pulse."""
         self.arena_pulses.add(tuple(self.arena_bounds), PURPLE)
@@ -273,29 +283,41 @@ class Game:
                 fighter.vx *= 1.2
                 fighter.vy *= 1.2
 
+
     def _start_escalation_sound(self):
         pass
 
     def _stop_escalation_sound(self):
         pass
 
-    # Skills disabled - _spawn_skill_orb removed
 
     def _trigger_hit(self, x, y, color, hit_stop_frames=None, damage=0, is_crit=False):
         """Apply hit effects including damage numbers."""
         self.particles.emit(x, y, WHITE, count=10 if not is_crit else 20, size=4 if not is_crit else 6)
         self.hit_stop = hit_stop_frames if hit_stop_frames else HIT_STOP_FRAMES
         self.screen_shake = SCREEN_SHAKE_INTENSITY
-        
-        # Spawn floating damage number (gold + larger for crits)
+
+        # Border flash: crits punch harder and hold longer
+        self.border_flash_timer = 28 if is_crit else 16
+        self.border_flash_max = self.border_flash_timer
+        self.border_flash_color = color
+
         if damage > 0:
             self.damage_numbers.spawn(x, y - 20, damage, color, is_crit)
-        
-        # Play hit sound via central manager
+
         if is_crit:
             self.sound_manager.play_crit()
         else:
             self.sound_manager.play_hit()
+
+        # Momentum bias: crits push harder than normal hits
+        bias_push = 0.25 if is_crit else 0.12
+
+        if color == self.f1_color:
+            self.momentum_bias = min(1.0, self.momentum_bias + bias_push)
+        else:
+            self.momentum_bias = max(-1.0, self.momentum_bias - bias_push)
+
 
     def _end_round(self, winner, loser):
         """Handle round end."""
@@ -390,7 +412,6 @@ class Game:
                 json.dump(tracker_data, f, indent=4)
             
 
-
     def _reset_round(self):
         """Reset round."""
         self.blue.reset()
@@ -411,6 +432,9 @@ class Game:
         
         self.hit_slowmo_frames = 0
         self.hit_slowmo_accumulator = 0.0
+
+        self.border_flash_timer = 0
+        self.momentum_bias = 0.0
         
         self.decomp_slowmo_frames = 0
         self.decomp_slowmo_accumulator = 0.0
@@ -562,8 +586,16 @@ class Game:
             self.screen_shake *= SCREEN_SHAKE_DECAY
             if self.screen_shake < 0.5:
                 self.screen_shake = 0
-        
 
+        # Decrement border flash.
+        if self.border_flash_timer > 0:
+            self.border_flash_timer -= 1    
+
+        # Momentum bias drifts back to 0 when no hits are landing
+        if self.momentum_bias > 0:
+            self.momentum_bias = max(0.0, self.momentum_bias - 0.003)
+        elif self.momentum_bias < 0:
+            self.momentum_bias = min(0.0, self.momentum_bias + 0.003)
         
         if self.round_ending:
             self.reset_timer -= 1
@@ -656,6 +688,7 @@ class Game:
         
         pygame.display.flip()
 
+
     def draw(self):
         """Draw game with neon visuals."""
         offset = (0, 0)
@@ -685,10 +718,35 @@ class Game:
             logo_rect = self.bg_logo.get_rect(center=(int(ax + aw/2 + offset[0]), int(ay + ah/2 + offset[1])))
             self.screen.blit(self.bg_logo, logo_rect)
         
-        # Base swap logic for border color (180 frames = 3 seconds at 60fps)
-        border_color = self.f1_color if (self.round_timer // 180) % 2 == 0 else self.f2_color
-        border_width = 4
-        
+        # Momentum tint: bias blends base border between f1 and f2 colors
+        if self.momentum_bias >= 0:
+            t = self.momentum_bias
+            base_border = (
+                int(self.f1_color[0] * t + (self.f1_color[0] if (self.round_timer // 180) % 2 == 0 else self.f2_color[0]) * (1 - t)),
+                int(self.f1_color[1] * t + (self.f1_color[1] if (self.round_timer // 180) % 2 == 0 else self.f2_color[1]) * (1 - t)),
+                int(self.f1_color[2] * t + (self.f1_color[2] if (self.round_timer // 180) % 2 == 0 else self.f2_color[2]) * (1 - t)),
+            )
+        else:
+            t = -self.momentum_bias
+            base_border = (
+                int(self.f2_color[0] * t + (self.f1_color[0] if (self.round_timer // 180) % 2 == 0 else self.f2_color[0]) * (1 - t)),
+                int(self.f2_color[1] * t + (self.f1_color[1] if (self.round_timer // 180) % 2 == 0 else self.f2_color[1]) * (1 - t)),
+                int(self.f2_color[2] * t + (self.f1_color[2] if (self.round_timer // 180) % 2 == 0 else self.f2_color[2]) * (1 - t)),
+            )
+
+        if self.border_flash_timer > 0:
+            t = self.border_flash_timer / max(1, self.border_flash_max)  # 1.0 → 0.0
+            fc = self.border_flash_color
+            border_color = (
+                int(fc[0] * t + base_border[0] * (1 - t)),
+                int(fc[1] * t + base_border[1] * (1 - t)),
+                int(fc[2] * t + base_border[2] * (1 - t)),
+            )
+            border_width = int(4 + 8 * t)  # Punches out to 12px on impact, decays to 4px
+        else:
+            border_color = base_border
+            border_width = 4
+                
         pygame.draw.rect(self.screen, border_color, arena_rect, border_width)
         
         self.arena_pulses.draw(self.screen, offset)
@@ -886,7 +944,6 @@ class Game:
             pygame.draw.line(self.screen, NEON_GRID,
                            (0, int(y + oy)), (SCREEN_WIDTH, int(y + oy)), 1)
     
-
 
     def run(self):
         """Main loop."""

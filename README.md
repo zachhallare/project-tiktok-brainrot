@@ -9,8 +9,8 @@
 **Color Battle** is an automated AI-vs-AI combat simulation built for endless, satisfying content loops. The game features two circular fighters bouncing around an arena like a DVD screensaver while wielding one of five unique weapons in a continuous "Beyblade-style" spin. Out of the box, it supports a dynamic 12-color Neon Palette selector prior to initialization.
 
 ### Core Loop
-1. **Countdown** → "3-2-1-FIGHT" initiates each round (accompanied by audio beeps)
-2. **The Clash** → Fighters are launched directly at the center for a massive choreographed opening sword clash
+1. **Countdown** → Cinematic "3-2-1-FIGHT" initiates each round. Fighters spawn close to the center, locked in place but aggressively spinning their weapons. The sequence features punch-in frame animations, screen-flash transitions, and a massive shockwave with screen shake on "FIGHT".
+2. **The Clash** → Fighters are launched directly at the center for a massive choreographed opening clash
 3. **Battle Phase** → Fighters autonomously bounce, collide, and attack via a permanent spin
 4. **Escalation** → Arena Pulse pushes fighters together after 2.5 seconds of inactivity
 5. **Resolution** → Slow-motion death sequence with particle explosion
@@ -141,7 +141,7 @@ Fighter colors are selected from a 12-color high-contrast `NEON_PALETTE`. Colors
     - **Minimum Width:** Health bars maintain a visible fill as long as the fighter is alive.
     - **Danger Zone:** Health bars shake at ≤10% HP.
     - **Low HP Blink:** Health bars blink rapidly when below 15% HP (alternating between normal and 40% darker shade).
-- **Winner Announcer** renders a color-coded circle indicator with "WINS" text in a pulsing box.
+- **Winner Announcer** renders a color-coded circle indicator with "WINS" text in a pulsing box. The winner is displayed in their normal color, and their weapon dynamically animates to maintain the rotational energy of combat.
 - **Arena Watermark:** A semi-transparent AlgoRot logo is centered in the arena as a background watermark.
 
 ### Trail System
@@ -150,7 +150,7 @@ Each fighter leaves a fading motion trail. Trail length and fade behavior are pe
 - Dagger: 12-position trail with more aggressive fade for a motion-blur effect
 
 ### Particle & Effect Systems
-- **ParticleSystem:** Sparks, explosions, and impact bursts
+- **ParticleSystem:** Sparks, explosions, and impact bursts. Parries trigger a directional upward fan, while critical hits unleash a high-impact, multi-layered explosion tied to the attacker's color.
 - **ShockwaveSystem:** Radial shockwaves on death
 - **ArenaPulseSystem:** Visualizes the inactivity pulse
 - **DamageNumberSystem:** Floating damage numbers with crit-scaling
@@ -159,13 +159,13 @@ Each fighter leaves a fading motion trail. Trail length and fade behavior are pe
 
 ## Audio System
 
-All sound effects are managed through a centralized `SoundManager` that preloads audio files at initialization to prevent in-game stutter.
+All sound effects are managed through a centralized `SoundManager` that preloads audio files at initialization to prevent in-game stutter. The game features a granular, weapon-specific audio library, providing distinct, signature sonic profiles for different weapon classes to maximize hit feedback and audience retention.
 
 ### Sound Categories
 | Category      | Sounds                                     |
 |---------------|---------------------------------------------|
-| **Combat**    | `hit_1.mp3`, `hit_2.mp3` (alternating), `critical_hit.mp3`, `sword_clash.mp3` |
-| **Death**     | `death_final_hit.mp3`, `sword_to_the_ground.mp3` |
+| **Combat**    | Per-weapon banks (`hit_1.mp3`, `hit_2.mp3`, `sweet_spot.mp3`, `clash.mp3`), plus shared `guard_break.mp3` |
+| **Ending**    | `death_final_hit.mp3`, `sword_to_the_ground.mp3`, `victory_fireworks.mp3` |
 | **Countdown** | `countdown_beep.mp3`, `sword-fight.mp3` |
 | **Feedback**  | `arena_pulse.mp3` |
 
