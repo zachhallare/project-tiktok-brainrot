@@ -364,16 +364,46 @@ class Game:
             duration = time.time() - self.match_start_real_time
             print(f"[RESULT] winner={winner_weapon} hp_pct={hp_percent:.0f} time={duration:.2f}s")
 
-        if hp_percent <= 10:
-            category = "clutch"
+        # Determine HP Category
+        if hp_percent == 0:
+            hp_category = "ghost"
+        elif hp_percent <= 10:
+            hp_category = "clutch"
+        elif hp_percent >= 60:
+            hp_category = "stomp"
         elif hp_percent >= 40:
-            category = "blowout"
+            hp_category = "blowout"
         else:
-            category = "standard"
+            hp_category = "standard"
+            
+        # Determine Lead Category
+        winner_max_lead = self.max_blue_lead if winner == self.blue else self.max_red_lead
+        loser_max_lead = self.max_red_lead if winner == self.blue else self.max_blue_lead
+        
+        lead_category = None
+        if self.lead_changes == 0 and winner_max_lead >= 0.10:
+            lead_category = "wire_to_wire"
+        elif loser_max_lead >= 0.3:
+            lead_category = random.choice(["comeback", "choke"])
+        elif self.lead_changes >= 3:
+            lead_category = "contested"
             
         # Title Pools (loaded from titles.py)
         title_pools = get_title_pools(self.f1_name, self.f2_name)
-        titles = title_pools[category]
+        
+        # Priority Selection: ghost > dramatic lead > contested+HP > HP
+        if hp_category == "ghost":
+            category = "ghost"
+            titles = title_pools["ghost"]
+        elif lead_category in ["comeback", "choke", "wire_to_wire"]:
+            category = lead_category
+            titles = title_pools[lead_category]
+        elif lead_category == "contested":
+            category = f"contested_{hp_category}"
+            titles = title_pools["contested"] + title_pools[hp_category]
+        else:
+            category = hp_category
+            titles = title_pools[hp_category]
 
 
         # Persistent JSON Tracker Logic (INDEX-BASED)
@@ -384,7 +414,7 @@ class Game:
             with open(tracker_file, 'r') as f:
                 tracker_data = json.load(f)
         else:
-            tracker_data = {"clutch": [], "blowout": [], "standard": []}
+            tracker_data = {}
             
         # Ensure category exists
         if category not in tracker_data:
@@ -435,6 +465,16 @@ class Game:
 
         self.border_flash_timer = 0
         self.momentum_bias = 0.0
+
+        self.lead_changes = 0
+        self.current_leader = None
+        self.max_blue_lead = 0.0
+        self.max_red_lead = 0.0
+        
+        self.lead_changes = 0
+        self.current_leader = None
+        self.max_blue_lead = 0.0
+        self.max_red_lead = 0.0
         
         self.decomp_slowmo_frames = 0
         self.decomp_slowmo_accumulator = 0.0
@@ -637,6 +677,24 @@ class Game:
         self.shockwaves.update()
         self.arena_pulses.update()
         self.damage_numbers.update()
+        
+        # Lead tracking
+        blue_pct = self.blue.health / max(1, self.blue.max_health)
+        red_pct = self.red.health / max(1, self.red.max_health)
+        
+        if blue_pct > red_pct:
+            leader = self.blue
+            self.max_blue_lead = max(self.max_blue_lead, blue_pct - red_pct)
+        elif red_pct > blue_pct:
+            leader = self.red
+            self.max_red_lead = max(self.max_red_lead, red_pct - blue_pct)
+        else:
+            leader = None
+            
+        if leader and leader != self.current_leader:
+            if self.current_leader is not None:
+                self.lead_changes += 1
+            self.current_leader = leader
         
         if self.blue.health <= 0:
             self._end_round(winner=self.red, loser=self.blue)
