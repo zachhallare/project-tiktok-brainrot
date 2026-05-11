@@ -8,3 +8,19 @@ Oversaturation spike — everything goes hypersaturated/neon for a beat before r
 Freeze frame + zoom — 8-12 frame freeze on hit with a slow push-in. This is the most "viral clip" friendly since it gives the viewer a moment to process what happened.
 
 =======================================================
+
+intro idea:
+
+instead of the usual text ui of 3-2-1-fight. i was thinking of using actions instead.
+
+like for 3 = the 2 fighters get summoned,
+
+for 2 = the fighters get randomly assigned a weapon,
+
+for 1 = the fighters start spinning,
+
+for fight = the fighters start moving.
+
+it will still have the sound effects for better transistions
+
+

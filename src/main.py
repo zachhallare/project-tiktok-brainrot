@@ -384,24 +384,63 @@ class Game:
         if self.lead_changes == 0 and winner_max_lead >= 0.10:
             lead_category = "wire_to_wire"
         elif loser_max_lead >= 0.3:
-            lead_category = random.choice(["comeback", "choke"])
+            lead_category = "comeback_choke"
         elif self.lead_changes >= 3:
             lead_category = "contested"
             
         # Title Pools (loaded from titles.py)
         title_pools = get_title_pools(self.f1_name, self.f2_name)
         
-        # Priority Selection: ghost > dramatic lead > contested+HP > HP
+        # Priority Selection:
+        # 1. ghost            — 0% HP, always overrides everything
+        # 2. clutch           — 1-10% HP, too extreme to suppress; blends with narrative if present
+        # 3. comeback_choke   — loser had 30%+ lead; comeback + choke pools merged (same event, two angles)
+        # 4. wire_to_wire     — zero lead changes; blends with stomp/blowout pool if margin is dominant
+        # 5. contested + HP   — 3+ lead changes; blends narrative and margin pools
+        # 6. pure HP margin   — standard/blowout/stomp with no narrative arc
+
         if hp_category == "ghost":
             category = "ghost"
             titles = title_pools["ghost"]
-        elif lead_category in ["comeback", "choke", "wire_to_wire"]:
-            category = lead_category
-            titles = title_pools[lead_category]
+
+        elif hp_category == "clutch":
+            # Clutch is priority 2 — surviving on 1-10% HP is always the headline.
+            # Blend in the narrative pool for extra variety if a story arc also exists.
+            if lead_category == "comeback_choke":
+                category = "clutch_comeback_choke"
+                titles = title_pools["clutch"] + title_pools["comeback"] + title_pools["choke"]
+            elif lead_category == "wire_to_wire":
+                category = "clutch_wire_to_wire"
+                titles = title_pools["clutch"] + title_pools["wire_to_wire"]
+            elif lead_category == "contested":
+                category = "clutch_contested"
+                titles = title_pools["clutch"] + title_pools["contested"]
+            else:
+                category = "clutch"
+                titles = title_pools["clutch"]
+
+        elif lead_category == "comeback_choke":
+            # Comeback and choke describe the same match from opposite sides.
+            # Blend both pools — doubles non-repeating runway.
+            category = "comeback_choke"
+            titles = title_pools["comeback"] + title_pools["choke"]
+
+        elif lead_category == "wire_to_wire":
+            # Wire-to-wire dominant wins blend margin context into the narrative pool.
+            if hp_category in ("stomp", "blowout"):
+                category = f"wire_to_wire_{hp_category}"
+                titles = title_pools["wire_to_wire"] + title_pools[hp_category]
+            else:
+                category = "wire_to_wire"
+                titles = title_pools["wire_to_wire"]
+
         elif lead_category == "contested":
+            # Contested blended with HP margin — already correct, kept as-is.
             category = f"contested_{hp_category}"
             titles = title_pools["contested"] + title_pools[hp_category]
+
         else:
+            # No narrative arc — pure HP margin result.
             category = hp_category
             titles = title_pools[hp_category]
 
