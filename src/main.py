@@ -162,7 +162,7 @@ class Game:
         self.countdown_timer = 0
         self.countdown_active = True
         self.countdown_texts = ["3", "2", "1", "FIGHT"]
-        self.countdown_durations = [40, 40, 52, 45]
+        self.countdown_durations = [22, 22, 28, 45]
         self.fight_punch_frame = False      # 1-frame camera punch on FIGHT reveal.
         self.countdown_flash_timer = 0
         self.countdown_flash_duration = 1  # tracks starting flash length for alpha calc
@@ -205,6 +205,22 @@ class Game:
         self.obs_manager.connect()
         self.combat_manager = CombatManager()
         self.ui_renderer = UIRenderer(self.screen, self.font_medium, self.font_small)
+        
+        # Intro and Outro Renderers
+        from renderers.intro_renderer import IntroRenderer
+        from renderers.outro_renderer import OutroRenderer
+
+        self.intro_renderer = IntroRenderer(
+            screen=self.screen,
+            clock=self.clock,
+            f1_name=self.f1_name,
+            f2_name=self.f2_name,
+            f1_color=self.f1_color,
+            f2_color=self.f2_color,
+            font_large=self.font_large,
+        )
+
+        self.outro_renderer = OutroRenderer(self.screen, self.clock, self.font_large)
         
         # Initialize centralized SoundManager
         from managers.sound_manager import SoundManager
@@ -745,290 +761,151 @@ class Game:
             self._end_round(winner=self.blue, loser=self.red)
 
 
-    def _draw_title_screen(self):
-        """Draw title screen."""
-        self.screen.fill(DARK_GRAY)
-        
-        ax, ay, aw, ah = self.base_arena
-        arena_rect = pygame.Rect(int(ax), int(ay), int(aw), int(ah))
-        pygame.draw.rect(self.screen, BLACK, arena_rect)
-        pygame.draw.rect(self.screen, GRAY, arena_rect, 4)
-        
-        title_text = "RED vs BLUE"
-        title_surface = self.font_large.render(title_text, True, WHITE)
-        title_rect = title_surface.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 80))
-        
-        shadow_surface = self.font_large.render(title_text, True, (50, 50, 50))
-        shadow_rect = shadow_surface.get_rect(center=(SCREEN_WIDTH // 2 + 3, SCREEN_HEIGHT // 2 - 77))
-        self.screen.blit(shadow_surface, shadow_rect)
-        self.screen.blit(title_surface, title_rect)
-        
-        subtitle = "BATTLE"
-        subtitle_surface = self.font_medium.render(subtitle, True, YELLOW)
-        subtitle_rect = subtitle_surface.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 10))
-        self.screen.blit(subtitle_surface, subtitle_rect)
-        
-        if (pygame.time.get_ticks() // 500) % 2 == 0:
-            prompt = "Press SPACE or CLICK to Start"
-            prompt_surface = self.font_small.render(prompt, True, WHITE)
-            prompt_rect = prompt_surface.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 80))
-            self.screen.blit(prompt_surface, prompt_rect)
-        
-        controls = "SPACE: Pause  |  R: Reset  |  ESC: Exit"
-        controls_surface = self.font_small.render(controls, True, GRAY)
-        controls_rect = controls_surface.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT - 40))
-        self.screen.blit(controls_surface, controls_rect)
-        # Draw game surface to high-res canvas
-        self.canvas.fill((15, 15, 15))  # Dark background for dead space
-        y_offset = (CANVAS_HEIGHT - SCREEN_HEIGHT) // 2
-        self.canvas.blit(self.screen, (0, y_offset))
-        
-        # Scale down and present to the laptop display window
-        scaled_preview = pygame.transform.smoothscale(self.canvas, (DISPLAY_WIDTH, DISPLAY_HEIGHT))
-        self.window.blit(scaled_preview, (0, 0))
-        
-        pygame.display.flip()
-
-
     def draw(self):
-        """Draw game with neon visuals."""
-        offset = (0, 0)
+        """Draw coordinator. Each section is isolated — edit one without touching others."""
+        offset = self._compute_shake_offset()
+
+        self.screen.fill(NEON_BG)
+        self._draw_grid(offset)                         # unchanged
+        self._draw_arena(offset)                        # extracted
+        self._draw_effects(offset)                      # extracted
+        self._draw_fighters(offset)                     # extracted
+        self._draw_crit_flash()                         # extracted
+        self._draw_countdown_overlay()                  # extracted ← intro edits go here
+        self._draw_winner_outro()                       # extracted ← outro edits go here
+        self.ui_renderer.draw(self)
+        self._present_to_window()                       # extracted ← canvas scaling, always last
+
+
+    def _draw_countdown_overlay(self):
+        """
+        Countdown overlay drawn during pre-fight sequence.
+        Delegate to intro_renderer so this method never needs to be edited directly.
+        """
+        if not self.countdown_active:
+            return
+        self.intro_renderer.draw_countdown(
+            screen=self.screen,
+            stage=self.countdown_stage,
+            timer=self.countdown_timer,
+            durations=self.countdown_durations,
+            texts=self.countdown_texts,
+            f1_color=self.f1_color,
+            f2_color=self.f2_color,
+            f1_bright=self.f1_bright,
+            f2_bright=self.f2_bright,
+            flash_timer=self.countdown_flash_timer,
+            flash_duration=self.countdown_flash_duration,
+            font_large=self.font_large,
+        )
+
+
+    def _draw_winner_outro(self):
+        """
+        Winner announcement screen. Delegate to outro_renderer.
+        Editing outro_renderer.py cannot affect combat draw logic.
+        """
+        if not (self.round_ending and self.winner_text and self.reset_timer < 80):
+            return
+        self.outro_renderer.draw_winner(
+            screen=self.screen,
+            winner=self.winner,
+            winner_text=self.winner_text,
+            f1_color=self.f1_color,
+            f2_color=self.f2_color,
+            blue=self.blue,
+            red=self.red,
+            particles=self.particles,
+            damage_numbers=self.damage_numbers,
+            arena_bounds=self.arena_bounds,
+            sound_manager=self.sound_manager,
+            winner_particles_spawned=self.winner_particles_spawned,
+        )
+        # Sync back the spawned flag (renderer can't mutate game state directly)
+        self.winner_particles_spawned = True
+
+
+    def _compute_shake_offset(self) -> tuple:
         if getattr(self, 'fight_punch_frame', False):
             punch = SCREEN_SHAKE_INTENSITY * 7
-            offset = (random.uniform(-punch, punch), random.uniform(-punch, punch))
             self.fight_punch_frame = False
+            return (random.uniform(-punch, punch), random.uniform(-punch, punch))
         elif self.screen_shake > 0:
-            offset = (random.uniform(-self.screen_shake, self.screen_shake),
-                     random.uniform(-self.screen_shake, self.screen_shake))
-        
-        self.screen.fill(NEON_BG)
-        
-        self._draw_grid(offset)
-        
-        draw_arena = self.arena_bounds
-        
-        ax, ay, aw, ah = draw_arena
-        arena_rect = pygame.Rect(int(ax + offset[0]), int(ay + offset[1]), int(aw), int(ah))
-        
-        arena_fill = ARENA_BG
-        pygame.draw.rect(self.screen, arena_fill, arena_rect)
-        
-        # Draw background logo watermark
-        if hasattr(self, 'bg_logo') and self.bg_logo:
-            # Bottom-right corner of arena with small padding
-            logo_rect = self.bg_logo.get_rect(center=(int(ax + aw/2 + offset[0]), int(ay + ah/2 + offset[1])))
+            return (random.uniform(-self.screen_shake, self.screen_shake),
+                    random.uniform(-self.screen_shake, self.screen_shake))
+        return (0, 0)
+
+
+    def _draw_arena(self, offset):
+        """Arena background, logo watermark, and momentum border."""
+        ax, ay, aw, ah = self.arena_bounds
+        ox, oy = offset
+        arena_rect = pygame.Rect(int(ax + ox), int(ay + oy), int(aw), int(ah))
+
+        pygame.draw.rect(self.screen, ARENA_BG, arena_rect)
+
+        if self.bg_logo:
+            logo_rect = self.bg_logo.get_rect(
+                center=(int(ax + aw / 2 + ox), int(ay + ah / 2 + oy))
+            )
             self.screen.blit(self.bg_logo, logo_rect)
-        
-        # Momentum tint: bias blends base border between f1 and f2 colors
+
+        # Momentum border (copied verbatim from your original draw())
         if self.momentum_bias >= 0:
             t = self.momentum_bias
-            base_border = (
-                int(self.f1_color[0] * t + (self.f1_color[0] if (self.round_timer // 180) % 2 == 0 else self.f2_color[0]) * (1 - t)),
-                int(self.f1_color[1] * t + (self.f1_color[1] if (self.round_timer // 180) % 2 == 0 else self.f2_color[1]) * (1 - t)),
-                int(self.f1_color[2] * t + (self.f1_color[2] if (self.round_timer // 180) % 2 == 0 else self.f2_color[2]) * (1 - t)),
-            )
+            cycle_color = self.f1_color if (self.round_timer // 180) % 2 == 0 else self.f2_color
+            base_border = tuple(int(self.f1_color[i] * t + cycle_color[i] * (1 - t)) for i in range(3))
         else:
             t = -self.momentum_bias
-            base_border = (
-                int(self.f2_color[0] * t + (self.f1_color[0] if (self.round_timer // 180) % 2 == 0 else self.f2_color[0]) * (1 - t)),
-                int(self.f2_color[1] * t + (self.f1_color[1] if (self.round_timer // 180) % 2 == 0 else self.f2_color[1]) * (1 - t)),
-                int(self.f2_color[2] * t + (self.f1_color[2] if (self.round_timer // 180) % 2 == 0 else self.f2_color[2]) * (1 - t)),
-            )
+            cycle_color = self.f1_color if (self.round_timer // 180) % 2 == 0 else self.f2_color
+            base_border = tuple(int(self.f2_color[i] * t + cycle_color[i] * (1 - t)) for i in range(3))
 
         if self.border_flash_timer > 0:
-            t = self.border_flash_timer / max(1, self.border_flash_max)  # 1.0 → 0.0
+            blend = self.border_flash_timer / max(1, self.border_flash_max)
             fc = self.border_flash_color
-            border_color = (
-                int(fc[0] * t + base_border[0] * (1 - t)),
-                int(fc[1] * t + base_border[1] * (1 - t)),
-                int(fc[2] * t + base_border[2] * (1 - t)),
-            )
-            border_width = int(4 + 8 * t)  # Punches out to 12px on impact, decays to 4px
+            border_color = tuple(int(fc[i] * blend + base_border[i] * (1 - blend)) for i in range(3))
+            border_width = int(4 + 8 * blend)
         else:
             border_color = base_border
             border_width = 4
-                
+
         pygame.draw.rect(self.screen, border_color, arena_rect, border_width)
-        
+
+
+    def _draw_effects(self, offset):
+        """Arena pulses and shockwaves."""
         self.arena_pulses.draw(self.screen, offset)
         self.shockwaves.draw(self.screen, offset)
-        
-        # Draw fighters
+
+
+    def _draw_fighters(self, offset):
+        """Fighter draw routing based on round state."""
         if not self.round_ending:
             self.blue.draw(self.screen, offset)
             self.red.draw(self.screen, offset)
         elif self.reset_timer > 80:
-            if self.winner == self.blue:
-                self.blue.draw(self.screen, offset)
-            else:
-                self.red.draw(self.screen, offset)
-
-        
+            winner = self.winner
+            if winner:
+                winner.draw(self.screen, offset)
         self.particles.draw(self.screen, offset)
         self.damage_numbers.draw(self.screen, offset)
-        
-        # Critical Hit Impact Flash (drawn AFTER fighters, BEFORE UI)
+
+
+    def _draw_crit_flash(self):
+        """Critical hit full-screen flash phases."""
         if self.crit_flash_phase == 1:
-            # Phase 1: Full screen BLACK flash
             self.screen.fill(BLACK)
         elif self.crit_flash_phase == 2:
-            # Phase 2: Full screen WHITE flash
             self.screen.fill(WHITE)
-        # Phase 3+: Normal render (no flash)
-        
-        
-        # Countdown overlay (enhanced hook for Shorts retention)
-        if self.countdown_active:
-            countdown_text = self.countdown_texts[self.countdown_stage]
-            duration = self.countdown_durations[self.countdown_stage]
-            progress = self.countdown_timer / max(1, duration)  # 0.0 → 1.0
-            
-            cx = SCREEN_WIDTH // 2
-            cy = SCREEN_HEIGHT // 2
-            
-            if countdown_text == "FIGHT":
-                # FIGHT: grows from small to large with dual-color glow
-                ease = 1 - (1 - progress) ** 3  # ease-out cubic
-                scale = 0.6 + ease * 1.0  # 0.6 → 1.6
-                
-                text_surface = self.font_large.render(countdown_text, True, WHITE)
-                new_w = max(1, int(text_surface.get_width() * scale))
-                new_h = max(1, int(text_surface.get_height() * scale))
-                text_surface = pygame.transform.smoothscale(text_surface, (new_w, new_h))
-                text_rect = text_surface.get_rect(center=(cx, cy))
-                
-                # Dual-color glow halo (both fighter colors)
-                for glow_color, alpha_val in [(self.f1_color, 80), (self.f2_color, 60)]:
-                    glow_surf = self.font_large.render(countdown_text, True, glow_color)
-                    glow_surf = pygame.transform.smoothscale(glow_surf, (new_w, new_h))
-                    glow_surf.set_alpha(alpha_val)
-                    for dx, dy in [(-4,0),(4,0),(0,-4),(0,4),(-3,-3),(3,3),(-3,3),(3,-3)]:
-                        self.screen.blit(glow_surf, text_rect.move(dx, dy))
-                
-                shadow = self.font_large.render(countdown_text, True, (0, 0, 0))
-                shadow = pygame.transform.smoothscale(shadow, (new_w, new_h))
-                shadow.set_alpha(150)
-                self.screen.blit(shadow, text_rect.move(3, 3))
-
-                self.screen.blit(text_surface, text_rect)
-            else:
-                # Numbers 3, 2, 1: punch-in (start big → ease to normal)
-                ease = 1 - (1 - progress) ** 2  # ease-out quadratic
-                scale = 2.0 - 1.0 * ease  # 2.0 → 1.0
-                
-                # Color per stage: 3=fighter1, 2=fighter2, 1=white
-                stage_colors = [self.f1_bright, self.f2_bright, WHITE]
-                text_color = stage_colors[self.countdown_stage]
-                
-                text_surface = self.font_large.render(countdown_text, True, text_color)
-                new_w = max(1, int(text_surface.get_width() * scale))
-                new_h = max(1, int(text_surface.get_height() * scale))
-                text_surface = pygame.transform.smoothscale(text_surface, (new_w, new_h))
-                text_rect = text_surface.get_rect(center=(cx, cy))
-                
-                # Drop shadow
-                shadow = self.font_large.render(countdown_text, True, (0, 0, 0))
-                shadow = pygame.transform.smoothscale(shadow, (new_w, new_h))
-                shadow.set_alpha(150)
-                self.screen.blit(shadow, text_rect.move(3, 3))
-                
-                self.screen.blit(text_surface, text_rect)
-            
-            
-            # Flash overlay on transitions
-            if self.countdown_flash_timer > 0:
-                flash_alpha = int(200 * (self.countdown_flash_timer / max(1, self.countdown_flash_duration)))
-                flash_surf = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
-                flash_surf.fill(WHITE)
-                flash_surf.set_alpha(flash_alpha)
-                self.screen.blit(flash_surf, (0, 0))
-        
-        # Winner UI Announcement
-        if self.round_ending and self.winner_text and self.reset_timer < 80:
-            win_color = self.f1_color if self.winner == self.blue else self.f2_color
-
-            # Particle burst for fireworks.
-            if not self.winner_particles_spawned:
-                self.winner_particles_spawned = True
-                self.damage_numbers.clear()
-                self.particles.clear()
-                cx_burst = SCREEN_WIDTH // 2
-                cy_burst = SCREEN_HEIGHT // 2
-                self.particles.emit_explosion(cx_burst, cy_burst, win_color, count=60)
-                # Extra particles from corners.
-                for bx, by in [(cx_burst - 80, cy_burst - 60), (cx_burst + 80, cy_burst - 60)]:
-                    self.particles.emit_explosion(bx, by, win_color, count=25)
-                
-                if hasattr(self, 'sound_manager'):
-                    self.sound_manager.play_victory_fireworks()
 
 
-            cx = SCREEN_WIDTH // 2
-            text_surface = self.font_large.render(self.winner_text, True, WHITE)
-            gap = 25
-            total_height = (FIGHTER_RADIUS * 2) + gap + text_surface.get_height()
-            top_y = SCREEN_HEIGHT // 2 - total_height // 2
-            circle_cy = top_y + FIGHTER_RADIUS
-
-            # Draw winner fighter body repositioned to center
-            draw_offset = (cx - self.winner.x, circle_cy - self.winner.y)
-            self.winner.draw_body_only(self.screen, draw_offset)
-
-            # Very subtle glow
-            glow_surf = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
-            pygame.draw.circle(glow_surf, (*win_color, 18), (cx, circle_cy), FIGHTER_RADIUS + 14)
-            self.screen.blit(glow_surf, (0, 0))
-
-            # Spinning weapon on top
-            raw_sprite = None
-            orig_w = 0
-            if hasattr(self.winner, '_renderer') and hasattr(self.winner._renderer, '_weapon_base'):
-                raw_sprite = self.winner._renderer._weapon_base
-                orig_w = self.winner._renderer._orig_w
-
-            if raw_sprite:
-                spin_angle = (pygame.time.get_ticks() / 150.0) % (2 * math.pi)
-                cos_a = math.cos(spin_angle)
-                sin_a = math.sin(spin_angle)
-
-                scaled_sprite = pygame.transform.rotozoom(raw_sprite, 0, 1.0)
-                scaled_w = orig_w * 1.0
-
-                handle_x = cx + cos_a * (FIGHTER_RADIUS + 5)
-                handle_y = circle_cy + sin_a * (FIGHTER_RADIUS + 5)
-
-                rotated = pygame.transform.rotate(scaled_sprite, -math.degrees(spin_angle))
-                rot_center_x = handle_x + (scaled_w / 2) * cos_a
-                rot_center_y = handle_y + (scaled_w / 2) * sin_a
-
-                weapon_rect = rotated.get_rect(center=(int(rot_center_x), int(rot_center_y)))
-                clip_rect = pygame.Rect(int(ax), int(ay), int(aw), int(ah))
-                self.screen.set_clip(clip_rect)
-                self.screen.blit(rotated, weapon_rect)
-                self.screen.set_clip(None)
-
-
-            # WINS text
-            text_cy = top_y + FIGHTER_RADIUS * 2 + gap + text_surface.get_height() // 2
-            text_rect = text_surface.get_rect(center=(cx, text_cy))
-            glow_surface = self.font_large.render(self.winner_text, True, win_color)
-            glow_surface.set_alpha(90)
-            for dx, dy in [(-4, 0), (4, 0), (0, -4), (0, 4)]:
-                self.screen.blit(glow_surface, text_rect.move(dx, dy))
-            self.screen.blit(text_surface, text_rect)
-        
-        # UI Overlays
-        self.ui_renderer.draw(self)
-        
-        # Draw game surface to high-res canvas
-        self.canvas.fill((15, 15, 15))  # Dark background for dead space
+    def _present_to_window(self):
+        """Canvas scaling and final display flip. Always the last draw call."""
+        self.canvas.fill((15, 15, 15))
         y_offset = (CANVAS_HEIGHT - SCREEN_HEIGHT) // 2
         self.canvas.blit(self.screen, (0, y_offset))
-        
-        # Scale down and present to the laptop display window
         scaled_preview = pygame.transform.smoothscale(self.canvas, (DISPLAY_WIDTH, DISPLAY_HEIGHT))
         self.window.blit(scaled_preview, (0, 0))
-        
         pygame.display.flip()
     
 
@@ -1085,7 +962,12 @@ class Game:
             
             if self.game_state == 'TITLE':
                 if not getattr(self, 'is_headless', False):
-                    self._draw_title_screen()
+                    should_start = self.intro_renderer.draw_title()
+                    self._present_to_window()          # always scale + flip after any draw
+                    if should_start:
+                        self.game_state = 'PLAYING'
+                        self.obs_manager.start_recording()
+                        self.obs_startup_timer = 60
             else:
                 self.update()
                 if not getattr(self, 'is_headless', False):
