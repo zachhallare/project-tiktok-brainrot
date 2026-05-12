@@ -191,11 +191,10 @@ class Game:
         logo_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "images", "logos", "logo-dark-grey-text.png")
         try:
             logo_img = pygame.image.load(logo_path).convert_alpha()
-            # Scale down to be a watermark (max ~400px wide)
-            scale_factor = 120.0 / max(logo_img.get_width(), 1)
+            scale_factor = 400.0 / max(logo_img.get_width(), 1)
             new_size = (int(logo_img.get_width() * scale_factor), int(logo_img.get_height() * scale_factor))
             self.bg_logo = pygame.transform.scale(logo_img, new_size)
-            self.bg_logo.set_alpha(45) # Semi-transparent watermark
+            self.bg_logo.set_alpha(60) 
         except Exception as e:
             print(f"Failed to load background logo: {e}")
             self.bg_logo = None
