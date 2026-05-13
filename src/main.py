@@ -186,6 +186,9 @@ class Game:
         self.loop_wipe_done = False  # True after end-of-match wipe completes (for single-run exit)
         self.loop_wipe_is_closing = False  # Only True when wipe is triggered by end-of-match
         
+        self._wipe_surf = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+        self._wipe_surf.fill(WHITE)
+
         # Load Arena Watermark Logo
         import os
         logo_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "images", "logos", "logo-dark-grey-text.png")
@@ -562,6 +565,27 @@ class Game:
         self.obs_startup_timer = 60
 
 
+    def _snap_fighters_to_intro(self):
+        """Silently teleport both fighters back to spawn under the solid-white frame."""
+        for f in [self.blue, self.red]:
+            f.x, f.y = f.start_x, f.start_y
+            f.vx = f.vy = 0
+            f.health = f.max_health  # full bars match the intro state
+            f.locked = True
+            f.trail.clear()
+            f.rotation_angle = 0.0 if f.is_blue else math.pi
+            f.sword_angle = f.rotation_angle
+
+        self.particles.clear()
+        self.shockwaves.clear()
+        self.damage_numbers.clear()
+        self.screen_shake = 0
+        self.momentum_bias = 0.0
+        self.border_flash_timer = 0
+        self.crit_flash_phase = 0
+        self.crit_impact_frames = 0
+
+
     def update(self):
         """Main update loop driven by the game clock.
 
@@ -706,10 +730,16 @@ class Game:
                 if hasattr(self, 'sound_manager'):
                     self.sound_manager.play_sword_to_ground()
             
-            if self.reset_timer <= 0:
-                # Game over — quit after the winner message
+            # ── Loop wipe trigger: 18 sim-frames = 1.5s at 5× slow-mo ───────
+            if self.reset_timer <= 18 and not self.loop_wipe_is_closing and not self.loop_wipe_done:
+                self.loop_wipe_phase = 1
+                self.loop_wipe_timer = 0
+                self.loop_wipe_is_closing = True
+
+            if self.reset_timer <= 0:    
                 pygame.event.post(pygame.event.Event(pygame.QUIT))
                 return
+
             self.particles.update()
             self.shockwaves.update()
             self.arena_pulses.update()
@@ -767,15 +797,17 @@ class Game:
         offset = self._compute_shake_offset()
 
         self.screen.fill(NEON_BG)
-        self._draw_grid(offset)                         # unchanged
-        self._draw_arena(offset)                        # extracted
-        self._draw_effects(offset)                      # extracted
-        self._draw_fighters(offset)                     # extracted
-        self._draw_crit_flash()                         # extracted
-        self._draw_countdown_overlay()                  # extracted ← intro edits go here
-        self._draw_winner_outro()                       # extracted ← outro edits go here
+        self._draw_grid(offset)
+        self._draw_arena(offset)
+        self._draw_effects(offset)
+        self._draw_fighters(offset)
+        self._draw_crit_flash()
+        self._draw_countdown_overlay()
+        self._draw_winner_outro()
         self.ui_renderer.draw(self)
-        self._present_to_window()                       # extracted ← canvas scaling, always last
+        self._draw_loop_reveal_overlay()    # ← labels + weapon spin, under the wipe
+        self._draw_loop_wipe()              # ← white flash on top of everything
+        self._present_to_window()
 
 
     def _draw_countdown_overlay(self):
@@ -801,12 +833,76 @@ class Game:
         )
 
 
+    def _draw_loop_wipe(self):
+        """
+        Full-screen white flash bridging outro → intro for a seamless loop.
+        Timer advances every real frame (smooth alpha), not every sim frame.
+
+        Phase 1 — fade to white  (18 real frames, ~0.30 s)
+        Phase 2 — solid white    ( 9 real frames, ~0.15 s)  ← snap happens here
+        Phase 3 — fade back in   (18 real frames, ~0.30 s)
+        """
+        if self.loop_wipe_phase == 0:
+            return
+
+        FLASH_IN  = 18
+        SOLID     = 9
+        FLASH_OUT = 18
+
+        self.loop_wipe_timer += 1
+
+        if self.loop_wipe_phase == 1:                           # fade to white
+            alpha = int(255 * min(1.0, self.loop_wipe_timer / FLASH_IN))
+            if self.loop_wipe_timer >= FLASH_IN:
+                self.loop_wipe_phase = 2
+                self.loop_wipe_timer = 0
+
+        elif self.loop_wipe_phase == 2:                         # solid white
+            alpha = 255
+            if self.loop_wipe_timer == 1:                       # first solid frame: snap
+                self._snap_fighters_to_intro()
+            if self.loop_wipe_timer >= SOLID:
+                self.loop_wipe_phase = 3
+                self.loop_wipe_timer = 0
+
+        elif self.loop_wipe_phase == 3:                         # fade back in
+            alpha = int(255 * max(0.0, 1.0 - self.loop_wipe_timer / FLASH_OUT))
+            if self.loop_wipe_timer >= FLASH_OUT:
+                self.loop_wipe_phase      = 0
+                self.loop_wipe_done       = True
+                self.loop_wipe_is_closing = False
+                return
+
+        self._wipe_surf.set_alpha(alpha)
+        self.screen.blit(self._wipe_surf, (0, 0))
+        
+    
+    def _draw_loop_reveal_overlay(self):
+        """
+        During wipe flash-out and the tail frames, draw the same matchup labels
+        the intro shows during 3/2/1 — making the loop visually seamless.
+        Also spins weapons every real frame so they're live, not frozen.
+        """
+        if not (self.loop_wipe_phase == 3 or self.loop_wipe_done):
+            return
+
+        # Reuse the intro renderer's matchup card layout directly
+        self.intro_renderer._draw_matchup_labels(
+            self.screen,
+            self.f1_color, self.f2_color,
+            self.f1_name, self.f2_name,
+            self.f1_bright, self.f2_bright,
+        )
+
+
     def _draw_winner_outro(self):
         """
         Winner announcement screen. Delegate to outro_renderer.
         Editing outro_renderer.py cannot affect combat draw logic.
         """
         if not (self.round_ending and self.winner_text and self.reset_timer < 80):
+            return
+        if self.loop_wipe_is_closing or self.loop_wipe_done:       # wipe has begun, hide winner screen
             return
         self.outro_renderer.draw_winner(
             screen=self.screen,
@@ -882,6 +978,10 @@ class Game:
     def _draw_fighters(self, offset):
         """Fighter draw routing based on round state."""
         if not self.round_ending:
+            self.blue.draw(self.screen, offset)
+            self.red.draw(self.screen, offset)
+        elif self.loop_wipe_phase == 3 or self.loop_wipe_done:
+            # Wipe is pulling back — reveal fighters at intro positions
             self.blue.draw(self.screen, offset)
             self.red.draw(self.screen, offset)
         elif self.reset_timer > 80:

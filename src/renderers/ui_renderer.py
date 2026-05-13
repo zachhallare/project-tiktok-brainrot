@@ -315,9 +315,9 @@ class UIRenderer:
         # Highlight facet (upper-left triangle of the diamond, 55% brighter)
         hi = tuple(min(255, int(c * 1.55)) for c in color)
         facet = [
-            (cx,         cy - gem_r),  # top
+            (cx, cy - gem_r),  # top
             (cx + gem_r, cy),          # right  (top-right half)
-            (cx,         cy),          # center
+            (cx, cy),          # center
         ]
         pygame.draw.polygon(self.screen, hi, facet)
 
@@ -332,7 +332,7 @@ class UIRenderer:
     def _get_bar_color(self, fighter) -> tuple:
         """Returns the fighter's color, with a rapid blink effect below 15% HP."""
         hp_pct = max(0.0, fighter.health / fighter.max_health)
-        if 0 < hp_pct < 0.15:
+        if 0 < hp_pct <= 0.10:
             if (pygame.time.get_ticks() // 100) % 2 == 0:
                 return fighter.health_bar_color
             r, g, b = fighter.health_bar_color

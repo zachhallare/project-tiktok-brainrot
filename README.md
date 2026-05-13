@@ -9,7 +9,7 @@
 **Color Battle** is an automated AI-vs-AI combat simulation built for endless, satisfying content loops. The game features two circular fighters bouncing around an arena like a DVD screensaver while wielding one of five unique weapons in a continuous "Beyblade-style" spin. Out of the box, it supports a dynamic 12-color Neon Palette selector prior to initialization.
 
 ### Core Loop
-1. **Countdown** → Cinematic "3-2-1-FIGHT" initiates each round. Fighters spawn close to the center, locked in place but aggressively spinning their weapons. The sequence features punch-in frame animations, screen-flash transitions, and a massive shockwave with screen shake on "FIGHT".
+1. **Countdown** → 4-stage cinematic sequence ("Summon", "Weapon Roulette", "Rev Up", "Fight"). Fighters are summoned with converging particle effects, their weapons are assigned via a sprite-based roulette, and they aggressively rev up their spins before launch. The sequence features punch-in frame animations, screen-flash transitions, and a massive shockwave with screen shake on "FIGHT".
 2. **The Clash** → Fighters are launched directly at the center for a massive choreographed opening clash
 3. **Battle Phase** → Fighters autonomously bounce, collide, and attack via a permanent spin
 4. **Escalation** → Arena Pulse pushes fighters together after 2.5 seconds of inactivity
@@ -311,7 +311,7 @@ This project is built to automate the creation of YouTube Shorts content. It inc
 ### How it works:
 1. The game sends a command directly to OBS in the background to **Start Recording**.
 2. After the winner is announced, the application automatically closes and commands OBS to **Stop Recording** and save your clip.
-3. The saved clip is automatically renamed using a dynamically generated viral title from the `titles.py` pool system.
+3. The saved clip is automatically renamed using a dynamically generated viral title from the `titles.py` pool system. Titles are intelligently selected based on real-time match performance tracking—awarding specific viral titles for "Wire-to-Wire" dominance (maintaining a >10% lead), "Comeback" victories, "Choke" losses, or "Contested" back-and-forth matches. Each category pulls from an expanded pool of 100+ entries.
 
 ### OBS Setup Instructions:
 1. Add a **Window Capture** source and select the Python game window.
