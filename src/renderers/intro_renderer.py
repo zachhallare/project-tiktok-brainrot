@@ -11,6 +11,10 @@ import pygame
 import math
 from config import SCREEN_WIDTH, SCREEN_HEIGHT, WHITE, BLACK, YELLOW
 
+# --- Matchup Label Layout ---
+_LABEL_CENTER_Y  = SCREEN_HEIGHT // 4        # vertical anchor (~150px)
+_LABEL_INSET_X   = SCREEN_WIDTH  // 4        # how far from center each side sits
+
 
 class IntroRenderer:
     """
@@ -19,14 +23,22 @@ class IntroRenderer:
     """
 
     def __init__(self, screen, clock, f1_name, f2_name,
-                 f1_color, f2_color, font_large):
+                 f1_color, f2_color, font_large,
+                 f1_weapon="sword", f2_weapon="sword"):
         self.screen = screen
         self.clock = clock
+        self.f1_weapon = f1_weapon
+        self.f2_weapon = f2_weapon
         self.f1_name = f1_name
         self.f2_name = f2_name
         self.f1_color = f1_color
         self.f2_color = f2_color
         self.font_large = font_large
+        
+        # Pre-bake label fonts once — no per-frame allocation
+        self._font_name   = pygame.font.Font(None, 52)   # fighter name
+        self._font_weapon = pygame.font.Font(None, 26)   # weapon tag
+        self._font_vs = pygame.font.Font(None, 32)
 
     # ------------------------------------------------------------------ #
     #  TITLE SCREEN                                                        #
@@ -41,7 +53,7 @@ class IntroRenderer:
 
         ── To swap intro styles: replace or extend this method only. ──
         """
-        return self._draw_old_title_screen()   # ← change this one line to swap styles
+        return self._draw_old_title_screen()   
 
     # ------------------------------------------------------------------ #
     #  COUNTDOWN OVERLAY                                                   #
@@ -56,7 +68,8 @@ class IntroRenderer:
         Copied verbatim from original draw() — safe to redesign here.
         """
         countdown_text = texts[stage]
-        # ── Silent countdown: hide 3/2/1, only show FIGHT ──
+
+        # ── Stages 0-2: silent but show matchup labels ──────────────────
         if countdown_text != "FIGHT":
             # Still draw the flash on transitions so the beat feels rhythmic
             if flash_timer > 0:
@@ -65,7 +78,16 @@ class IntroRenderer:
                 flash_surf.fill(WHITE)
                 flash_surf.set_alpha(flash_alpha)
                 screen.blit(flash_surf, (0, 0))
-            return  # ← skip all number text rendering
+
+            self._draw_matchup_labels(
+                screen, f1_color, f2_color,
+                self.f1_name, self.f2_name,
+                f1_bright, f2_bright,
+            )
+
+            return 
+
+        # ── Stage 3: FIGHT ──────────────────────────────────────────────
         duration = durations[stage]
         progress = timer / max(1, duration)
         cx = SCREEN_WIDTH // 2
@@ -99,6 +121,93 @@ class IntroRenderer:
             flash_surf.set_alpha(flash_alpha)
             screen.blit(flash_surf, (0, 0))
 
+
+    # ------------------------------------------------------------------ #
+    #  MATCHUP LABEL OVERLAY                                               #
+    # ------------------------------------------------------------------ #
+ 
+    def _draw_matchup_labels(self, screen, f1_color, f2_color,
+                              f1_name, f2_name, f1_bright, f2_bright):
+        """
+        Render left/right matchup cards during the 3/2/1 countdown.
+ 
+        Layout (centered on _LABEL_CENTER_Y):
+            [F1 NAME]          [F2 NAME]
+            [f1 weapon]        [f2 weapon]
+ 
+        Each name gets a soft glow halo in the fighter's bright color.
+        Weapon tag sits 4px below the name, dimmed to 60% brightness.
+        A thin horizontal rule separates name from weapon.
+        """
+        cx      = SCREEN_WIDTH // 2
+        cy      = _LABEL_CENTER_Y
+        left_x  = cx - _LABEL_INSET_X   # center-x of left  card
+        right_x = cx + _LABEL_INSET_X   # center-x of right card
+ 
+        self._draw_label_card(screen, left_x,  cy, self.f1_weapon, f1_name,
+                              f1_color, f1_bright, align='center')
+        self._draw_label_card(screen, right_x, cy, self.f2_weapon, f2_name,
+                              f2_color, f2_bright, align='center')
+
+        # VS indicator — centered between the two cards
+        vs_surf = self._font_vs.render("VS", True, (180, 180, 160))
+        vs_rect = vs_surf.get_rect(center=(cx, cy))
+
+        # Subtle glow behind VS
+        vs_glow = self._font_weapon.render("VS", True, (200, 200, 220))
+        vs_glow.set_alpha(30)
+        for dx, dy in [(-2,0),(2,0),(0,-2),(0,2)]:
+            screen.blit(vs_glow, vs_rect.move(dx, dy))
+
+        screen.blit(vs_surf, vs_rect)
+ 
+ 
+    def _draw_label_card(self, screen, cx, cy, weapon_name, fighter_name,
+                         color, bright_color, align='center'):
+        """
+        Draw a single matchup card: glow halo → name → divider → weapon tag.
+ 
+        Args:
+            cx, cy:       Center anchor point.
+            weapon_name:  Weapon identifier string (e.g. 'axe', 'dagger').
+            fighter_name: Color/fighter name (e.g. 'CYAN', 'PURPLE').
+            color:        Base fighter RGB tuple.
+            bright_color: Brightened fighter RGB for glow.
+            align:        Text alignment — 'center', 'left', or 'right'.
+        """
+        NAME_GAP   = 4    # px between name bottom and divider
+        WEAPON_GAP = 6    # px between divider and weapon tag top
+        RULE_W     = 60   # width of the horizontal divider rule
+        dim_color  = tuple(max(0, int(c * 0.60)) for c in color)
+ 
+        # --- Name surface ---
+        display_name = fighter_name.split("_")[0]
+        name_surf = self._font_name.render(display_name.upper(), True, WHITE)
+        name_rect = name_surf.get_rect(center=(cx, cy))
+ 
+        # Glow halo — 3 offset blits in bright_color at low alpha
+        glow_surf = self._font_name.render(display_name.upper(), True, bright_color)
+        glow_surf.set_alpha(55)
+        for dx, dy in [(-2,0),(2,0),(0,-2),(0,2)]:
+            screen.blit(glow_surf, name_rect.move(dx, dy))
+ 
+        screen.blit(name_surf, name_rect)
+ 
+        # --- Horizontal rule ---
+        rule_y = name_rect.bottom + NAME_GAP
+        rule_x = cx - RULE_W // 2
+        rule_color = tuple(max(0, int(c * 0.50)) for c in color)
+        pygame.draw.line(screen, rule_color,
+                         (rule_x, rule_y), (rule_x + RULE_W, rule_y), 1)
+ 
+        # --- Weapon tag ---
+        weapon_surf = self._font_weapon.render(weapon_name.upper(), True, dim_color)
+        weapon_rect = weapon_surf.get_rect(
+            centerx=cx, top=rule_y + WEAPON_GAP
+        )
+        screen.blit(weapon_surf, weapon_rect)
+
+
     # ------------------------------------------------------------------ #
     #  Shared helpers                                                      #
     # ------------------------------------------------------------------ #
@@ -118,9 +227,9 @@ class IntroRenderer:
         surf = font.render(name.upper(), True, WHITE)
         surf.set_alpha(alpha)
         rect = surf.get_rect()
-        if align == "right":   rect.right = x
-        elif align == "left":  rect.left = x
-        else:                  rect.centerx = x
+        if align == "right": rect.right = x
+        elif align == "left": rect.left = x
+        else: rect.centerx = x
         rect.top = y
         self.screen.blit(surf, rect)
 

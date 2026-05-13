@@ -217,6 +217,8 @@ class Game:
             f1_color=self.f1_color,
             f2_color=self.f2_color,
             font_large=self.font_large,
+            f1_weapon=self.f1_weapon,
+            f2_weapon=self.f2_weapon,
         )
 
         self.outro_renderer = OutroRenderer(self.screen, self.clock, self.font_large)
