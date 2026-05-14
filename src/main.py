@@ -236,18 +236,19 @@ class Game:
     def _lock_fighters_for_countdown(self):
         """Lock fighters in place for countdown — weapons keep spinning."""
         self.blue.locked = True
-        self.red.locked = True
-        self.blue.vx = 0
-        self.blue.vy = 0
-        self.red.vx = 0
-        self.red.vy = 0
-        # Don't zero rotation — let weapons spin during countdown
-        # Just face each other initially
-        self.blue.rotation_angle = 0.0
-        self.blue.sword_angle = 0.0
-        self.red.rotation_angle = math.pi
-        self.red.sword_angle = math.pi
-    
+        self.red.locked  = True
+        self.blue.vx = self.blue.vy = 0
+        self.red.vx  = self.red.vy  = 0
+
+        # Angle weapons ~60° outward so long weapons don't overlap at center
+        # Blue spins clockwise (spin_direction=1), so starting angled up-right
+        # means it naturally sweeps toward the opponent — feels aggressive
+        self.blue.rotation_angle = -(math.pi / 3)   # ~-60° (upper-right)
+        self.blue.sword_angle    = self.blue.rotation_angle
+
+        self.red.rotation_angle  = math.pi + (math.pi / 3)  # ~240° (upper-left)
+        self.red.sword_angle     = self.red.rotation_angle
+        
 
     def _unlock_fighters(self):
         """Unlock fighters and launch them at each other from close range."""
@@ -573,13 +574,14 @@ class Game:
             f.health = f.max_health  # full bars match the intro state
             f.locked = True
             f.trail.clear()
-            f.rotation_angle = 0.0 if f.is_blue else math.pi
-            f.sword_angle = f.rotation_angle
+            f.rotation_angle = -(math.pi / 3) if f.is_blue else math.pi + (math.pi / 3)
+            f.sword_angle    = f.rotation_angle
 
         self.particles.clear()
         self.shockwaves.clear()
         self.damage_numbers.clear()
         self.screen_shake = 0
+        self.round_timer = 0
         self.momentum_bias = 0.0
         self.border_flash_timer = 0
         self.crit_flash_phase = 0
@@ -947,26 +949,32 @@ class Game:
             )
             self.screen.blit(self.bg_logo, logo_rect)
 
-        # Momentum border (copied verbatim from your original draw())
-        if self.momentum_bias >= 0:
-            t = self.momentum_bias
-            cycle_color = self.f1_color if (self.round_timer // 180) % 2 == 0 else self.f2_color
-            base_border = tuple(int(self.f1_color[i] * t + cycle_color[i] * (1 - t)) for i in range(3))
-        else:
-            t = -self.momentum_bias
-            cycle_color = self.f1_color if (self.round_timer // 180) % 2 == 0 else self.f2_color
-            base_border = tuple(int(self.f2_color[i] * t + cycle_color[i] * (1 - t)) for i in range(3))
-
-        if self.border_flash_timer > 0:
-            blend = self.border_flash_timer / max(1, self.border_flash_max)
-            fc = self.border_flash_color
-            border_color = tuple(int(fc[i] * blend + base_border[i] * (1 - blend)) for i in range(3))
-            border_width = int(4 + 8 * blend)
-        else:
-            border_color = base_border
+        # Skip momentum color until combat starts (keeps it neutral until the first hit)
+        if self.round_timer == 0:
+            pulse_color = self.f1_color if (pygame.time.get_ticks() // 333) % 2 == 0 else self.f2_color
+            border_color = tuple(max(0, int(c * 0.7)) for c in pulse_color)
             border_width = 4
+        else:
+            # Momentum border (copied verbatim from your original draw())
+            if self.momentum_bias >= 0:
+                t = self.momentum_bias
+                cycle_color = self.f1_color if (self.round_timer // 180) % 2 == 0 else self.f2_color
+                base_border = tuple(int(self.f1_color[i] * t + cycle_color[i] * (1 - t)) for i in range(3))
+            else:
+                t = -self.momentum_bias
+                cycle_color = self.f1_color if (self.round_timer // 180) % 2 == 0 else self.f2_color
+                base_border = tuple(int(self.f2_color[i] * t + cycle_color[i] * (1 - t)) for i in range(3))
 
-        pygame.draw.rect(self.screen, border_color, arena_rect, border_width)
+            if self.border_flash_timer > 0:
+                blend = self.border_flash_timer / max(1, self.border_flash_max)
+                fc = self.border_flash_color
+                border_color = tuple(int(fc[i] * blend + base_border[i] * (1 - blend)) for i in range(3))
+                border_width = int(4 + 8 * blend)
+            else:
+                border_color = base_border
+                border_width = 4
+
+            pygame.draw.rect(self.screen, border_color, arena_rect, border_width)
 
 
     def _draw_effects(self, offset):
