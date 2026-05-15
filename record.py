@@ -174,82 +174,40 @@ def main():
 
     # TEST MODE
     if is_test_mode:
-        print("\n[TEST MODE] Select test type:")
-        print("  1. Manual Test (pick weapons)")
-        print("  2. Auto Test (headless, all relevant matchups)")
-        print("  3. Visual Auto Test (rendered, all relevant matchups)")
+        print("\n[TEST MODE] Select execution mode:")
+        print("  1. Full Match (Visual)")
+        print("  2. Headless Mode (Fast)")
+        print("  3. Back")
         while True:
-            test_choice = input("Select option (1-3): ").strip()
-            if test_choice in ['1', '2', '3']:
+            exec_choice = input("Select option (1-3): ").strip()
+            if exec_choice in ['1', '2', '3']:
                 break
             print("Please enter 1, 2, or 3.")
 
-        mute_choice = input("\nMute sound effects for this test? (y/n): ").strip().lower()
-        mute_flag = ["--mute-sounds"] if mute_choice == 'y' else []
+        if exec_choice == '3':
+            return main()
 
-        # --- MANUAL TEST ---
-        if test_choice == '1':
-            print("\n[MANUAL TEST] Pick a weapon for each fighter.")
-            f1_weapon = pick_weapon("Fighter 1")
-            f2_weapon = pick_weapon("Fighter 2")
+        is_headless = (exec_choice == '2')
+        mute_flag = []
+        if not is_headless:
+            mute_choice = input("\nMute sound effects for this test? (y/n): ").strip().lower()
+            mute_flag = ["--mute-sounds"] if mute_choice == 'y' else []
 
-            try:
-                count_str = input("\nHow many rounds to test? (Default: 1): ").strip()
-                count = int(count_str) if count_str else 1
-                if count <= 0:
-                    count = 1
-            except ValueError:
-                count = 1
-
-            print(f"\n[MANUAL TEST] Fighter 1: {f1_weapon.upper()}  |  Fighter 2: {f2_weapon.upper()}")
-            print(f"[INFO] Running {count} round(s). OBS recording is disabled.\n")
-
-            for i in range(count):
-                print(f"\n{'='*40}")
-                print(f"[TEST] ROUND {i+1} OF {count}")
-                print(f"{'='*40}")
-                start_time = time.time()
-                subprocess.run([
-                    sys.executable, main_script,
-                    "--test-mode",
-                    "--f1-weapon", f1_weapon,
-                    "--f2-weapon", f2_weapon,
-                ] + mute_flag)
-                elapsed = time.time() - start_time
-                print(f"\n[INFO] Round total duration: {elapsed:.2f}s")
-
-            print("\n" + "=" * 50)
-            print("TEST MATCH(ES) COMPLETE!")
-            print("=" * 50)
-            return
-
-        # --- AUTO TEST ---
-        print("\nSelect auto test scope:")
-        print("  1. All predefined matchups")
-        print("  2. Specific matchup (pick weapons)")
+        print("\n[TEST MODE] Select test scope:")
+        print("  1. One specific combo (pick weapons)")
+        print("  2. All possible combos")
         while True:
             scope_choice = input("Select option (1-2): ").strip()
             if scope_choice in ['1', '2']:
                 break
             print("Please enter 1 or 2.")
-            
-        if scope_choice == '2':
+
+        if scope_choice == '1':
             f1 = pick_weapon("Fighter 1")
             f2 = pick_weapon("Fighter 2")
             AUTO_TEST_COMBOS = [(f1, f2)]
         else:
-            AUTO_TEST_COMBOS = [
-                ('dagger', 'hammer'),
-                ('dagger', 'axe'),
-                ('dagger', 'sword'),
-                ('dagger', 'spear'),
-                ('hammer', 'axe'),
-                ('hammer', 'sword'),
-                ('hammer', 'spear'),
-                ('sword', 'spear'),
-                ('sword', 'axe'),
-                ('spear', 'axe'),
-            ]
+            AUTO_TEST_COMBOS = ALL_COMBOS
 
         try:
             count_str = input("\nHow many rounds per matchup? (Default: 5): ").strip()
@@ -259,29 +217,32 @@ def main():
         except ValueError:
             rounds = 5
 
-        is_headless = (test_choice == '2')
-        test_name = "AUTO TEST" if is_headless else "VISUAL AUTO TEST"
+        test_name = "HEADLESS TEST" if is_headless else "VISUAL TEST"
         total_matches = len(AUTO_TEST_COMBOS) * rounds
         print(f"\n[{test_name}] Running {len(AUTO_TEST_COMBOS)} matchups × {rounds} rounds = {total_matches} total rounds")
-        print(f"[INFO] OBS recording is disabled.\n")
+        print(f"[INFO] OBS recording is disabled.")
+        print(f"[INFO] Side assignment randomized each round (left/right flips 50%).\n")
 
-        all_results = {}  # {(w1, w2): [(winner_weapon, hp_pct), ...]}
+        all_results = {}  # {(w1, w2): [(winner_weapon, hp_pct, elapsed), ...]}
 
         for combo_idx, (w1, w2) in enumerate(AUTO_TEST_COMBOS, 1):
-            combo_label = f"{w1.upper()} vs {w2.upper()}"
+            canonical_label = f"{w1.upper()} vs {w2.upper()}"
             all_results[(w1, w2)] = []
 
             print(f"\n{'='*50}")
-            print(f"  MATCHUP {combo_idx}/{len(AUTO_TEST_COMBOS)}: {combo_label}")
+            print(f"  MATCHUP {combo_idx}/{len(AUTO_TEST_COMBOS)}: {canonical_label}")
             print(f"{'='*50}")
 
             for r in range(1, rounds + 1):
+                f1_weapon, f2_weapon = (w2, w1) if random.random() < 0.5 else (w1, w2)
+                side_label = f"L={f1_weapon.upper()} R={f2_weapon.upper()}"
+
                 start_time = time.time()
                 cmd = [
                     sys.executable, main_script,
                     "--test-mode",
-                    "--f1-weapon", w1,
-                    "--f2-weapon", w2,
+                    "--f1-weapon", f1_weapon,
+                    "--f2-weapon", f2_weapon,
                 ] + mute_flag
                 if is_headless:
                     cmd.append("--headless")
@@ -293,7 +254,6 @@ def main():
                 )
                 elapsed_time = time.time() - start_time
 
-                # Parse the [RESULT] line from stdout
                 winner_weapon = "???"
                 hp_pct = 0
                 for line in result.stdout.splitlines():
@@ -307,25 +267,25 @@ def main():
                         break
 
                 all_results[(w1, w2)].append((winner_weapon, hp_pct, elapsed_time))
-                print(f"    Round {r}: {winner_weapon} won with {hp_pct}% HP left (total time: {elapsed_time:.2f})")
+                print(f"    Round {r} [{side_label}]: {winner_weapon} won with {hp_pct}% HP left ({elapsed_time:.2f}s)")
 
-        # Print final summary
         print("\n\n" + "=" * 60)
-        print("                    AUTO TEST RESULTS")
+        print(f"                    {test_name} RESULTS")
         print("=" * 60)
 
         for combo_idx, (w1, w2) in enumerate(AUTO_TEST_COMBOS, 1):
             results = all_results[(w1, w2)]
             w1_wins = sum(1 for w, _, _ in results if w == w1)
             w2_wins = sum(1 for w, _, _ in results if w == w2)
+            other_wins = rounds - w1_wins - w2_wins
             combo_label = f"{w1} vs {w2}"
 
-            print(f"\n{combo_idx}. {combo_label}  ({w1_wins}-{w2_wins})")
+            print(f"\n{combo_idx}. {combo_label}  ({w1}: {w1_wins}  {w2}: {w2_wins}{'  ???: ' + str(other_wins) if other_wins else ''})")
             for r_idx, (winner_weapon, hp_pct, elapsed_time) in enumerate(results, 1):
-                print(f"    Round {r_idx}: {winner_weapon} won with {hp_pct}% HP left (total time: {elapsed_time:.2f})")
+                print(f"    Round {r_idx}: {winner_weapon} won with {hp_pct}% HP left ({elapsed_time:.2f}s)")
 
         print("\n" + "=" * 60)
-        print("AUTO TEST COMPLETE!")
+        print(f"{test_name} COMPLETE!")
         print("=" * 60)
         return
 
@@ -333,26 +293,13 @@ def main():
     if not check_obs_connection():
         return
 
-    print("\n[BATCH MODE] Select weapon combination pool:")
-    print("  1. Purely Sword vs Sword")
-    print("  2. Randomized 12 specific combos")
-    while True:
-        pool_choice = input("Select option (1-2): ").strip()
-        if pool_choice in ['1', '2']:
-            break
-        print("Please enter 1 or 2.")
-
-    if pool_choice == '1':
-        active_combos = [('sword', 'sword')]
-        tracker_file = "used_combos_sword.json"
-    else:
-        active_combos = [
-            ('sword', 'sword'), ('axe', 'axe'), ('dagger', 'hammer'),
-            ('dagger', 'axe'), ('dagger', 'sword'), ('dagger', 'spear'),
-            ('hammer', 'axe'), ('hammer', 'sword'), ('hammer', 'spear'),
-            ('sword', 'spear'), ('sword', 'axe'), ('spear', 'axe')
-        ]
-        tracker_file = "used_combos_12.json"
+    active_combos = [
+        ('sword', 'sword'), ('axe', 'axe'), ('dagger', 'hammer'),
+        ('dagger', 'axe'), ('dagger', 'sword'), ('dagger', 'spear'),
+        ('hammer', 'axe'), ('hammer', 'sword'), ('hammer', 'spear'),
+        ('sword', 'spear'), ('sword', 'axe'), ('spear', 'axe')
+    ]
+    tracker_file = "used_combos_12.json"
 
     try:
         count = int(input("How many matches? (Max: 100): ").strip())
@@ -396,3 +343,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+    
