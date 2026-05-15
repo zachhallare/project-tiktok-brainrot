@@ -176,12 +176,13 @@ def main():
     if is_test_mode:
         print("\n[TEST MODE] Select test type:")
         print("  1. Manual Test (pick weapons)")
-        print("  2. Auto Test (all relevant matchups)")
+        print("  2. Auto Test (headless, all relevant matchups)")
+        print("  3. Visual Auto Test (rendered, all relevant matchups)")
         while True:
-            test_choice = input("Select option (1-2): ").strip()
-            if test_choice in ['1', '2']:
+            test_choice = input("Select option (1-3): ").strip()
+            if test_choice in ['1', '2', '3']:
                 break
-            print("Please enter 1 or 2.")
+            print("Please enter 1, 2, or 3.")
 
         mute_choice = input("\nMute sound effects for this test? (y/n): ").strip().lower()
         mute_flag = ["--mute-sounds"] if mute_choice == 'y' else []
@@ -223,18 +224,32 @@ def main():
             return
 
         # --- AUTO TEST ---
-        AUTO_TEST_COMBOS = [
-            ('dagger', 'hammer'),
-            ('dagger', 'axe'),
-            ('dagger', 'sword'),
-            ('dagger', 'spear'),
-            ('hammer', 'axe'),
-            ('hammer', 'sword'),
-            ('hammer', 'spear'),
-            ('sword', 'spear'),
-            ('sword', 'axe'),
-            ('spear', 'axe'),
-        ]
+        print("\nSelect auto test scope:")
+        print("  1. All predefined matchups")
+        print("  2. Specific matchup (pick weapons)")
+        while True:
+            scope_choice = input("Select option (1-2): ").strip()
+            if scope_choice in ['1', '2']:
+                break
+            print("Please enter 1 or 2.")
+            
+        if scope_choice == '2':
+            f1 = pick_weapon("Fighter 1")
+            f2 = pick_weapon("Fighter 2")
+            AUTO_TEST_COMBOS = [(f1, f2)]
+        else:
+            AUTO_TEST_COMBOS = [
+                ('dagger', 'hammer'),
+                ('dagger', 'axe'),
+                ('dagger', 'sword'),
+                ('dagger', 'spear'),
+                ('hammer', 'axe'),
+                ('hammer', 'sword'),
+                ('hammer', 'spear'),
+                ('sword', 'spear'),
+                ('sword', 'axe'),
+                ('spear', 'axe'),
+            ]
 
         try:
             count_str = input("\nHow many rounds per matchup? (Default: 5): ").strip()
@@ -244,8 +259,10 @@ def main():
         except ValueError:
             rounds = 5
 
+        is_headless = (test_choice == '2')
+        test_name = "AUTO TEST" if is_headless else "VISUAL AUTO TEST"
         total_matches = len(AUTO_TEST_COMBOS) * rounds
-        print(f"\n[AUTO TEST] Running {len(AUTO_TEST_COMBOS)} matchups × {rounds} rounds = {total_matches} total rounds")
+        print(f"\n[{test_name}] Running {len(AUTO_TEST_COMBOS)} matchups × {rounds} rounds = {total_matches} total rounds")
         print(f"[INFO] OBS recording is disabled.\n")
 
         all_results = {}  # {(w1, w2): [(winner_weapon, hp_pct), ...]}
@@ -260,14 +277,17 @@ def main():
 
             for r in range(1, rounds + 1):
                 start_time = time.time()
+                cmd = [
+                    sys.executable, main_script,
+                    "--test-mode",
+                    "--f1-weapon", w1,
+                    "--f2-weapon", w2,
+                ] + mute_flag
+                if is_headless:
+                    cmd.append("--headless")
+
                 result = subprocess.run(
-                    [
-                        sys.executable, main_script,
-                        "--test-mode",
-                        "--headless",
-                        "--f1-weapon", w1,
-                        "--f2-weapon", w2,
-                    ] + mute_flag,
+                    cmd,
                     capture_output=True,
                     text=True,
                 )

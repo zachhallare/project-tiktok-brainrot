@@ -1,6 +1,10 @@
-tasks:
-- ask how long is the outro because its too long, try to shorten it by a few seconds.
+current task - reducing the time for the video to around 35-45 seconds.
 
+- so they hit either other more: what if we change the movement of the fighters so it naturally goes to the enemy fighter without it being too obvious, it would change the randomized billiard like i was going for but it might help? or what if: thoughts on making the fighters and their weapon a bit bigger? thoughts? be honest.
+
+next task - when doing the five different match ups i noticed its always "fixed". like for example in dagger vs hammer, its always left fighter gets dagger and right fighter gets hammer, they never switch up like sometimes, its hammer vs dagger. itll get repetative in some way for loyal viewers.
+
+next task - the outro where it shows the intro again for the loop should be REALLY quick, as in a split second only, because they loop will be really obvious. thoughts? be honest.
 
 =======================================================
 

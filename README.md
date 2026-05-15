@@ -42,13 +42,13 @@ There is no player failure state—this is an automated simulation. Both fighter
 
 The game features **5 distinct weapon types**, each with unique sprites, hitbox profiles, stat distributions, and special mechanics:
 
-| Weapon   | Reach | Damage | Spin Speed | Knockback | HP  | Move Speed | Special |
-|----------|-------|--------|------------|-----------|-----|------------|---------|
-| **Sword**   | 40px  | 1.05×  | 0.75×      | 1.0×      | 250 | 1.0×       | Balanced all-rounder |
-| **Dagger**  | 20px  | 1.45×  | 0.95×      | 0.5×      | 235 | 1.25×      | 1.6× parry drain, +2 momentum per hit, longer trail |
-| **Spear**   | 148px | 1.20×  | 0.58×      | 0.8×      | 235 | 1.0×       | Massive reach, high handle ratio (0.78) with tip sweet-spot |
-| **Hammer**  | 29px  | 0.72×  | 0.53×      | 0.9×      | 275 | 0.88×      | Reverses defender spin, all hits are sweet-spot, max hitstop on crits |
-| **Axe**     | 33px  | 1.10×  | 0.41×      | 1.5×      | 245 | 0.85×      | Wide hitbox profile, highest knockback |
+| Weapon | Role | Damage Mult | Health | Reach | Speed | Spin Speed | Knockback | Parry Drain | Sweet Spot | Special | Weakness |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| **Sword** | Balanced defender | 1.15 | 250 | 40 | 1.0x | 0.90x | 1.0x | 0.75x cheap | Tip-only (70%) | Cheapest to defend | Burst damage |
+| **Dagger** | Glass cannon | 1.45 | 235 | 20 | 1.25x | 1.0x | 0.5x | 1.6x expensive | Tip-only (70%) | Snowballs fast (2 stacks) | Dies to anything tanky |
+| **Spear** | Range controller | 1.10 | 248 | 120 | 1.05x | 0.58x | 0.8x | 1.0x normal | Extreme tip (82%) | Hard to hit with | Disrupted by spin reversal |
+| **Axe** | Heavy pusher | 1.10 | 245 | 33 | 0.85x | 0.41x | 1.2x | 1.0x normal | Wide head (68%) | Launches opponents | Slow, predictable |
+| **Hammer** | Disruptor | 0.92 | 255 | 29 | 0.96x | 0.53x | 0.9x | 1.4x threatening | Full body | Reverses spin on hit | Low damage output |
 
 Each weapon has a unique **hitbox profile** — a series of `(t, half_width)` sampling points along the blade that define the cross-sectional collision shape. This means the Spear's narrow tip behaves differently from the Axe's wide head.
 
@@ -207,9 +207,11 @@ project_root/
 │   ├── audios/
 │   │   ├── combat/          # Hit, clash, death sounds
 │   │   ├── countdown/       # Beep and fight sounds
-│   │   └── feedback/        # Arena pulse sounds
+│   │   ├── ending/          # Winner celebration
+│   │   ├── feedback/        # Arena pulse sounds
+│   │   └── weapon/          # Weapon sounds
 │   └── images/
-│       ├── logos/            # Arena watermark
+│       ├── logos/           # Arena watermark
 │       └── weapons/         # Weapon sprite PNGs (sword, dagger, spear, axe, hammer)
 ├── docs/
 │   └── todo.md              # Development notes and future plans
@@ -227,6 +229,8 @@ project_root/
 │   │   └── sound_manager.py  # Centralized sound preloading and playback
 │   └── renderers/
 │       ├── fighter_renderer.py # Sprite-based weapon rendering and body/trail drawing
+│       ├── intro_renderer.py   # Cinematic 4-stage countdown sequence
+│       ├── outro_renderer.py   # Winner announcement and post-match sequence
 │       └── ui_renderer.py      # Tekken-style HUD with health bars and danger effects
 ├── record.py                # Batch recording + manual/auto test runner
 ├── used_titles.json         # Persistent title tracker (prevents repeated video titles)

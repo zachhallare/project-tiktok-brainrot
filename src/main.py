@@ -348,7 +348,7 @@ class Game:
         """Handle round end."""
         self.round_ending = True
         self.winner = winner
-        self.reset_timer = 0 if getattr(self, 'is_headless', False) else 120
+        self.reset_timer = 0 if getattr(self, 'is_headless', False) else 75
         
         if winner == self.blue:
             self.winner_text = "WINS"
@@ -742,9 +742,11 @@ class Game:
                 pygame.event.post(pygame.event.Event(pygame.QUIT))
                 return
 
-            self.particles.update()
-            self.shockwaves.update()
-            self.arena_pulses.update()
+            # Stop updating effects once wipe has started — kills the lingering particle bug
+            if not self.loop_wipe_is_closing:
+                self.particles.update()
+                self.shockwaves.update()
+                self.arena_pulses.update()
             return
         
         self.round_timer += 1
@@ -902,7 +904,7 @@ class Game:
         Winner announcement screen. Delegate to outro_renderer.
         Editing outro_renderer.py cannot affect combat draw logic.
         """
-        if not (self.round_ending and self.winner_text and self.reset_timer < 80):
+        if not (self.round_ending and self.winner_text and self.reset_timer < 55):
             return
         if self.loop_wipe_is_closing or self.loop_wipe_done:       # wipe has begun, hide winner screen
             return
@@ -992,7 +994,7 @@ class Game:
             # Wipe is pulling back — reveal fighters at intro positions
             self.blue.draw(self.screen, offset)
             self.red.draw(self.screen, offset)
-        elif self.reset_timer > 80:
+        elif self.reset_timer > 55:
             winner = self.winner
             if winner:
                 winner.draw(self.screen, offset)

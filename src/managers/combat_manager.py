@@ -259,14 +259,14 @@ class CombatManager:
             sweet_spot_threshold = attacker.weapon_config.get("sweet_spot_threshold", 0.70)
 
             if not all_sweet_spot and impact_ratio < sweet_spot_threshold:
-                base_damage     = 13
+                base_damage     = 15
                 shake_intensity = 4
                 spark_count     = 10
                 spark_color     = (255, 255, 0)
                 spark_size      = 4
                 is_sweet_spot   = False
             else:
-                base_damage     = 18
+                base_damage     = 21
                 shake_intensity = 15
                 spark_count     = 30
                 spark_color     = (255, 100, 0) if random.random() < 0.5 else (255, 0, 0)
@@ -302,12 +302,12 @@ class CombatManager:
 
                 # Apply weapon-specific effects (e.g., Hammer's spin reversal)
                 if attacker.weapon_config.get("reverses_spin", False):
-                    defender.spin_direction *= -1
+                    if random.random() < 0.60:
+                        defender.spin_direction *= -1
 
                 # Hammer hitstop override for extreme impact feel
                 if attacker.weapon_config.get("max_hitstop", False):
-                    if is_crit: game.hit_stop = max(game.hit_stop, HAMMER_HIT_STOP_FRAMES)
-                    else:       game.hit_stop = max(game.hit_stop, HAMMER_NORMAL_HIT_STOP)
+                    game.hit_stop = max(game.hit_stop, HAMMER_HIT_STOP_FRAMES)
 
                 # High-impact cinematic sequences for critical hits
                 if is_crit and is_sweet_spot:
