@@ -179,7 +179,7 @@ WEAPON_CONFIGS = {
         'sprite_file': 'dagger.png',
         'sprite_size': (48, 14),
         'sword_length': 20,
-        'damage_mult': 1.45, # Glass cannon — high damage, low reach.
+        'damage_mult': 1.62, # Glass cannon — high damage, low reach.
         'handle_ratio': 0.30,
         'hitbox_profile': [(0.30, 4), (0.60, 5), (0.85, 4), (1.00, 2)],
         'spin_speed_mult': 1.0,   # Very fast rotation.
@@ -190,8 +190,8 @@ WEAPON_CONFIGS = {
         'max_hitstop': False,
         'parry_drain_mult': 1.6,  # Aggressive: drains opponent's energy fast.
         'momentum_gain': 2,       
-        'base_health': 235,       # Fragile.
-        'move_speed_mult': 1.25,  # Highest agility.
+        'base_health': 250,       # Fragile.
+        'move_speed_mult': 1.35,  # Highest agility.
         'trail_length': 12        # Enhanced visual flair.
     },
 
@@ -219,18 +219,18 @@ WEAPON_CONFIGS = {
         'sprite_file': 'axe.png',
         'sprite_size': (70, 32),
         'sword_length': 33,
-        'damage_mult': 1.10,
+        'damage_mult': 1.27,
         'handle_ratio': 0.45,
         'hitbox_profile': [(0.45, 4), (0.62, 14), (0.78, 18), (0.90, 16), (1.00, 10)],
-        'spin_speed_mult': 0.41,
-        'knockback_mult': 1.35,    
+        'spin_speed_mult': 0.55,
+        'knockback_mult': 1.05,    
         'sweet_spot_threshold': 0.68,
         'all_sweet_spot': False,
         'reverses_spin': False,
         'max_hitstop': False,
         'parry_drain_mult': 1.0,
         'momentum_gain': 1,
-        'base_health': 245,
+        'base_health': 215,
         'move_speed_mult': 0.85,
         'trail_length': 8
     },
@@ -239,7 +239,7 @@ WEAPON_CONFIGS = {
         'sprite_file': 'hammer.png',
         'sprite_size': (63, 25),
         'sword_length': 29,
-        'damage_mult': 0.92,
+        'damage_mult': 0.88,
         'handle_ratio': 0.48,
         'hitbox_profile': [(0.48, 4), (0.65, 20), (0.80, 22), (0.93, 22), (1.00, 18)],
         'spin_speed_mult': 0.53,

@@ -42,13 +42,20 @@ There is no player failure state—this is an automated simulation. Both fighter
 
 The game features **5 distinct weapon types**, each with unique sprites, hitbox profiles, stat distributions, and special mechanics:
 
-| Weapon | Role | Damage Mult | Health | Reach | Speed | Spin Speed | Knockback | Parry Drain | Sweet Spot | Special | Weakness |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| **Sword** | Balanced defender | 1.15 | 250 | 40 | 1.0x | 0.90x | 1.0x | 0.75x cheap | Tip-only (70%) | Cheapest to defend | Burst damage |
-| **Dagger** | Glass cannon | 1.45 | 235 | 20 | 1.25x | 1.0x | 0.5x | 1.6x expensive | Tip-only (70%) | Snowballs fast (2 stacks) | Dies to anything tanky |
-| **Spear** | Range controller | 1.10 | 248 | 120 | 1.05x | 0.58x | 0.8x | 1.0x normal | Extreme tip (82%) | Hard to hit with | Disrupted by spin reversal |
-| **Axe** | Heavy pusher | 1.10 | 245 | 33 | 0.85x | 0.41x | 1.2x | 1.0x normal | Wide head (68%) | Launches opponents | Slow, predictable |
-| **Hammer** | Disruptor | 0.92 | 255 | 29 | 0.96x | 0.53x | 0.9x | 1.4x threatening | Full body | Reverses spin on hit | Low damage output |
+| Weapon | Role | Health | Damage Mult | Reach | Special |
+|---|---|---|---|---|---|
+| **Sword** | Balanced defender | 250 | 1.15x | 40 | Cheapest to defend |
+| **Dagger** | Aggressive rusher | 250 | 1.62x | 20 | Snowballs fast (2 momentum stacks) |
+| **Spear** | Range controller | 255 | 1.10x | 120 | Extreme reach |
+| **Axe** | Heavy pusher | 215 | 1.27x | 33 | Launches opponents |
+| **Hammer** | Disruptor | 255 | 0.88x | 29 | Reverses spin on hit |
+
+### Matchups
+- **Dagger** counters **Hammer**
+- **Hammer** counters **Sword** and **Axe**
+- **Spear** counters **Sword**
+- **Dagger** and **Spear** trade roughly evenly
+- **Axe** is the "honest" weapon — no dominant matchups, no terrible ones
 
 Each weapon has a unique **hitbox profile** — a series of `(t, half_width)` sampling points along the blade that define the cross-sectional collision shape. This means the Spear's narrow tip behaves differently from the Axe's wide head.
 

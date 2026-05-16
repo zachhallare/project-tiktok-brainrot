@@ -27,7 +27,7 @@ except ImportError:
 
 
 WEAPON_NAMES = ['sword', 'dagger', 'spear', 'axe', 'hammer']
-ALL_COMBOS = list(itertools.combinations_with_replacement(WEAPON_NAMES, 2))
+ALL_COMBOS = list(itertools.combinations(WEAPON_NAMES, 2)) + [('sword', 'sword'), ('axe', 'axe')]
 COMBO_TRACKER_FILE = "used_weapon_combos.json"
 
 
@@ -255,6 +255,7 @@ def main():
                 elapsed_time = time.time() - start_time
 
                 winner_weapon = "???"
+                winner_side = "???"
                 hp_pct = 0
                 for line in result.stdout.splitlines():
                     if line.startswith("[RESULT]"):
@@ -262,12 +263,14 @@ def main():
                         for p in parts:
                             if p.startswith("winner="):
                                 winner_weapon = p.split("=", 1)[1]
+                            elif p.startswith("side="):
+                                winner_side = p.split("=", 1)[1]
                             elif p.startswith("hp_pct="):
                                 hp_pct = int(p.split("=", 1)[1])
                         break
 
-                all_results[(w1, w2)].append((winner_weapon, hp_pct, elapsed_time))
-                print(f"    Round {r} [{side_label}]: {winner_weapon} won with {hp_pct}% HP left ({elapsed_time:.2f}s)")
+                all_results[(w1, w2)].append((winner_weapon, winner_side, hp_pct, elapsed_time))
+                print(f"    Round {r} [{side_label}]: {winner_side}-{winner_weapon} won with {hp_pct}% HP left ({elapsed_time:.2f}s)")
 
         print("\n\n" + "=" * 60)
         print(f"                    {test_name} RESULTS")
@@ -275,14 +278,21 @@ def main():
 
         for combo_idx, (w1, w2) in enumerate(AUTO_TEST_COMBOS, 1):
             results = all_results[(w1, w2)]
-            w1_wins = sum(1 for w, _, _ in results if w == w1)
-            w2_wins = sum(1 for w, _, _ in results if w == w2)
-            other_wins = rounds - w1_wins - w2_wins
             combo_label = f"{w1} vs {w2}"
-
-            print(f"\n{combo_idx}. {combo_label}  ({w1}: {w1_wins}  {w2}: {w2_wins}{'  ???: ' + str(other_wins) if other_wins else ''})")
-            for r_idx, (winner_weapon, hp_pct, elapsed_time) in enumerate(results, 1):
-                print(f"    Round {r_idx}: {winner_weapon} won with {hp_pct}% HP left ({elapsed_time:.2f}s)")
+            
+            if w1 == w2:
+                left_wins = sum(1 for _, side, _, _ in results if side == "L")
+                right_wins = sum(1 for _, side, _, _ in results if side == "R")
+                other_wins = rounds - left_wins - right_wins
+                print(f"\n{combo_idx}. {combo_label}  (Left: {left_wins}  Right: {right_wins}{'  ???: ' + str(other_wins) if other_wins else ''})")
+            else:
+                w1_wins = sum(1 for w, _, _, _ in results if w == w1)
+                w2_wins = sum(1 for w, _, _, _ in results if w == w2)
+                other_wins = rounds - w1_wins - w2_wins
+                print(f"\n{combo_idx}. {combo_label}  ({w1}: {w1_wins}  {w2}: {w2_wins}{'  ???: ' + str(other_wins) if other_wins else ''})")
+                
+            for r_idx, (winner_weapon, winner_side, hp_pct, elapsed_time) in enumerate(results, 1):
+                print(f"    Round {r_idx}: {winner_side}-{winner_weapon} won with {hp_pct}% HP left ({elapsed_time:.2f}s)")
 
         print("\n" + "=" * 60)
         print(f"{test_name} COMPLETE!")

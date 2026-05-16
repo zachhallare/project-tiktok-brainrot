@@ -387,7 +387,8 @@ class Game:
         # Structured result for auto-test parsing
         if self.is_test_mode:
             duration = time.time() - self.match_start_real_time
-            print(f"[RESULT] winner={winner_weapon} hp_pct={hp_percent:.0f} time={duration:.2f}s")
+            winner_side = "L" if winner == self.blue else "R"
+            print(f"[RESULT] winner={winner_weapon} side={winner_side} hp_pct={hp_percent:.0f} time={duration:.2f}s")
 
         # Determine HP Category
         if hp_percent == 0:

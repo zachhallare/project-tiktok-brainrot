@@ -1,5 +1,12 @@
+todos
+
+- the small particles for every bounce off the wall so there's the feeling of friction. has already been implemented, check claude history.
+
+- try changing up the arena pulse system design aesthetically (diff color, diff style, more animation like multiple boxes going smaller, etc). found in main.py and effects.py
+
 
 =======================================================
+
 
 what if only:
 
