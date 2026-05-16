@@ -98,8 +98,8 @@ SLOW_MOTION_SPEED = 0.20 # Intensity of the final blow's cinematic slowdown.
 # --- Hit Feedback (Juice) ---
 # Hit-stop (freezing the simulation) creates a sense of physical impact weight.
 HIT_STOP_FRAMES = 8
-HAMMER_NORMAL_HIT_STOP = 10      # Heavy weapon impact.
-HAMMER_HIT_STOP_FRAMES = 20      # Critical heavy weapon impact.
+HAMMER_NORMAL_HIT_STOP = 7      # Heavy weapon impact.
+HAMMER_HIT_STOP_FRAMES = 13      # Critical heavy weapon impact.
 SCREEN_SHAKE_INTENSITY = 15
 SCREEN_SHAKE_DECAY = 0.85
 
@@ -159,7 +159,7 @@ WEAPON_CONFIGS = {
         'sprite_file': 'sword.png',
         'sprite_size': (87, 23),
         'sword_length': 40,
-        'damage_mult': 1.15,
+        'damage_mult': 1.20,
         'handle_ratio': 0.25,
         'hitbox_profile': [(0.25, 6), (0.50, 9), (0.75, 7), (1.00, 4)],
         'spin_speed_mult': 0.90, # Balanced rotation.
@@ -250,7 +250,7 @@ WEAPON_CONFIGS = {
         'max_hitstop': True,      # Forces dramatic freeze frames on every hit.
         'parry_drain_mult': 1.0,
         'momentum_gain': 0,
-        'base_health': 255,       # Tank profile.
+        'base_health': 232,       # Tank profile.
         'move_speed_mult': 0.96,
         'trail_length': 8
     },
