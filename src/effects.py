@@ -11,7 +11,7 @@ import pygame
 import math
 import random
 
-from config import WHITE, YELLOW, PURPLE, GOLD, DAMAGE_NUMBER_LIFETIME, DAMAGE_NUMBER_SPEED
+from config import WHITE, GRAY, PULSE_WHITE, YELLOW, PURPLE, GOLD, DAMAGE_NUMBER_LIFETIME, DAMAGE_NUMBER_SPEED
 
 
 class Particle:
@@ -180,18 +180,18 @@ class ShockwaveSystem:
 
 
 class ArenaPulse:
-    """Visual wave that collapses from the arena borders toward the center.
+    """A quick border ping that collapses from the arena edges toward the center.
 
-    Used as an 'anti-staleness' mechanic to visually signal an impending 
-    physics boost when fighters are inactive.
+    Designed as a subtle peripheral signal — thin, fast, and unobtrusive so it
+    doesn't compete with the fighters for viewer attention.
     """
     
-    def __init__(self, arena_bounds, color=PURPLE):
+    def __init__(self, arena_bounds, color=PULSE_WHITE):
         self.ax, self.ay, self.aw, self.ah = arena_bounds
         self.color = color
-        self.progress = 0.0  # 0 = at borders, 1 = at center
-        self.lifetime = 30
-        self.max_lifetime = 30
+        self.progress = 0.0
+        self.lifetime = 20          # Shorter lifetime = snappier, less distracting
+        self.max_lifetime = 20
     
     def update(self):
         """Progresses the pulse toward the center."""
@@ -200,15 +200,16 @@ class ArenaPulse:
         return self.lifetime > 0
     
     def draw(self, surface, offset=(0, 0)):
-        """Renders the collapsing pulse rectangle with a neon glow."""
+        """Renders a single thin collapsing rectangle — clean border ping."""
         if self.lifetime <= 0:
             return
         
         ox, oy = offset
         alpha = self.lifetime / self.max_lifetime
         
-        # Calculate shrinking rectangle representing the pulse wave
-        shrink = self.progress * min(self.aw, self.ah) / 2 * 0.8
+        # Collapse inward to ~40% of the arena's smaller dimension
+        max_shrink = min(self.aw, self.ah) / 2 * 0.40
+        shrink = self.progress * max_shrink
         pulse_rect = pygame.Rect(
             int(self.ax + shrink + ox),
             int(self.ay + shrink + oy),
@@ -216,19 +217,12 @@ class ArenaPulse:
             int(self.ah - shrink * 2)
         )
         
-        # Draw pulsing ring
-        thickness = max(3, int(8 * alpha))
+        if pulse_rect.width <= 0 or pulse_rect.height <= 0:
+            return
+        
         r, g, b = self.color
         fade_color = (int(r * alpha), int(g * alpha), int(b * alpha))
-        pygame.draw.rect(surface, fade_color, pulse_rect, thickness)
-        
-        # Inner glow line for 'juice'
-        if thickness > 2:
-            inner_rect = pulse_rect.inflate(-4, -4)
-            glow_color = (min(255, int(r * alpha * 1.5)), 
-                         min(255, int(g * alpha * 1.5)), 
-                         min(255, int(b * alpha * 1.5)))
-            pygame.draw.rect(surface, glow_color, inner_rect, 2)
+        pygame.draw.rect(surface, fade_color, pulse_rect, 2)  # Thin 2px outline only
 
 
 class ArenaPulseSystem:
@@ -237,7 +231,7 @@ class ArenaPulseSystem:
     def __init__(self):
         self.pulses = []
     
-    def add(self, arena_bounds, color=PURPLE):
+    def add(self, arena_bounds, color=PULSE_WHITE):
         self.pulses.append(ArenaPulse(arena_bounds, color))
     
     def update(self):

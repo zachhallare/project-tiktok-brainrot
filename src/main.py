@@ -34,7 +34,7 @@ except ImportError:
 # Import constants and classes from other modules.
 from config import (
     SCREEN_WIDTH, SCREEN_HEIGHT, CANVAS_WIDTH, CANVAS_HEIGHT, DISPLAY_WIDTH, DISPLAY_HEIGHT, FPS,
-    WHITE, PURPLE, BLACK, ARENA_BG, DARK_GRAY, GRAY, YELLOW,
+    WHITE, PURPLE, BLACK, ARENA_BG, DARK_GRAY, GRAY, YELLOW, PULSE_WHITE,
     ARENA_MARGIN, ARENA_WIDTH, ARENA_HEIGHT,
     ROUND_MAX_TIME, BASE_KNOCKBACK, DAMAGE_PER_HIT, SLOW_MOTION_SPEED,
     HIT_STOP_FRAMES, SCREEN_SHAKE_INTENSITY, SCREEN_SHAKE_DECAY,
@@ -287,7 +287,7 @@ class Game:
 
     def _trigger_arena_pulse(self):
         """Trigger Arena Pulse."""
-        self.arena_pulses.add(tuple(self.arena_bounds), PURPLE)
+        self.arena_pulses.add(tuple(self.arena_bounds), PULSE_WHITE)
         self.screen_shake = ARENA_PULSE_SHAKE
         
         # Play arena pulse sound

@@ -209,40 +209,44 @@ All sound effects are managed through a centralized `SoundManager` that preloads
 
 ### Project Structure
 ```text
-project_root/
-├── assets/
-│   ├── audios/
-│   │   ├── combat/          # Hit, clash, death sounds
-│   │   ├── countdown/       # Beep and fight sounds
-│   │   ├── ending/          # Winner celebration
-│   │   ├── feedback/        # Arena pulse sounds
-│   │   └── weapon/          # Weapon sounds
+project-tiktok-brainrot/
+│
+├── assets/                          # All static media assets
+│   ├── audios/                      # Categorized sound effect library
+│   │   ├── combat/                  # Hit, clash, and death impact sounds
+│   │   ├── countdown/               # Pre-match beep and "FIGHT!" cue
+│   │   ├── ending/                  # Post-match winner fanfare
+│   │   ├── feedback/                # Arena pulse / ambient crowd audio
+│   │   └── weapons/                 # Per-weapon swing and impact sounds
 │   └── images/
-│       ├── logos/           # Arena watermark
-│       └── weapons/         # Weapon sprite PNGs (sword, dagger, spear, axe, hammer)
-├── docs/
-│   └── todo.md              # Development notes and future plans
-├── src/
-│   ├── config.py            # Constants, physics values, weapon configs, and color palette
-│   ├── effects.py           # Particle, shockwave, arena pulse, and damage number systems
-│   ├── main.py              # Main game loop, window management, and CLI entry point
-│   ├── titles.py            # Dynamic title pool generation for viral video naming
-│   ├── utils.py             # Helpful utilities
+│       ├── logos/                   # AlgoRot watermark overlay (PNG)
+│       └── weapons/                 # Weapon sprite sheets (sword, dagger, spear, axe, hammer)
+│
+├── src/                             # Core simulation source code
+│   ├── config.py                    # Central config: physics constants, weapon profiles, color palette, window settings
+│   ├── effects.py                   # Visual FX engine: particles, shockwaves, arena pulses, floating damage numbers
+│   ├── main.py                      # Entry point: game loop, state machine, CLI argument parsing (--headless, --muted)
+│   ├── titles.py                    # Viral title generator: pools of hook-driven titles keyed by weapon matchup and outcome
+│   ├── utils.py                     # Shared math helpers: lerp(), angle_lerp(), clamp()
+│   │
 │   ├── entities/
-│   │   └── fighter.py       # Core fighter state, movement, and weapon integration
+│   │   └── fighter.py               # Fighter dataclass: position, velocity, HP, stamina, weapon state, bounce physics
+│   │
 │   ├── managers/
-│   │   ├── combat_manager.py # Profile-based hit detection, parry, guard break, damage calc
-│   │   ├── obs_manager.py    # OBS WebSocket integration for automated recording
-│   │   └── sound_manager.py  # Centralized sound preloading and playback
+│   │   ├── combat_manager.py        # Combat logic: hit detection, damage calculation, parry windows, guard breaks, knockback
+│   │   ├── obs_manager.py           # OBS Studio automation: WebSocket connect/start/stop recording, viral file renaming
+│   │   └── sound_manager.py         # Sound system: asset preloading, volume control, per-event playback routing
+│   │
 │   └── renderers/
-│       ├── fighter_renderer.py # Sprite-based weapon rendering and body/trail drawing
-│       ├── intro_renderer.py   # Cinematic 4-stage countdown sequence
-│       ├── outro_renderer.py   # Winner announcement and post-match sequence
-│       └── ui_renderer.py      # Tekken-style HUD with health bars and danger effects
-├── record.py                # Batch recording + manual/auto test runner
-├── used_titles.json         # Persistent title tracker (prevents repeated video titles)
-├── requirements.txt         # Python dependencies
-└── .env                     # OBS WebSocket credentials (OBS_PORT, OBS_PASSWORD)
+│       ├── fighter_renderer.py      # Fighter drawing: sprite-based weapon overlay, body glow, motion trail
+│       ├── intro_renderer.py        # Cinematic intro: 4-stage countdown (matchup card → 3-2-1 → FIGHT!)
+│       ├── outro_renderer.py        # Post-match sequence: winner reveal, replay loop, fade-out
+│       └── ui_renderer.py           # HUD: Tekken-style health bars, stamina meters, round timer, danger effects
+│
+├── record.py                        # Orchestrator: batch recording pipeline, retry logic, test/headless runner
+├── used_combos_12.json              # Persistent pool tracker — cycles all 12 weapon combos before repeating
+├── used_titles.json                 # Persistent title tracker — prevents duplicate video titles across sessions
+├── requirements.txt                 # Python dependencies (pygame, obsws-python, python-dotenv)
 ```
 
 ---

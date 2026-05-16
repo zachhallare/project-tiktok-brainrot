@@ -36,6 +36,7 @@ ARENA_BG = (26, 26, 26)
 WHITE = (255, 255, 255)
 DARK_GRAY = (30, 30, 30)
 GRAY = (60, 60, 60)
+PULSE_WHITE = (220, 215, 200)  # Warm off-white for arena pulse — visible on dark BG, no fighter clash.
 YELLOW = (255, 220, 100)
 PURPLE = (200, 100, 255)
 

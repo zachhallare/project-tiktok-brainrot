@@ -86,7 +86,7 @@ class OBSManager:
             try:
                 self.obs_client.start_record()
                 self.is_recording = True
-                print("[OBS] 🎥 Camera Rolling! Recording Started.")
+                print("[OBS] Camera Rolling! Recording Started.")
             except Exception as e:
                 print(f"[OBS] Start recording failed: {e}")
 
