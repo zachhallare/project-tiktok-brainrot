@@ -1042,6 +1042,7 @@ class Game:
             self.game_state = 'PLAYING'
             if not getattr(self, 'is_headless', False):
                 self.obs_manager.start_recording()
+                self.recording_start_time = time.time()
             self.obs_startup_timer = 60
         elif "--test-mode" in sys.argv:
             self.game_state = 'PLAYING'
@@ -1058,6 +1059,7 @@ class Game:
                         if self.game_state == 'TITLE':
                             self.game_state = 'PLAYING'
                             self.obs_manager.start_recording()  # Start OBS
+                            self.recording_start_time = time.time()
                             self.obs_startup_timer = 60  # Delay on start
                         else:
                             self.paused = not self.paused
@@ -1070,6 +1072,7 @@ class Game:
                     if self.game_state == 'TITLE':
                         self.game_state = 'PLAYING'
                         self.obs_manager.start_recording()  # Start OBS
+                        self.recording_start_time = time.time()
                         self.obs_startup_timer = 60  # Delay on start
             
             if self.game_state == 'TITLE':
@@ -1079,6 +1082,7 @@ class Game:
                     if should_start:
                         self.game_state = 'PLAYING'
                         self.obs_manager.start_recording()
+                        self.recording_start_time = time.time()
                         self.obs_startup_timer = 60
             else:
                 self.update()
@@ -1090,6 +1094,8 @@ class Game:
         
         # Stop OBS before shutting down entirely
         if not getattr(self, 'is_headless', False):
+            video_duration = time.time() - getattr(self, 'recording_start_time', time.time())
+            print(f"[VIDEO_DURATION] {video_duration:.2f}")
             self.obs_manager.stop_recording(getattr(self, 'viral_title_idea', None))
         pygame.quit()
 

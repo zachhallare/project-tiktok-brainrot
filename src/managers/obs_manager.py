@@ -153,7 +153,10 @@ class OBSManager:
                         except OSError:
                             # File likely still locked by OBS encoder/muxer
                             time.sleep(retry_delay)
-                            
+
+                    if success:
+                        # Emit parseable path so the orchestrator can delete rejected videos
+                        print(f"[VIDEO_PATH] {new_path}")
                     if not success:
                         print(f"[OBS] Failed to rename. File might still be locked: {latest_file}")
                 else:

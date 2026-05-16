@@ -108,6 +108,49 @@ def next_random_combo(active_combos: list, tracker_file: str) -> tuple:
     return w1, w2, chosen_idx
 
 
+def _pick_next_combo(active_combos: list, tracker_file: str) -> tuple:
+    """Pick the next combo from the pool WITHOUT committing it to the tracker.
+
+    This is step 1 of a two-phase commit. The combo index is only saved to
+    disk once the resulting video is confirmed within the duration limit.
+
+    Args:
+        active_combos: The list of available (w1, w2) tuples.
+        tracker_file: Path to the JSON tracker file.
+
+    Returns:
+        tuple: (f1_weapon, f2_weapon, combo_index)
+    """
+    used = _load_used_indices(tracker_file)
+    available = [i for i in range(len(active_combos)) if i not in used]
+    if not available:
+        print(f"\n[INFO] All {len(active_combos)} weapon combos used. Resetting pool.")
+        used = []
+        available = list(range(len(active_combos)))
+
+    chosen_idx = random.choice(available)
+    w1, w2 = active_combos[chosen_idx]
+    if random.random() < 0.5:
+        w1, w2 = w2, w1
+    return w1, w2, chosen_idx
+
+
+def _commit_combo(chosen_idx: int, tracker_file: str):
+    """Persist a combo index to the used-combos tracker.
+
+    This is step 2 of a two-phase commit, called only after the resulting
+    video is confirmed to be within the duration limit.
+
+    Args:
+        chosen_idx: The index of the combo in the active_combos list.
+        tracker_file: Path to the JSON tracker file.
+    """
+    used = _load_used_indices(tracker_file)
+    if chosen_idx not in used:
+        used.append(chosen_idx)
+        _save_used_indices(used, tracker_file)
+
+
 def check_obs_connection() -> bool:
     """Blocking safety gate that verifies OBS Studio is open and WebSocket-enabled.
 
@@ -311,6 +354,9 @@ def main():
     ]
     tracker_file = "used_combos_12.json"
 
+    MAX_VIDEO_DURATION = 45.0   # seconds — videos over this are discarded and retried
+    MAX_RETRIES = 3             # attempts per combo before moving on
+
     try:
         count = int(input("How many matches? (Max: 100): ").strip())
         if count <= 0:
@@ -325,33 +371,98 @@ def main():
 
     print(f"\n[INFO] Starting Batch Recording — {count} match(es) — weapons randomized per match")
     print(f"[INFO] Combo pool: {len(active_combos)} unique matchups tracked in '{tracker_file}'")
+    print(f"[INFO] Duration gate: ≤{MAX_VIDEO_DURATION}s | Max retries per combo: {MAX_RETRIES}")
     print("[INFO] OBS confirmed open. Starting batch...\n")
 
-    for i in range(count):
-        f1_weapon, f2_weapon, combo_idx = next_random_combo(active_combos, tracker_file)
+    successful = 0
+    while successful < count:
+        f1_weapon, f2_weapon, combo_idx = _pick_next_combo(active_combos, tracker_file)
         combo_label = f"{f1_weapon.upper()} vs {f2_weapon.upper()}"
 
         print(f"\n{'='*40}")
-        print(f"[BATCH] MATCH {i+1} OF {count}  |  {combo_label}  (combo #{combo_idx})")
+        print(f"[BATCH] VIDEO {successful + 1} OF {count}  |  {combo_label}  (combo #{combo_idx})")
         print(f"{'='*40}")
 
-        subprocess.run([
-            sys.executable, main_script,
-            "--auto-start",
-            "--f1-weapon", f1_weapon,
-            "--f2-weapon", f2_weapon
-        ])
+        video_accepted = False
 
-        if i < count - 1:
-            print("\n[INFO] Waiting 3 seconds for OBS to save...")
+        for attempt in range(1, MAX_RETRIES + 1):
+            if attempt > 1:
+                print(f"\n[RETRY] Attempt {attempt}/{MAX_RETRIES} — retrying same combo ({combo_label})...")
+
+            # Stream subprocess output in real-time AND capture it for parsing
+            cmd = [
+                sys.executable, main_script,
+                "--auto-start",
+                "--f1-weapon", f1_weapon,
+                "--f2-weapon", f2_weapon
+            ]
+            proc = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True
+            )
+            output_lines = []
+            for line in proc.stdout:
+                print(line, end='', flush=True)
+                output_lines.append(line)
+            proc.wait()
+
+            # Parse [VIDEO_DURATION] and [VIDEO_PATH] from output
+            duration = None
+            video_path = None
+            for line in output_lines:
+                if line.startswith("[VIDEO_DURATION]"):
+                    try:
+                        duration = float(line.split()[1])
+                    except (IndexError, ValueError):
+                        pass
+                elif line.startswith("[VIDEO_PATH]"):
+                    video_path = line[len("[VIDEO_PATH]"):].strip()
+
+            print("\n[INFO] Waiting 3 seconds for OBS to finalize...")
             time.sleep(3)
+
+            # Duration unknown — accept by default to avoid getting stuck
+            if duration is None:
+                print("[WARN] Could not read video duration. Accepting by default.")
+                _commit_combo(combo_idx, tracker_file)
+                successful += 1
+                video_accepted = True
+                break
+
+            print(f"[INFO] Video duration: {duration:.1f}s")
+
+            if duration <= MAX_VIDEO_DURATION:
+                print(f"[OK] ✅ Accepted ({duration:.1f}s). [{successful + 1}/{count} complete]")
+                _commit_combo(combo_idx, tracker_file)
+                successful += 1
+                video_accepted = True
+                break
+            else:
+                print(f"[DISCARD] ❌ Too long ({duration:.1f}s > {MAX_VIDEO_DURATION}s). Discarding...")
+                if video_path and os.path.exists(video_path):
+                    try:
+                        os.remove(video_path)
+                        print(f"[DISCARD] Deleted: {os.path.basename(video_path)}")
+                    except OSError as e:
+                        print(f"[WARN] Could not delete file: {e}")
+                else:
+                    print("[WARN] File path not found — may need manual cleanup.")
+
+                if attempt < MAX_RETRIES:
+                    print(f"[INFO] Retrying in 2 seconds...")
+                    time.sleep(2)
+
+        if not video_accepted:
+            print(f"\n[SKIP] ⚠️  {combo_label} failed all {MAX_RETRIES} attempts. Moving to next combo.")
+            print(f"[INFO] Progress: {successful}/{count} videos accepted.")
 
     print("\n" + "=" * 50)
     print("BATCH RECORDING COMPLETE! All videos saved via OBS.")
+    print(f"Total accepted: {successful}/{count}")
     print("=" * 50)
 
 
 if __name__ == "__main__":
-    main()
-
-    
+    main()
