@@ -6,8 +6,8 @@ Who wins? Drop your pick 👇
 
 [AUTO-GENERATED TITLE GOES HERE]
 
-#AlgoRot #shorts #satisfying #oddlysatisfying #physicssimulation #autobattler #brainrot #simulation 
+#AlgoRot #shorts #satisfying #oddlysatisfying #physicssimulation #autobattler #brainrot #simulation
 
 
 Tags:
-AlgoRot,satisfying,satisfying video,physics simulation,oddly satisfying,visual asmr,brainrot,2d physics,simulation game,coding,satisfying collisions,battle simulation,ai battle,ai combat,auto battler,algorithmic battle,weapon battle,epic battle,fighting,indie game,game dev,python,pygame,zero player game,glowing effects,neon aesthetic,minimalist simulation,shorts,youtube shorts,trending,viral,animation
+AlgoRot,satisfying,satisfying video,physics simulation,oddly satisfying,visual asmr,brainrot,2d physics,simulation game,coding,satisfying collisions,battle simulation,ai battle,ai combat,auto battler,algorithmic battle,weapon battle,epic battle,fighting,indie game,game dev,python,pygame,zero player game,glowing effects,neon aesthetic,minimalist simulation,shorts,youtube shorts,animation,weapons,combat simulation,fighting games,fighter,fight
