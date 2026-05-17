@@ -13,6 +13,19 @@ import random
 
 from config import WHITE, GRAY, PULSE_WHITE, YELLOW, PURPLE, GOLD, DAMAGE_NUMBER_LIFETIME, DAMAGE_NUMBER_SPEED
 
+# Weight-coded yellow shades for parry sparks.
+# All shades stay within the yellow family — variation is warmth/intensity, not hue.
+# Dagger (lightest): bright lemon-yellow — fast, electric clash.
+# Sword / Axe (mid-weight): standard yellow — clean, neutral clash.
+# Hammer / Spear (heaviest): deep amber/gold — heavy, warm clash.
+PARRY_SPARK_COLORS = {
+    "dagger": (255, 255,  80),   # lemon-yellow
+    "sword":  (255, 230,   0),   # standard yellow
+    "axe":    (255, 220,  10),   # standard yellow (slight warmth)
+    "spear":  (255, 180,   0),   # amber
+    "hammer": (255, 160,   0),   # deep amber / gold
+}
+
 
 class Particle:
     """A single visual entity with physical properties.
@@ -106,13 +119,22 @@ class ParticleSystem:
         """Removes all particles from the system."""
         self.particles.clear()
 
-    def emit_parry(self, x, y, color, count=20):
+    def emit_parry(self, x, y, color=None, count=20, weapon=None):
         """Spawns a directional upward fan of sparks.
 
         Visually distinct from explosions, this effect reads as a 'clash' or 
         deflection rather than a direct impact. Particles move faster and 
         vanish quicker to simulate high-energy friction.
+
+        Args:
+            x, y:   World coordinates of the clash point.
+            color:  Explicit RGB override. If None, resolved from `weapon`.
+            count:  Number of spark particles to emit.
+            weapon: Weapon name string used to look up the weight-coded yellow
+                    shade from PARRY_SPARK_COLORS. Ignored when `color` is set.
         """
+        if color is None:
+            color = PARRY_SPARK_COLORS.get(weapon, (255, 230, 0))  # default: standard yellow
         for _ in range(count):
             # Fan arc: straight up ± ~50 degrees
             angle = random.uniform(-math.pi / 2 - 0.87, -math.pi / 2 + 0.87)

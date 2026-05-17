@@ -283,7 +283,20 @@ class Fighter:
                 self.vx += random.uniform(-0.5, 0.5) or 0.3
             _hit_wall = True
 
-
+        # Wall Bounce Sparks — visual only, no audio.
+        # Sparks are emitted at the wall contact point so they read as friction/impact
+        # rather than spawning from the fighter body centre.
+        if _hit_wall and _pre_bounce_speed > _WALL_SOUND_SPEED_MIN:
+            spark_count = random.randint(5, 6)
+            # Determine the contact point on whichever wall(s) were just hit
+            if self.x - r <= ax + 1:             # left wall
+                particles.emit(ax, self.y, self.color, count=spark_count, size=3, lifetime=18)
+            elif self.x + r >= ax + aw - 1:      # right wall
+                particles.emit(ax + aw, self.y, self.color, count=spark_count, size=3, lifetime=18)
+            if self.y - r <= ay + 1:             # top wall
+                particles.emit(self.x, ay, self.color, count=spark_count, size=3, lifetime=18)
+            elif self.y + r >= ay + ah - 1:      # bottom wall
+                particles.emit(self.x, ay + ah, self.color, count=spark_count, size=3, lifetime=18)
 
         if self.victory_bounce > 0:
             self.victory_bounce -= 1

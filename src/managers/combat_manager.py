@@ -207,7 +207,17 @@ class CombatManager:
 
                     game.hit_stop     = 8
                     game.screen_shake = 12
-                    game.particles.emit_parry(ix_point[0], ix_point[1], (255, 255, 100), count=20)
+                    # Use the heavier weapon's shade for the spark color.
+                    # In a mutual clash neither fighter is strictly "the attacker",
+                    # so we pick whichever weapon has the higher parry_drain_mult
+                    # (heavier weapons drain more from opponents and dominate the spark).
+                    dominant_weapon = (
+                        blue.weapon
+                        if blue.weapon_config.get("parry_drain_mult", 1.0)
+                           >= red.weapon_config.get("parry_drain_mult", 1.0)
+                        else red.weapon
+                    )
+                    game.particles.emit_parry(ix_point[0], ix_point[1], count=20, weapon=dominant_weapon)
                     if hasattr(game, 'sound_manager'):
                         # Use the attacker's clash sound — heavier weapons sound heavier
                         game.sound_manager.play_weapon_clash(blue.weapon)
