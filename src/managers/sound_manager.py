@@ -24,6 +24,15 @@ assets/audios/
 │   └── sword_to_the_ground.mp3
 └── feedback/
     └── arena_pulse.mp3
+
+Weapon Pitch Modifiers
+----------------------
+Light weapons (dagger)  pitch UP   ~5%  (ratio 1.05)
+Heavy weapons (hammer)  pitch DOWN ~8%  (ratio 0.92)
+Mid-weight (sword, axe, spear) stay at baseline (ratio 1.0)
+
+Pitch shifting is applied at load time via numpy resampling so there is
+zero per-frame CPU cost during playback.
 """
 
 import pygame
@@ -32,6 +41,20 @@ import numpy as np
 
 # Canonical weapon identifiers (must match WEAPON_CONFIGS keys in config.py)
 WEAPON_NAMES = ("sword", "dagger", "spear", "axe", "hammer")
+
+# Pitch multipliers per weapon archetype.
+# Values > 1.0 raise pitch; values < 1.0 lower pitch.
+# A ratio of R means the resampled array is R× shorter/longer,
+# which pygame plays back at the mixer's native sample rate — yielding
+# an effective pitch shift of R semitones-worth.
+WEAPON_PITCH_MODIFIERS: dict[str, float] = {
+    "dagger": 1.05,   # light — pitch up ~5 %
+    "sword":  1.00,   # mid   — baseline
+    "axe":    1.00,   # mid   — baseline
+    "spear":  1.00,   # mid   — baseline
+    "hammer": 0.92,   # heavy — pitch down ~8 %
+}
+
 
 def _compute_rms(snd) -> float:
     """Return the RMS amplitude of a pygame Sound object."""
@@ -42,6 +65,56 @@ def _compute_rms(snd) -> float:
     except Exception:
         return 1.0
 
+
+def _pitch_shift_sound(snd, ratio: float) -> pygame.mixer.Sound:
+    """Return a new pygame Sound pitched by *ratio* via numpy resampling.
+
+    A ratio of 1.05 raises pitch ~5 %; 0.92 lowers it ~8 %.  The sample
+    array is interpolated to 1/ratio of its original length and then
+    wrapped back into a Sound object.  The original Sound is unchanged.
+
+    Args:
+        snd:   Source pygame Sound object.
+        ratio: Pitch multiplier (>1 = higher, <1 = lower).
+
+    Returns:
+        A new pygame Sound object, or the original if ratio ≈ 1.0 or on
+        any error.
+    """
+    if abs(ratio - 1.0) < 1e-4:
+        return snd
+    try:
+        arr = pygame.sndarray.array(snd)          # shape: (frames,) or (frames, channels)
+        original_len = arr.shape[0]
+        new_len = max(1, int(round(original_len / ratio)))
+
+        if arr.ndim == 1:
+            # Mono
+            x_old = np.linspace(0, 1, original_len)
+            x_new = np.linspace(0, 1, new_len)
+            shifted = np.interp(x_new, x_old, arr.astype(np.float32))
+            shifted = np.clip(shifted, -32768, 32767).astype(arr.dtype)
+        else:
+            # Stereo / multi-channel
+            channels = arr.shape[1]
+            x_old = np.linspace(0, 1, original_len)
+            x_new = np.linspace(0, 1, new_len)
+            shifted_channels = [
+                np.interp(x_new, x_old, arr[:, c].astype(np.float32))
+                for c in range(channels)
+            ]
+            shifted = np.stack(shifted_channels, axis=1)
+            shifted = np.clip(shifted, -32768, 32767).astype(arr.dtype)
+
+        new_snd = pygame.sndarray.make_sound(shifted)
+        # Preserve volume from the original
+        new_snd.set_volume(snd.get_volume())
+        return new_snd
+    except Exception:
+        # Graceful fallback — return the un-pitched original
+        return snd
+
+
 class SoundManager:
     """Central controller for game audio.
 
@@ -51,6 +124,10 @@ class SoundManager:
 
     Per-weapon audio banks are stored as dicts keyed by weapon name so that
     each archetype can have its own sonic signature without code duplication.
+
+    Pitch variation is applied at construction time: light weapons (dagger)
+    play hit/clash sounds ~5 % higher; heavy weapons (hammer) ~8 % lower.
+    Mid-weight weapons (sword, axe, spear) play at baseline pitch.
     """
 
     def __init__(self):
@@ -91,6 +168,8 @@ class SoundManager:
         # Per-weapon sound banks
         # Each weapon gets its own hit_1, hit_2, sweet_spot, and clash sound.
         # An alternating index per weapon prevents audio fatigue on rapid hits.
+        # Hit and clash sounds are pitch-shifted at load time according to
+        # WEAPON_PITCH_MODIFIERS — no runtime cost during playback.
         # ------------------------------------------------------------------
         self._weapon_hit_banks: dict[str, list] = {}
         self._weapon_hit_index: dict[str, int] = {}
@@ -99,12 +178,32 @@ class SoundManager:
 
         for wpn in WEAPON_NAMES:
             folder = os.path.join("weapons", wpn)
-            h1 = load(folder, "hit_1.mp3", 0.55)
-            h2 = load(folder, "hit_2.mp3", 0.55)
+            pitch = WEAPON_PITCH_MODIFIERS.get(wpn, 1.0)
+
+            h1_raw = load(folder, "hit_1.mp3", 0.55)
+            h2_raw = load(folder, "hit_2.mp3", 0.55)
+
+            # Apply pitch shift to hit sounds; register pitched copies so that
+            # _normalize_all picks them up instead of the raw originals.
+            h1 = _pitch_shift_sound(h1_raw, pitch) if h1_raw else None
+            h2 = _pitch_shift_sound(h2_raw, pitch) if h2_raw else None
+            if h1 and h1 is not h1_raw:
+                _sound_registry[h1] = 0.55
+            if h2 and h2 is not h2_raw:
+                _sound_registry[h2] = 0.55
+
             self._weapon_hit_banks[wpn] = [h1, h2]
             self._weapon_hit_index[wpn] = 0
+
+            # sweet_spot (crit) stays at baseline pitch
             self._weapon_sweet_spot[wpn] = load(folder, "sweet_spot.mp3", 0.65)
-            self._weapon_clash[wpn] = load(folder, "clash.mp3", 0.55)
+
+            # clash (parry) is pitch-shifted to match the weapon's weight feel
+            clash_raw = load(folder, "clash.mp3", 0.55)
+            clash = _pitch_shift_sound(clash_raw, pitch) if clash_raw else None
+            if clash and clash is not clash_raw:
+                _sound_registry[clash] = 0.55
+            self._weapon_clash[wpn] = clash
 
         # ------------------------------------------------------------------
         # Shared combat sounds
@@ -157,6 +256,9 @@ class SoundManager:
     def play_weapon_hit(self, weapon: str):
         """Play a normal hit sound for the given weapon, alternating variants.
 
+        The sound is played at the pre-pitched rate for this weapon archetype
+        (dagger ~5 % higher, hammer ~8 % lower, others baseline).
+
         Args:
             weapon: Weapon archetype key (e.g. 'sword', 'hammer').
         """
@@ -175,6 +277,8 @@ class SoundManager:
     def play_weapon_sweet_spot(self, weapon: str):
         """Play the sweet-spot (critical zone) hit sound for the given weapon.
 
+        Sweet-spot sounds play at baseline pitch regardless of weapon weight.
+
         Args:
             weapon: Weapon archetype key.
         """
@@ -191,6 +295,8 @@ class SoundManager:
 
         When two weapons meet, the attacker's clash sound is used; callers
         should pass the attacker's weapon so heavier weapons sound heavier.
+        The clash sound is pre-pitched to the weapon's archetype modifier
+        (dagger ~5 % higher, hammer ~8 % lower, others baseline).
 
         Args:
             weapon: Weapon archetype key.

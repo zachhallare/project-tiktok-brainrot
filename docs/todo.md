@@ -1,14 +1,5 @@
 todos
 
-Batch 4 — sound_manager.py (1 change)
-I need you to implement 1 change to sound_manager.py. Please return the complete file.
-
-Send me sound_manager.py first so you can audit it before making changes.
-
-Change:
-WEAPON SOUND PITCH VARIATION: Currently all weapons play sounds at identical pitch. Add a pitch modifier dict keyed by weapon name. Light weapons (dagger) pitch up ~5%, heavy weapons (hammer) pitch down ~8%, mid-weight weapons (sword, axe, spear) stay at baseline. Apply this modifier on playback for parry and hit sounds. Implementation can use pre-pitched sound variants or a runtime pitch modifier depending on what pygame supports cleanly.
-
-
 
 Batch 5 — intro_renderer.py + main.py (intro timing fixes)
 I need you to implement 2 changes across intro_renderer.py and main.py. Please return both complete files.
