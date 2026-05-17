@@ -368,20 +368,29 @@ def main():
     MAX_RETRIES = 3             # attempts per combo before moving on
 
     try:
-        count = int(input("How many matches? (Max: 100): ").strip())
+        count = int(input("How many matches? (Max: 40): ").strip())
         if count <= 0:
             print("Please enter a number greater than 0.")
             return
-        if count > 100:
-            print("[INFO] Limiting to 100 matches.")
-            count = 100
+        if count > 40:
+            print("[INFO] Limiting to 40 matches to prevent OBS lag.")
+            count = 40
     except ValueError:
         print("Invalid input. Please enter a number.")
         return
 
+    try:
+        cooldown_str = input("Cooldown between videos in seconds? (Default: 5): ").strip()
+        cooldown = int(cooldown_str) if cooldown_str else 5
+        if cooldown < 0:
+            cooldown = 0
+    except ValueError:
+        cooldown = 5
+
     print(f"\n[INFO] Starting Batch Recording — {count} match(es) — weapons randomized per match")
     print(f"[INFO] Combo pool: {len(active_combos)} unique matchups tracked in '{tracker_file}'")
     print(f"[INFO] Duration gate: ≤{MAX_VIDEO_DURATION}s | Max retries per combo: {MAX_RETRIES}")
+    print(f"[INFO] Inter-video cooldown: {cooldown}s")
     print("[INFO] OBS confirmed open. Starting batch...\n")
 
     successful = 0
@@ -448,6 +457,9 @@ def main():
                 _commit_combo(combo_idx, tracker_file)
                 successful += 1
                 video_accepted = True
+                if cooldown > 0 and successful < count:
+                    print(f"[INFO] Cooldown: waiting {cooldown}s before next video...")
+                    time.sleep(cooldown)
                 break
             else:
                 print(f"[DISCARD] ❌ Too long ({duration:.1f}s > {MAX_VIDEO_DURATION}s). Discarding...")
