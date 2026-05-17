@@ -6,8 +6,8 @@ Who wins? Drop your pick 👇
 
 [AUTO-GENERATED TITLE GOES HERE]
 
-#AlgoRot #shorts #satisfying #oddlysatisfying #physicssimulation #autobattler #brainrot #simulation #aibattle #zeropLayergame
+#AlgoRot #shorts #satisfying #oddlysatisfying #physicssimulation #autobattler #brainrot #simulation 
 
 
 Tags:
-AlgoRot,satisfying video,physics simulation,oddly satisfying,visual asmr,brainrot,doomscrolling,neon chaos,2d physics,simulation game,coding,satisfying collisions,team battle simulation,particle simulation,dvd screensaver,dvd bounce,ai battle,ai combat,auto battler,zero player game,satisfying loop,slow motion,casual game,game development,pygame,python,glowing effects,hit stop,neon aesthetic,minimalist simulation,algorithmic battle,chaotic fun
+AlgoRot,satisfying,satisfying video,physics simulation,oddly satisfying,visual asmr,brainrot,2d physics,simulation game,coding,satisfying collisions,battle simulation,ai battle,ai combat,auto battler,algorithmic battle,weapon battle,epic battle,fighting,indie game,game dev,python,pygame,zero player game,glowing effects,neon aesthetic,minimalist simulation,shorts,youtube shorts,trending,viral,animation
