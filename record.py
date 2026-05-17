@@ -312,8 +312,18 @@ def main():
                                 hp_pct = int(p.split("=", 1)[1])
                         break
 
+                # No [RESULT] tag means both fighters died simultaneously — treat as DRAW.
+                # winner_weapon stays "???" only in this case; relabel it so the summary
+                # is readable and the existing other_wins counter handles it correctly.
+                if winner_weapon == "???":
+                    winner_weapon = "DRAW"
+                    winner_side = "DRAW"
+
                 all_results[(w1, w2)].append((winner_weapon, winner_side, hp_pct, elapsed_time))
-                print(f"    Round {r} [{side_label}]: {winner_side}-{winner_weapon} won with {hp_pct}% HP left ({elapsed_time:.2f}s)")
+                if winner_weapon == "DRAW":
+                    print(f"    Round {r} [{side_label}]: DRAW (simultaneous death, {elapsed_time:.2f}s)")
+                else:
+                    print(f"    Round {r} [{side_label}]: {winner_side}-{winner_weapon} won with {hp_pct}% HP left ({elapsed_time:.2f}s)")
 
         print("\n\n" + "=" * 60)
         print(f"                    {test_name} RESULTS")

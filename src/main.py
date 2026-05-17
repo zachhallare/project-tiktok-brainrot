@@ -536,11 +536,6 @@ class Game:
         self.max_blue_lead = 0.0
         self.max_red_lead = 0.0
         
-        self.lead_changes = 0
-        self.current_leader = None
-        self.max_blue_lead = 0.0
-        self.max_red_lead = 0.0
-        
         self.decomp_slowmo_frames = 0
         self.decomp_slowmo_accumulator = 0.0
         

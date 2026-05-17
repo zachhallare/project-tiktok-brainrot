@@ -55,6 +55,10 @@ class IntroRenderer:
         """
         return self._draw_old_title_screen()   
 
+    def _draw_old_title_screen(self) -> bool:
+        """Stub — old title screen removed. Returns False (no start trigger)."""
+        return False
+
     # ------------------------------------------------------------------ #
     #  COUNTDOWN OVERLAY                                                   #
     #  Called from Game._draw_countdown_overlay()                         #
