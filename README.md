@@ -244,7 +244,7 @@ project-tiktok-brainrot/
 │       └── ui_renderer.py           # HUD: Tekken-style health bars, stamina meters, round timer, danger effects
 │
 ├── record.py                        # Orchestrator: batch recording pipeline, retry logic, test/headless runner
-├── used_combos_12.json              # Persistent pool tracker — cycles all 12 weapon combos before repeating
+├── used_combos_12.json              # Persistent pool tracker — cycles all 10 weapon combos before repeating
 ├── used_titles.json                 # Persistent title tracker — prevents duplicate video titles across sessions
 ├── requirements.txt                 # Python dependencies (pygame, obsws-python, python-dotenv)
 ```
@@ -297,7 +297,7 @@ python record.py
 ### 1. Batch Recording (OBS)
 Automated batch recording for content creation:
 - Verifies OBS WebSocket connection before proceeding
-- Choose weapon pool: **Sword-only** or **12 specific combos**
+- Choose weapon pool: **Sword-only** or **10 specific combos**
 - Combo tracker (`used_combos_*.json`) ensures all matchups are cycled before repeating
 - Fighter colors randomized per match
 - 3-second delay between rounds for OBS to save

@@ -1112,6 +1112,19 @@ if __name__ == "__main__":
                 print(f"[WARN] Unknown weapon '{w}', defaulting to {default}.")
         return default
 
+    def _pick_contrasting_colors(colors_dict, min_steps=4, max_attempts=100):
+        keys = list(colors_dict.keys())
+        n    = len(keys)
+        for _ in range(max_attempts):
+            a, b = random.sample(keys, 2)
+            i, j = keys.index(a), keys.index(b)
+            # Shortest arc distance on the circular wheel
+            dist = min(abs(i - j), n - abs(i - j))
+            if dist >= min_steps:
+                return a, b
+        # Fallback: guaranteed-safe pairs if RNG is unlucky (shouldn't happen)
+        return keys[0], keys[6]   # RED vs CYAN — maximum contrast
+
     if "--weapons" in sys.argv and sys.argv[sys.argv.index("--weapons") + 1] == "random":
         f1_weapon, f2_weapon = random.sample(all_weapon, 2)
     else:
@@ -1119,7 +1132,7 @@ if __name__ == "__main__":
         f2_weapon = _pick_weapon("--f2-weapon")
 
     # Randomly pick two distinct color names from the 12-slice wheel
-    name_1, name_2 = random.sample(list(BASE_COLORS.keys()), 2)
+    name_1, name_2 = _pick_contrasting_colors(BASE_COLORS)
     
     print("[MATCH STARTING]")
     print(f"Fighter 1: {name_1}")

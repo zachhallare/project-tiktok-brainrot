@@ -27,7 +27,7 @@ except ImportError:
 
 
 WEAPON_NAMES = ['sword', 'dagger', 'spear', 'axe', 'hammer']
-ALL_COMBOS = list(itertools.combinations(WEAPON_NAMES, 2)) + [('sword', 'sword'), ('axe', 'axe')]
+ALL_COMBOS = list(itertools.combinations(WEAPON_NAMES, 2))
 COMBO_TRACKER_FILE = "used_weapon_combos.json"
 
 
@@ -357,7 +357,7 @@ def main():
         return
 
     active_combos = [
-        ('sword', 'sword'), ('axe', 'axe'), ('dagger', 'hammer'),
+        ('dagger', 'hammer'),
         ('dagger', 'axe'), ('dagger', 'sword'), ('dagger', 'spear'),
         ('hammer', 'axe'), ('hammer', 'sword'), ('hammer', 'spear'),
         ('sword', 'spear'), ('sword', 'axe'), ('spear', 'axe')
