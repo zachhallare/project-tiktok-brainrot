@@ -53,6 +53,8 @@ class Fighter:
         # Weapon Configuration
         self.weapon = weapon
         self.weapon_config = WEAPON_CONFIGS[weapon]
+        profile = self.weapon_config.get('hitbox_profile', [])
+        self.max_weapon_half_w = max(hw for _, hw in profile) if profile else 0.0
 
         # Health scaling based on weapon weight/archetype
         weapon_health = self.weapon_config.get('base_health', BASE_HEALTH)

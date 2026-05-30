@@ -57,10 +57,12 @@ class CombatManager:
             return None, 0.0
 
         # Spatial partitioning: quick distance check before expensive profile sampling
-        max_half_w   = max(hw for _, hw in profile)
+        max_half_w   = attacker.max_weapon_half_w
         max_reach    = attacker.radius + 3 + attacker.sword_length + defender.radius + max_half_w
-        fighter_dist = math.hypot(attacker.x - defender.x, attacker.y - defender.y)
-        if fighter_dist > max_reach:
+        dx_f = attacker.x - defender.x
+        dy_f = attacker.y - defender.y
+        dist_sq_f = dx_f * dx_f + dy_f * dy_f
+        if dist_sq_f > max_reach * max_reach:
             return None, 0.0
 
         (base_x, base_y), (tip_x, tip_y) = attacker.get_sword_hitbox()
@@ -77,8 +79,11 @@ class CombatManager:
             px = base_x + (tip_x - base_x) * t
             py = base_y + (tip_y - base_y) * t
 
-            dist = math.hypot(px - defender.x, py - defender.y)
-            if dist < half_w + defender.radius:
+            dx = px - defender.x
+            dy = py - defender.y
+            dist_sq = dx * dx + dy * dy
+            limit = half_w + defender.radius
+            if dist_sq < limit * limit:
                 # damage_t is taken from the handle-most point for consistency
                 if best_damage_t is None or t < best_damage_t:
                     best_damage_t = t

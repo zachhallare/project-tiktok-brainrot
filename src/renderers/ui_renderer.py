@@ -50,6 +50,15 @@ class UIRenderer:
         self._prev_blue_pct   = 1.0
         self._prev_red_pct    = 1.0
 
+        # Pre-render a master stripe surface of maximum possible width (600px)
+        self._master_stripe_surf = pygame.Surface((600, 28), pygame.SRCALPHA)
+        for i in range(-28, 600 + 28, 13):
+            pygame.draw.line(self._master_stripe_surf, (255, 255, 255, 28),
+                             (i, 0), (i + 28, 28), 4)
+
+        # Pre-allocate reusable scratch surface for polygon glows
+        self._glow_scratch_surf = pygame.Surface((600, 100), pygame.SRCALPHA)
+
 
     def draw(self, game):
         """Main entry point for rendering the entire UI overlay."""
@@ -252,10 +261,8 @@ class UIRenderer:
             # Diagonal stripe texture clipped to fill rect
             old_clip = self.screen.get_clip()
             self.screen.set_clip(pygame.Rect(fill_x, y, fill_w, h))
-            stripe_surf = pygame.Surface((fill_w + h, h), pygame.SRCALPHA)
-            for i in range(-h, fill_w + h, 13):
-                pygame.draw.line(stripe_surf, (255, 255, 255, 28),
-                                 (i, 0), (i + h, h), 4)
+            # Slice/subsurface of pre-rendered stripe surface (no allocation)
+            stripe_surf = self._master_stripe_surf.subsurface((0, 0, fill_w + h, h))
             self.screen.blit(stripe_surf, (fill_x, y))
             self.screen.set_clip(old_clip)
  
@@ -281,10 +288,12 @@ class UIRenderer:
         surf_w = max(1, max(xs) - min(xs) + expand * 2)
         surf_h = max(1, max(ys) - min(ys) + expand * 2)
 
-        glow = pygame.Surface((surf_w, surf_h), pygame.SRCALPHA)
+        # Clear only the bounding box area on the scratch surface
+        self._glow_scratch_surf.fill((0, 0, 0, 0), (0, 0, surf_w, surf_h))
         shifted = [(p[0] - min_x, p[1] - min_y) for p in poly]
-        pygame.draw.polygon(glow, (*color, 60), shifted)
-        self.screen.blit(glow, (min_x, min_y), special_flags=pygame.BLEND_RGBA_ADD)
+        pygame.draw.polygon(self._glow_scratch_surf, (*color, 60), shifted)
+        sub = self._glow_scratch_surf.subsurface((0, 0, surf_w, surf_h))
+        self.screen.blit(sub, (min_x, min_y), special_flags=pygame.BLEND_RGBA_ADD)
 
 
     def _draw_bar_cap(self, cx, cy, r, fighter):

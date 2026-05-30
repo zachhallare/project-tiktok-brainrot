@@ -28,6 +28,11 @@ class OutroRenderer:
         self.screen = screen
         self.clock = clock
         self.font_large = font_large
+        self._text_cache = {}
+        self._rotation_cache = {}
+        # Pre-allocate small surface for the winner's glow ring to avoid full-screen allocations every frame
+        r_glow = FIGHTER_RADIUS + 14
+        self._glow_surf = pygame.Surface((r_glow * 2, r_glow * 2), pygame.SRCALPHA)
 
     # ------------------------------------------------------------------ #
     #  WINNER OUTRO                                                        #
@@ -81,7 +86,13 @@ class OutroRenderer:
 
         # ── Layout math ──────────────────────────────────────────────────
         cx = SCREEN_WIDTH // 2
-        text_surface = self.font_large.render(winner_text, True, WHITE)
+        
+        # Cache rendered text surfaces
+        text_key = (winner_text, WHITE)
+        if text_key not in self._text_cache:
+            self._text_cache[text_key] = self.font_large.render(winner_text, True, WHITE)
+        text_surface = self._text_cache[text_key]
+
         gap = 25
         total_height = (FIGHTER_RADIUS * 2) + gap + text_surface.get_height()
         top_y = SCREEN_HEIGHT // 2 - total_height // 2
@@ -91,10 +102,11 @@ class OutroRenderer:
         draw_offset = (cx - winner.x, circle_cy - winner.y)
         winner.draw_body_only(screen, draw_offset)
 
-        # ── Subtle glow ring ─────────────────────────────────────────────
-        glow_surf = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
-        pygame.draw.circle(glow_surf, (*win_color, 18), (cx, circle_cy), FIGHTER_RADIUS + 14)
-        screen.blit(glow_surf, (0, 0))
+        # ── Subtle glow ring (reusable small surface) ────────────────────
+        r_glow = FIGHTER_RADIUS + 14
+        self._glow_surf.fill((0, 0, 0, 0))
+        pygame.draw.circle(self._glow_surf, (*win_color, 18), (r_glow, r_glow), r_glow)
+        screen.blit(self._glow_surf, (cx - r_glow, circle_cy - r_glow))
 
         # ── Spinning weapon orbiting the fighter body ─────────────────────
         raw_sprite = None
@@ -108,13 +120,22 @@ class OutroRenderer:
             cos_a = math.cos(spin_angle)
             sin_a = math.sin(spin_angle)
 
-            scaled_sprite = pygame.transform.rotozoom(raw_sprite, 0, 1.0)
-            scaled_w = orig_w * 1.0
+            # Avoid redundant rotozoom
+            scaled_sprite = raw_sprite
+            scaled_w = orig_w
 
             handle_x = cx + cos_a * (FIGHTER_RADIUS + 5)
             handle_y = circle_cy + sin_a * (FIGHTER_RADIUS + 5)
 
-            rotated = pygame.transform.rotate(scaled_sprite, -math.degrees(spin_angle))
+            # Rotate CW by angle (lazy-cached to nearest integer degree)
+            spin_deg = int(math.degrees(spin_angle)) % 360
+            cache_key = (winner.weapon, spin_deg)
+            if cache_key in self._rotation_cache:
+                rotated = self._rotation_cache[cache_key]
+            else:
+                rotated = pygame.transform.rotate(scaled_sprite, -spin_deg)
+                self._rotation_cache[cache_key] = rotated
+
             rot_center_x = handle_x + (scaled_w / 2) * cos_a
             rot_center_y = handle_y + (scaled_w / 2) * sin_a
 
@@ -130,7 +151,11 @@ class OutroRenderer:
         text_cy = top_y + FIGHTER_RADIUS * 2 + gap + text_surface.get_height() // 2
         text_rect = text_surface.get_rect(center=(cx, text_cy))
 
-        glow_surface = self.font_large.render(winner_text, True, win_color)
+        glow_key = (winner_text, win_color)
+        if glow_key not in self._text_cache:
+            self._text_cache[glow_key] = self.font_large.render(winner_text, True, win_color)
+        glow_surface = self._text_cache[glow_key]
+
         glow_surface.set_alpha(90)
         for dx, dy in [(-4, 0), (4, 0), (0, -4), (0, 4)]:
             screen.blit(glow_surface, text_rect.move(dx, dy))

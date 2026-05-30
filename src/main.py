@@ -189,6 +189,16 @@ class Game:
         self._wipe_surf = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
         self._wipe_surf.fill(WHITE)
 
+        # Pre-render grid background with a margin (to support screen shake)
+        margin = 120
+        self.grid_surf = pygame.Surface((SCREEN_WIDTH + margin * 2, SCREEN_HEIGHT + margin * 2))
+        self.grid_surf.fill(NEON_BG)
+        grid_spacing = 40
+        for x in range(0, SCREEN_WIDTH + margin * 2, grid_spacing):
+            pygame.draw.line(self.grid_surf, NEON_GRID, (x, 0), (x, SCREEN_HEIGHT + margin * 2), 1)
+        for y in range(0, SCREEN_HEIGHT + margin * 2, grid_spacing):
+            pygame.draw.line(self.grid_surf, NEON_GRID, (0, y), (SCREEN_WIDTH + margin * 2, y), 1)
+
         # Load Arena Watermark Logo
         import os
         logo_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "images", "logos", "logo-dark-grey-text.png")
@@ -796,8 +806,8 @@ class Game:
         """Draw coordinator. Each section is isolated — edit one without touching others."""
         offset = self._compute_shake_offset()
 
-        self.screen.fill(NEON_BG)
-        self._draw_grid(offset)
+        ox, oy = offset
+        self.screen.blit(self.grid_surf, (ox - 120, oy - 120))
         self._draw_arena(offset)
         self._draw_effects(offset)
         self._draw_fighters(offset)

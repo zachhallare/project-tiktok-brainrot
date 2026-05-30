@@ -321,25 +321,33 @@ class DamageNumber:
         cx = int(self.x + ox)
         cy = int(self.y + oy)
 
-        def _make_surf(color):
-            """Internal helper to render and scale the text surface."""
-            surf = font.render(text, True, color)
+        if not hasattr(self, '_cached_base_surf'):
+            self._cached_base_surf = font.render(text, True, self.color)
+            if self.outline_color is not None:
+                self._cached_outline_base_surf = font.render(text, True, self.outline_color)
+
+        def _make_surf(base_surf):
+            """Internal helper to scale and set alpha on the base surface."""
             if self.scale != 1.0:
-                w = int(surf.get_width() * self.scale)
-                h = int(surf.get_height() * self.scale)
+                w = int(base_surf.get_width() * self.scale)
+                h = int(base_surf.get_height() * self.scale)
                 if w > 0 and h > 0:
-                    surf = pygame.transform.scale(surf, (w, h))
+                    surf = pygame.transform.scale(base_surf, (w, h))
+                else:
+                    surf = base_surf
+            else:
+                surf = base_surf.copy()
             surf.set_alpha(alpha)
             return surf
 
         # Draw the outline for critical hits using multiple offset stamps
         if self.outline_color is not None:
-            outline_surf = _make_surf(self.outline_color)
+            outline_surf = _make_surf(self._cached_outline_base_surf)
             for dx, dy in _OUTLINE_OFFSETS:
                 rect = outline_surf.get_rect(center=(cx + dx, cy + dy))
                 surface.blit(outline_surf, rect)
 
-        fill_surf = _make_surf(self.color)
+        fill_surf = _make_surf(self._cached_base_surf)
         surface.blit(fill_surf, fill_surf.get_rect(center=(cx, cy)))
 
 

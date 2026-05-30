@@ -36,6 +36,8 @@ class FighterRenderer:
         ).convert_alpha()
         self._weapon_base = pygame.transform.scale(raw, cfg['sprite_size'])
         self._orig_w, self._orig_h = cfg['sprite_size']
+        self._trail_cache = {}
+        self._rotation_cache = {}
 
 
     def render(self, fighter, surface: pygame.Surface, offset=(0, 0)):
@@ -119,10 +121,15 @@ class FighterRenderer:
             if alpha <= 0:
                 continue
 
-            trail_surf = pygame.Surface((trail_r * 2, trail_r * 2), pygame.SRCALPHA)
-            pygame.draw.circle(
-                trail_surf, (*fighter.color[:3], alpha), (trail_r, trail_r), trail_r
-            )
+            cache_key = (fighter.color, trail_r, alpha)
+            if cache_key in self._trail_cache:
+                trail_surf = self._trail_cache[cache_key]
+            else:
+                trail_surf = pygame.Surface((trail_r * 2, trail_r * 2), pygame.SRCALPHA)
+                pygame.draw.circle(
+                    trail_surf, (*fighter.color[:3], alpha), (trail_r, trail_r), trail_r
+                )
+                self._trail_cache[cache_key] = trail_surf
             surface.blit(trail_surf, (int(tx + ox) - trail_r, int(ty + oy) - trail_r))
 
 
@@ -153,9 +160,13 @@ class FighterRenderer:
         base_sx = fighter.x + ox + cos_a * (r + 3)
         base_sy = fighter.y + oy + sin_a * (r + 3)
 
-        # Rotate CW by angle
-        angle_deg = math.degrees(angle)
-        rotated = pygame.transform.rotate(self._weapon_base, -angle_deg)
+        # Rotate CW by angle (lazy-cached to nearest integer degree)
+        angle_deg = int(math.degrees(angle)) % 360
+        if angle_deg in self._rotation_cache:
+            rotated = self._rotation_cache[angle_deg]
+        else:
+            rotated = pygame.transform.rotate(self._weapon_base, -angle_deg)
+            self._rotation_cache[angle_deg] = rotated
 
         # Sprite center = handle_pos + (orig_w / 2) along blade axis
         rot_center_x = base_sx + (self._orig_w / 2) * cos_a

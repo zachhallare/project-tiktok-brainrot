@@ -39,6 +39,10 @@ class IntroRenderer:
         self._font_name   = pygame.font.Font(None, 52)   # fighter name
         self._font_weapon = pygame.font.Font(None, 26)   # weapon tag
         self._font_vs = pygame.font.Font(None, 32)
+        self._text_cache = {}
+        # Pre-allocate white flash surface to avoid per-frame allocations during countdown
+        self._flash_surf = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+        self._flash_surf.fill(WHITE)
 
     # ------------------------------------------------------------------ #
     #  TITLE SCREEN                                                        #
@@ -67,10 +71,12 @@ class IntroRenderer:
     def draw_countdown(self, screen, stage, timer, durations, texts,
                        f1_color, f2_color, f1_bright, f2_bright,
                        flash_timer, flash_duration, font_large):
-        """
-        In-game countdown overlay (3, 2, 1, FIGHT).
-        Copied verbatim from original draw() — safe to redesign here.
-        """
+        def get_rendered_text(text, font, color):
+            key = (text, color)
+            if key not in self._text_cache:
+                self._text_cache[key] = font.render(text, True, color)
+            return self._text_cache[key]
+
         countdown_text = texts[stage]
         duration = durations[stage]
         progress = timer / max(1, duration)
@@ -82,10 +88,8 @@ class IntroRenderer:
             # Still draw the flash on transitions so the beat feels rhythmic
             if flash_timer > 0:
                 flash_alpha = int(200 * (flash_timer / max(1, flash_duration)))
-                flash_surf = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
-                flash_surf.fill(WHITE)
-                flash_surf.set_alpha(flash_alpha)
-                screen.blit(flash_surf, (0, 0))
+                self._flash_surf.set_alpha(flash_alpha)
+                screen.blit(self._flash_surf, (0, 0))
 
             self._draw_matchup_labels(
                 screen, f1_color, f2_color,
@@ -100,26 +104,26 @@ class IntroRenderer:
             shrink = min(0.08, progress * 0.08)                # gentle shrink toward end
             scale  = 1.0 + pop * 0.5 - shrink
  
-            num_surf = font_large.render(countdown_text, True, WHITE)
+            num_surf = get_rendered_text(countdown_text, font_large, WHITE)
             new_w = max(1, int(num_surf.get_width()  * scale))
             new_h = max(1, int(num_surf.get_height() * scale))
-            num_surf = pygame.transform.smoothscale(num_surf, (new_w, new_h))
+            num_surf = pygame.transform.scale(num_surf, (new_w, new_h))
             num_rect = num_surf.get_rect(center=(cx, cy))
  
             # Glow halo in fighter colors — alternates between f1/f2 each stage
             glow_primary   = f1_color if stage % 2 == 0 else f2_color
             glow_secondary = f2_color if stage % 2 == 0 else f1_color
             for glow_color, alpha_val in [(glow_primary, 90), (glow_secondary, 55)]:
-                glow = font_large.render(countdown_text, True, glow_color)
-                glow = pygame.transform.smoothscale(glow, (new_w, new_h))
+                glow = get_rendered_text(countdown_text, font_large, glow_color)
+                glow = pygame.transform.scale(glow, (new_w, new_h))
                 glow.set_alpha(alpha_val)
                 for dx, dy in [(-5, 0), (5, 0), (0, -5), (0, 5),
                                 (-4, -4), (4, 4), (-4, 4), (4, -4)]:
                     screen.blit(glow, num_rect.move(dx, dy))
  
             # Drop shadow
-            shadow = font_large.render(countdown_text, True, BLACK)
-            shadow = pygame.transform.smoothscale(shadow, (new_w, new_h))
+            shadow = get_rendered_text(countdown_text, font_large, BLACK)
+            shadow = pygame.transform.scale(shadow, (new_w, new_h))
             shadow.set_alpha(160)
             screen.blit(shadow, num_rect.move(4, 4))
  
@@ -131,31 +135,29 @@ class IntroRenderer:
         # ── Stage 3: FIGHT ──────────────────────────────────────────────
         ease = 1 - (1 - progress) ** 3
         scale = 0.6 + ease * 1.0
-        text_surface = font_large.render(countdown_text, True, WHITE)
+        text_surface = get_rendered_text(countdown_text, font_large, WHITE)
         new_w = max(1, int(text_surface.get_width() * scale))
         new_h = max(1, int(text_surface.get_height() * scale))
-        text_surface = pygame.transform.smoothscale(text_surface, (new_w, new_h))
+        text_surface = pygame.transform.scale(text_surface, (new_w, new_h))
         text_rect = text_surface.get_rect(center=(cx, cy))
         
         for glow_color, alpha_val in [(f1_color, 80), (f2_color, 60)]:
-            glow = font_large.render(countdown_text, True, glow_color)
-            glow = pygame.transform.smoothscale(glow, (new_w, new_h))
+            glow = get_rendered_text(countdown_text, font_large, glow_color)
+            glow = pygame.transform.scale(glow, (new_w, new_h))
             glow.set_alpha(alpha_val)
             for dx, dy in [(-4,0),(4,0),(0,-4),(0,4),(-3,-3),(3,3),(-3,3),(3,-3)]:
                 screen.blit(glow, text_rect.move(dx, dy))
         
-        shadow = font_large.render(countdown_text, True, BLACK)
-        shadow = pygame.transform.smoothscale(shadow, (new_w, new_h))
+        shadow = get_rendered_text(countdown_text, font_large, BLACK)
+        shadow = pygame.transform.scale(shadow, (new_w, new_h))
         shadow.set_alpha(150)
         screen.blit(shadow, text_rect.move(3, 3))
         screen.blit(text_surface, text_rect)
         
         if flash_timer > 0:
             flash_alpha = int(200 * (flash_timer / max(1, flash_duration)))
-            flash_surf = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
-            flash_surf.fill(WHITE)
-            flash_surf.set_alpha(flash_alpha)
-            screen.blit(flash_surf, (0, 0))
+            self._flash_surf.set_alpha(flash_alpha)
+            screen.blit(self._flash_surf, (0, 0))
 
 
     # ------------------------------------------------------------------ #
